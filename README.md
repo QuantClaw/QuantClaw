@@ -1,8 +1,20 @@
-# QuantClaw
+<p align="center">
+  <img src="assets/quantclaw-logo-transparent.png" alt="QuantClaw" width="180" />
+</p>
 
-**High-performance personal AI assistant in C++17**
+<h1 align="center">QuantClaw</h1>
 
-QuantClaw is a native C++ implementation of the [OpenClaw](https://github.com/nicepkg/openclaw) ecosystem — built for performance and low memory footprint while staying fully compatible with OpenClaw workspace files, skills, and the WebSocket RPC protocol.
+<p align="center">
+  <strong>High-performance personal AI assistant in C++17</strong>
+</p>
+
+<p align="center">
+  <a href="README_CN.md">中文文档</a>
+</p>
+
+---
+
+QuantClaw is a native C++ implementation of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem — built for performance and low memory footprint while staying fully compatible with OpenClaw workspace files, skills, and the WebSocket RPC protocol.
 
 ## Features
 
