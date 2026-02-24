@@ -16,36 +16,24 @@ permissions:
 
 jobs:
   build-test:
-    name: Build & Test (${{ matrix.os }} - ${{ matrix.compiler }})
-    runs-on: ${{ matrix.os }}
+    name: Build & Test (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        compiler: [gcc, clang]
-        exclude:
-          - os: macos-latest
-            compiler: gcc
         include:
-          - os: ubuntu-latest
-            compiler: gcc
+          - compiler: gcc
             cc: gcc-11
             cxx: g++-11
-          - os: ubuntu-latest
-            compiler: clang
+          - compiler: clang
             cc: clang-14
             cxx: clang++-14
-          - os: macos-latest
-            compiler: clang
-            cc: clang
-            cxx: clang++
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install dependencies (Ubuntu)
-      if: runner.os == 'Linux'
+    - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -57,11 +45,6 @@ jobs:
           libssl-dev \
           ${{ matrix.cc }} \
           ${{ matrix.cxx }}
-
-    - name: Install dependencies (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        brew install cmake ninja spdlog nlohmann-json curl openssl
 
     - name: Configure CMake
       env:
@@ -84,11 +67,11 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results-${{ matrix.os }}-${{ matrix.compiler }}
+        name: test-results-${{ matrix.compiler }}
         path: build/Testing/
 
   docker-build:
-    name: Docker Build Test
+    name: Docker Build
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -113,7 +96,7 @@ jobs:
   format-check:
     name: Code Format Check
     runs-on: ubuntu-latest
-    continue-on-error: true  # Don't block CI on format issues
+    continue-on-error: true
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -136,16 +119,14 @@ jobs:
         done
 
         if [ -n "$FAILED_FILES" ]; then
-          echo "⚠️  Warning: The following files have formatting issues:"
+          echo "Warning: The following files have formatting issues:"
           echo -e "$FAILED_FILES"
           echo ""
-          echo "To fix formatting, run one of:"
-          echo "  1. ./scripts/format-code.sh"
-          echo "  2. docker run --rm -v \$(pwd):/src -w /src silkeh/clang:14 bash -c 'find src include tests -name \"*.cpp\" -o -name \"*.hpp\" | xargs clang-format -i -style=file'"
+          echo "To fix: ./scripts/format-code.sh"
           exit 1
         fi
 
-        echo "✓ All files are properly formatted!"
+        echo "All files are properly formatted."
 
   static-analysis:
     name: Static Analysis (cppcheck)
