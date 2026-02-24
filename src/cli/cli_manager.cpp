@@ -68,18 +68,19 @@ void CLIManager::show_help() const {
 
     std::cout << std::endl;
     std::cout << "Global flags:" << std::endl;
-    std::cout << "  --version, -v\tPrint version" << std::endl;
-    std::cout << "  --help, -h\tShow help" << std::endl;
-    std::cout << "  --json\tJSON output mode" << std::endl;
+    std::cout << "  --config, -c <path>\tUse specified config file" << std::endl;
+    std::cout << "  --version, -v\t\tPrint version" << std::endl;
+    std::cout << "  --help, -h\t\tShow help" << std::endl;
+    std::cout << "  --json\t\tJSON output mode" << std::endl;
     std::cout << std::endl;
     std::cout << "Examples:" << std::endl;
-    std::cout << "  quantclaw gateway              Start gateway (foreground)" << std::endl;
-    std::cout << "  quantclaw gateway install       Install as system service" << std::endl;
-    std::cout << "  quantclaw gateway status         Show gateway status" << std::endl;
-    std::cout << "  quantclaw agent -m \"Hello\"       Send message to agent" << std::endl;
-    std::cout << "  quantclaw sessions list          List sessions" << std::endl;
-    std::cout << "  quantclaw health                 Health check" << std::endl;
-    std::cout << "  quantclaw config get gateway.port Get config value" << std::endl;
+    std::cout << "  quantclaw gateway                        Start gateway (foreground)" << std::endl;
+    std::cout << "  quantclaw -c /path/to/config.json gateway  Use custom config" << std::endl;
+    std::cout << "  quantclaw gateway install                Install as system service" << std::endl;
+    std::cout << "  quantclaw agent \"Hello\"                  Send message to agent" << std::endl;
+    std::cout << "  quantclaw sessions list                  List sessions" << std::endl;
+    std::cout << "  quantclaw health                         Health check" << std::endl;
+    std::cout << "  quantclaw config get gateway.port        Get config value" << std::endl;
 }
 
 } // namespace quantclaw::cli

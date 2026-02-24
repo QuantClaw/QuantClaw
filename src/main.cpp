@@ -24,6 +24,20 @@ static std::shared_ptr<spdlog::logger> create_logger() {
 int main(int argc, char* argv[]) {
     auto logger = create_logger();
 
+    // Parse global --config / -c flag before anything else
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if ((arg == "--config" || arg == "-c") && i + 1 < argc) {
+            quantclaw::QuantClawConfig::set_config_path(argv[i + 1]);
+            // Remove --config <path> from argv so commands don't see it
+            for (int j = i; j + 2 < argc; ++j) {
+                argv[j] = argv[j + 2];
+            }
+            argc -= 2;
+            break;
+        }
+    }
+
     // Create shared command handlers
     auto gateway_cmds = std::make_shared<quantclaw::cli::GatewayCommands>(logger);
     auto agent_cmds = std::make_shared<quantclaw::cli::AgentCommands>(logger);

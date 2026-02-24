@@ -22,6 +22,10 @@ Thumbs.db
 *.log
 *.pid
 
+# Developer tool local config
+.claude/
+
 # Node adapter dependencies
 adapters/node_modules/
 adapters/package-lock.json
+refs

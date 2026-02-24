@@ -237,7 +237,16 @@ std::string QuantClawConfig::expand_home(const std::string& path) {
     return expanded;
 }
 
+std::string QuantClawConfig::config_path_override_;
+
+void QuantClawConfig::set_config_path(const std::string& path) {
+    config_path_override_ = path;
+}
+
 std::string QuantClawConfig::default_config_path() {
+    if (!config_path_override_.empty()) {
+        return expand_home(config_path_override_);
+    }
     return expand_home("~/.quantclaw/quantclaw.json");
 }
 

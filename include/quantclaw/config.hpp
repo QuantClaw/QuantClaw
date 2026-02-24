@@ -187,6 +187,12 @@ struct QuantClawConfig {
 
     static std::string expand_home(const std::string& path);
     static std::string default_config_path();
+
+    // Override the default config path (set via --config CLI flag)
+    static void set_config_path(const std::string& path);
+
+private:
+    static std::string config_path_override_;
 };
 
 } // namespace quantclaw
