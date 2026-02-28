@@ -60,7 +60,7 @@ public:
     std::filesystem::path get_base_dir() const;
 
     // Get sessions directory for an agent
-    std::filesystem::path get_sessions_dir(const std::string& agent_id = "default") const;
+    std::filesystem::path get_sessions_dir(const std::string& agent_id = "main") const;
 
 private:
     bool is_memory_file(const std::filesystem::path& filepath) const;

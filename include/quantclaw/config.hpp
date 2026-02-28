@@ -179,11 +179,34 @@ struct QuantClawConfig {
     MCPConfig mcp;
     SkillsConfig skills;
 
+    // Plugins raw config (plugins section from JSON)
+    nlohmann::json plugins_config;
+
+    // Session maintenance config (raw JSON, consumed by SessionMaintenance)
+    nlohmann::json session_maintenance_config;
+
+    // Subagent config (raw JSON, consumed by SubagentManager)
+    nlohmann::json subagent_config;
+
+    // Browser config (raw JSON, consumed by BrowserSession)
+    nlohmann::json browser_config;
+
+    // Exec approval config (raw JSON, consumed by ExecApprovalManager)
+    nlohmann::json exec_approval_config;
+
     // Legacy compatibility
     std::unordered_map<std::string, ToolConfig> tools;
 
     static QuantClawConfig from_json(const nlohmann::json& json);
     static QuantClawConfig load_from_file(const std::string& filepath);
+
+    // Write a dot-path value (e.g. "agent.model") into the config file.
+    // Creates a backup (.bak) before writing.
+    static void set_value(const std::string& filepath, const std::string& dot_path,
+                          const nlohmann::json& value);
+
+    // Remove a dot-path key from the config file.
+    static void unset_value(const std::string& filepath, const std::string& dot_path);
 
     static std::string expand_home(const std::string& path);
     static std::string default_config_path();

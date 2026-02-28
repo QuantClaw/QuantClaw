@@ -210,6 +210,7 @@ namespace methods {
     constexpr const char* GATEWAY_HEALTH    = "gateway.health";
     constexpr const char* GATEWAY_STATUS    = "gateway.status";
     constexpr const char* CONFIG_GET        = "config.get";
+    constexpr const char* CONFIG_SET        = "config.set";
     constexpr const char* CONFIG_RELOAD     = "config.reload";
     constexpr const char* AGENT_REQUEST     = "agent.request";
     constexpr const char* AGENT_STOP        = "agent.stop";

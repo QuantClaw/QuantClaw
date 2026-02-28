@@ -76,8 +76,8 @@ chmod +x /usr/local/bin/quantclaw
 # Create workspace (OpenClaw-compatible layout)
 echo "Creating workspace..."
 USER_HOME=$(eval echo ~$SUDO_USER)
-mkdir -p "$USER_HOME/.quantclaw/agents/default/workspace"
-mkdir -p "$USER_HOME/.quantclaw/agents/default/sessions"
+mkdir -p "$USER_HOME/.quantclaw/agents/main/workspace"
+mkdir -p "$USER_HOME/.quantclaw/agents/main/sessions"
 mkdir -p "$USER_HOME/.quantclaw/logs"
 
 # Create example config (OpenClaw format)

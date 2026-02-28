@@ -122,10 +122,102 @@ std::string SkillLoader::get_skill_context(const std::vector<SkillMetadata>& ski
         if (!skill.description.empty()) {
             context << skill.description << "\n\n";
         }
-        context << skill.content << "\n\n";
+        context << skill.content << "\n";
+
+        // Append resource directory info if available
+        bool has_resources = false;
+        if (!skill.scripts_dir.empty() || !skill.references_dir.empty() ||
+            !skill.assets_dir.empty()) {
+            context << "\n**Resources:**\n";
+            has_resources = true;
+        }
+        if (!skill.scripts_dir.empty()) {
+            context << "- Scripts: `" << skill.scripts_dir << "`\n";
+        }
+        if (!skill.references_dir.empty()) {
+            context << "- References: `" << skill.references_dir << "`\n";
+        }
+        if (!skill.assets_dir.empty()) {
+            context << "- Assets: `" << skill.assets_dir << "`\n";
+        }
+
+        // List slash commands
+        if (!skill.commands.empty()) {
+            if (!has_resources) context << "\n";
+            context << "**Commands:**\n";
+            for (const auto& cmd : skill.commands) {
+                context << "- `/" << cmd.name << "`";
+                if (!cmd.description.empty()) {
+                    context << " — " << cmd.description;
+                }
+                context << "\n";
+            }
+        }
+
+        context << "\n";
     }
 
     return context.str();
+}
+
+bool SkillLoader::install_skill(const SkillMetadata& skill) {
+    if (skill.installs.empty()) {
+        logger_->info("Skill '{}' has no install instructions", skill.name);
+        return true;
+    }
+
+    bool all_ok = true;
+    for (const auto& inst : skill.installs) {
+        // Skip if binary already available
+        if (!inst.binary.empty() && is_binary_available(inst.binary)) {
+            logger_->debug("Skill '{}': {} already installed", skill.name, inst.binary);
+            continue;
+        }
+
+        std::string cmd;
+        if (inst.method == "node") {
+            cmd = "npm install -g " + inst.formula;
+        } else if (inst.method == "go") {
+            cmd = "go install " + inst.formula;
+        } else if (inst.method == "uv") {
+            cmd = "uv pip install " + inst.formula;
+        } else if (inst.method == "apt") {
+            cmd = "sudo apt-get install -y " + inst.formula;
+        } else if (inst.method == "download") {
+            const char* home = std::getenv("HOME");
+            std::string bin_dir = std::string(home ? home : "/tmp") +
+                                  "/.quantclaw/bin";
+            std::filesystem::create_directories(bin_dir);
+            std::string dest = bin_dir + "/" +
+                               (inst.binary.empty() ? "downloaded" : inst.binary);
+            cmd = "curl -fsSL -o " + dest + " " + inst.formula +
+                  " && chmod +x " + dest;
+        } else {
+            logger_->warn("Skill '{}': unknown install method '{}'",
+                         skill.name, inst.method);
+            continue;
+        }
+
+        logger_->info("Installing skill '{}' via {}: {}", skill.name,
+                      inst.method, cmd);
+        int ret = std::system(cmd.c_str());
+        if (ret != 0) {
+            logger_->error("Skill '{}' install failed (exit {})", skill.name, ret);
+            all_ok = false;
+        }
+    }
+    return all_ok;
+}
+
+std::vector<SkillCommand> SkillLoader::get_all_commands(
+    const std::vector<SkillMetadata>& skills) const {
+    std::vector<SkillCommand> commands;
+    for (const auto& skill : skills) {
+        for (const auto& cmd : skill.commands) {
+            commands.push_back(cmd);
+        }
+    }
+    return commands;
 }
 
 SkillMetadata SkillLoader::parse_skill_file(const std::filesystem::path& skill_file) const {
@@ -221,6 +313,54 @@ SkillMetadata SkillLoader::parse_skill_file(const std::filesystem::path& skill_f
                 skill.config_files = metadata["config"].get<std::vector<std::string>>();
             }
 
+            // Extract install info (metadata.openclaw.install)
+            nlohmann::json* install_section = nullptr;
+            if (metadata.contains("metadata") &&
+                metadata["metadata"].contains("openclaw") &&
+                metadata["metadata"]["openclaw"].contains("install")) {
+                install_section = &metadata["metadata"]["openclaw"]["install"];
+            } else if (metadata.contains("install")) {
+                install_section = &metadata["install"];
+            }
+            if (install_section && install_section->is_object()) {
+                for (auto it = install_section->begin();
+                     it != install_section->end(); ++it) {
+                    SkillInstallInfo info;
+                    info.method = it.key();
+                    if (it.value().is_string()) {
+                        info.formula = it.value().get<std::string>();
+                    } else if (it.value().is_object()) {
+                        info.formula = it.value().value("formula", "");
+                        info.binary = it.value().value("binary", "");
+                    }
+                    skill.installs.push_back(std::move(info));
+                }
+            }
+
+            // Extract slash commands
+            nlohmann::json* cmds_section = nullptr;
+            if (metadata.contains("commands") && metadata["commands"].is_array()) {
+                cmds_section = &metadata["commands"];
+            } else if (metadata.contains("metadata") &&
+                       metadata["metadata"].contains("openclaw") &&
+                       metadata["metadata"]["openclaw"].contains("commands") &&
+                       metadata["metadata"]["openclaw"]["commands"].is_array()) {
+                cmds_section = &metadata["metadata"]["openclaw"]["commands"];
+            }
+            if (cmds_section) {
+                for (const auto& cmd : *cmds_section) {
+                    if (!cmd.is_object()) continue;
+                    SkillCommand sc;
+                    sc.name = cmd.value("name", "");
+                    sc.description = cmd.value("description", "");
+                    sc.tool_name = cmd.value("toolName", "");
+                    sc.arg_mode = cmd.value("argMode", "freeform");
+                    if (!sc.name.empty()) {
+                        skill.commands.push_back(std::move(sc));
+                    }
+                }
+            }
+
         } catch (const std::exception& e) {
             logger_->warn("Failed to parse skill frontmatter: {}", e.what());
         }
@@ -230,6 +370,19 @@ SkillMetadata SkillLoader::parse_skill_file(const std::filesystem::path& skill_f
     if (skill.name.empty()) {
         skill.name = skill_file.parent_path().filename().string();
     }
+
+    // Set root directory and detect resource subdirectories
+    skill.root_dir = skill_file.parent_path();
+    auto check_resource_dir = [&](const std::string& subdir) -> std::string {
+        auto p = skill.root_dir / subdir;
+        if (std::filesystem::exists(p) && std::filesystem::is_directory(p)) {
+            return p.string();
+        }
+        return "";
+    };
+    skill.scripts_dir = check_resource_dir("scripts");
+    skill.references_dir = check_resource_dir("references");
+    skill.assets_dir = check_resource_dir("assets");
 
     // Content is everything after frontmatter
     std::string content_part = file_content;

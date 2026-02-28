@@ -394,3 +394,127 @@ TEST_F(ConfigTest, ConfigReload_PropagatesChanges) {
     EXPECT_EQ(agent_loop->get_config().max_iterations, 20);
     EXPECT_DOUBLE_EQ(agent_loop->get_config().temperature, 0.9);
 }
+
+// --- Config set_value / unset_value ---
+
+TEST_F(ConfigTest, SetValue_CreatesNewKey) {
+    auto config_path = (test_dir_ / "set_test.json").string();
+
+    // Start with empty config
+    {
+        std::ofstream f(config_path);
+        f << "{}";
+    }
+
+    quantclaw::QuantClawConfig::set_value(config_path, "agent.model", "gpt-4o");
+
+    auto config = quantclaw::QuantClawConfig::load_from_file(config_path);
+    EXPECT_EQ(config.agent.model, "gpt-4o");
+}
+
+TEST_F(ConfigTest, SetValue_OverwritesExisting) {
+    auto config_path = (test_dir_ / "set_overwrite.json").string();
+
+    {
+        std::ofstream f(config_path);
+        f << R"({"agent": {"model": "old-model", "temperature": 0.5}})";
+    }
+
+    quantclaw::QuantClawConfig::set_value(config_path, "agent.model", "new-model");
+
+    auto config = quantclaw::QuantClawConfig::load_from_file(config_path);
+    EXPECT_EQ(config.agent.model, "new-model");
+    EXPECT_DOUBLE_EQ(config.agent.temperature, 0.5);  // Other fields preserved
+}
+
+TEST_F(ConfigTest, SetValue_CreatesIntermediateObjects) {
+    auto config_path = (test_dir_ / "set_nested.json").string();
+
+    {
+        std::ofstream f(config_path);
+        f << "{}";
+    }
+
+    quantclaw::QuantClawConfig::set_value(config_path, "gateway.auth.token", "my-secret");
+
+    auto config = quantclaw::QuantClawConfig::load_from_file(config_path);
+    EXPECT_EQ(config.gateway.auth.token, "my-secret");
+}
+
+TEST_F(ConfigTest, SetValue_CreatesBackup) {
+    auto config_path = (test_dir_ / "set_backup.json").string();
+    auto backup_path = config_path + ".bak";
+
+    {
+        std::ofstream f(config_path);
+        f << R"({"agent": {"model": "original"}})";
+    }
+
+    quantclaw::QuantClawConfig::set_value(config_path, "agent.model", "changed");
+
+    EXPECT_TRUE(std::filesystem::exists(backup_path));
+    auto backup = quantclaw::QuantClawConfig::load_from_file(backup_path);
+    EXPECT_EQ(backup.agent.model, "original");
+}
+
+TEST_F(ConfigTest, SetValue_NumericValue) {
+    auto config_path = (test_dir_ / "set_numeric.json").string();
+
+    {
+        std::ofstream f(config_path);
+        f << "{}";
+    }
+
+    quantclaw::QuantClawConfig::set_value(config_path, "gateway.port", 9999);
+
+    auto config = quantclaw::QuantClawConfig::load_from_file(config_path);
+    EXPECT_EQ(config.gateway.port, 9999);
+}
+
+TEST_F(ConfigTest, UnsetValue_RemovesKey) {
+    auto config_path = (test_dir_ / "unset_test.json").string();
+
+    {
+        std::ofstream f(config_path);
+        f << R"({"agent": {"model": "gpt-4", "temperature": 0.5}})";
+    }
+
+    quantclaw::QuantClawConfig::unset_value(config_path, "agent.temperature");
+
+    // Re-read raw JSON to verify the key is gone
+    std::ifstream file(config_path);
+    nlohmann::json j;
+    file >> j;
+    EXPECT_FALSE(j["agent"].contains("temperature"));
+    EXPECT_EQ(j["agent"]["model"], "gpt-4");
+}
+
+TEST_F(ConfigTest, UnsetValue_NonexistentPathIsNoop) {
+    auto config_path = (test_dir_ / "unset_noop.json").string();
+
+    {
+        std::ofstream f(config_path);
+        f << R"({"agent": {"model": "gpt-4"}})";
+    }
+
+    // Should not throw
+    EXPECT_NO_THROW(
+        quantclaw::QuantClawConfig::unset_value(config_path, "nonexistent.deep.path")
+    );
+
+    auto config = quantclaw::QuantClawConfig::load_from_file(config_path);
+    EXPECT_EQ(config.agent.model, "gpt-4");
+}
+
+TEST_F(ConfigTest, SetValue_OnNonexistentFile) {
+    auto config_path = (test_dir_ / "new_config.json").string();
+
+    // File doesn't exist yet
+    EXPECT_FALSE(std::filesystem::exists(config_path));
+
+    quantclaw::QuantClawConfig::set_value(config_path, "agent.model", "gpt-4o");
+
+    EXPECT_TRUE(std::filesystem::exists(config_path));
+    auto config = quantclaw::QuantClawConfig::load_from_file(config_path);
+    EXPECT_EQ(config.agent.model, "gpt-4o");
+}

@@ -103,8 +103,8 @@ TEST_F(MemoryManagerTest, GetWorkspacePath) {
 }
 
 TEST_F(MemoryManagerTest, GetSessionsDir) {
-    auto sessions_dir = memory_manager_->get_sessions_dir("default");
-    EXPECT_TRUE(sessions_dir.string().find("agents/default/sessions") != std::string::npos);
+    auto sessions_dir = memory_manager_->get_sessions_dir("main");
+    EXPECT_TRUE(sessions_dir.string().find("agents/main/sessions") != std::string::npos);
 }
 
 TEST_F(MemoryManagerTest, LoadWorkspaceFiles) {

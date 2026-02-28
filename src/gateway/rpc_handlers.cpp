@@ -80,6 +80,29 @@ void register_rpc_handlers(
         }
     );
 
+    // --- config.set ---
+    server.register_handler(methods::CONFIG_SET,
+        [logger, reload_fn](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
+            std::string path = params.value("path", "");
+            if (path.empty()) {
+                throw std::runtime_error("path is required");
+            }
+            if (!params.contains("value")) {
+                throw std::runtime_error("value is required");
+            }
+
+            auto config_file = QuantClawConfig::default_config_path();
+            QuantClawConfig::set_value(config_file, path, params["value"]);
+
+            // Trigger hot-reload so the running server picks up the change
+            if (reload_fn) {
+                reload_fn();
+            }
+
+            return {{"ok", true}, {"path", path}};
+        }
+    );
+
     // --- Shared agent request helper ---
     // Extracted so both agent.request and chat.send can reuse the core logic
     struct AgentRequestResult {
@@ -91,7 +114,7 @@ void register_rpc_handlers(
         const nlohmann::json& params, ClientConnection& client,
         quantclaw::AgentEventCallback event_callback) -> AgentRequestResult
     {
-        std::string session_key = params.value("sessionKey", "agent:default:main");
+        std::string session_key = params.value("sessionKey", "agent:main:main");
         std::string message = params.value("message", "");
 
         if (message.empty()) {
@@ -485,7 +508,7 @@ void register_rpc_handlers(
         }
     );
 
-    int handler_count = reload_fn ? 20 : 19;
+    int handler_count = reload_fn ? 21 : 20;
     logger->info("Registered {} RPC handlers", handler_count);
 }
 

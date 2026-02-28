@@ -1,0 +1,105 @@
+#pragma once
+
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <memory>
+#include <functional>
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
+#include "quantclaw/providers/llm_provider.hpp"
+
+namespace quantclaw {
+
+// Model reference: "provider/model" format (compatible with OpenClaw)
+struct ModelRef {
+  std::string provider;  // e.g. "anthropic", "openai", "ollama"
+  std::string model;     // e.g. "claude-opus-4-6", "gpt-4o"
+
+  std::string to_string() const { return provider + "/" + model; }
+
+  static ModelRef parse(const std::string& raw,
+                        const std::string& default_provider = "openai");
+};
+
+// Provider entry with auth and config
+struct ProviderEntry {
+  std::string id;           // e.g. "anthropic", "openai"
+  std::string display_name;
+  std::string base_url;
+  std::string api_key;
+  std::string api_key_env;  // Env var name for API key
+  int timeout = 30;
+  nlohmann::json extra;     // Provider-specific settings
+};
+
+// Model alias mapping (OpenClaw compatible)
+struct ModelAlias {
+  std::string alias;     // Short name (e.g. "opus")
+  std::string target;    // Full model ref (e.g. "anthropic/claude-opus-4-6")
+};
+
+// Provider factory: creates LLMProvider instances
+using ProviderFactory = std::function<std::shared_ptr<LLMProvider>(
+    const ProviderEntry& entry,
+    std::shared_ptr<spdlog::logger> logger)>;
+
+// Central provider registry — manages all LLM providers and model resolution
+class ProviderRegistry {
+ public:
+  explicit ProviderRegistry(std::shared_ptr<spdlog::logger> logger);
+
+  // Register a provider factory (e.g. "openai", "anthropic", "ollama")
+  void register_factory(const std::string& provider_id,
+                        ProviderFactory factory);
+
+  // Register built-in provider factories (openai, anthropic, ollama, gemini)
+  void register_builtin_factories();
+
+  // Add a provider entry (from config)
+  void add_provider(const ProviderEntry& entry);
+
+  // Add a model alias
+  void add_alias(const std::string& alias, const std::string& target);
+
+  // Load providers from config JSON
+  void load_from_config(const nlohmann::json& providers_json);
+
+  // Load model aliases from config JSON
+  void load_aliases(const nlohmann::json& aliases_json);
+
+  // Resolve a model string to a full ModelRef, expanding aliases
+  ModelRef resolve_model(const std::string& raw,
+                         const std::string& default_provider = "openai") const;
+
+  // Get or create a provider instance for a given provider ID
+  std::shared_ptr<LLMProvider> get_provider(const std::string& provider_id);
+
+  // Get or create a provider for a model ref
+  std::shared_ptr<LLMProvider> get_provider_for_model(const ModelRef& ref);
+
+  // List all registered provider IDs
+  std::vector<std::string> provider_ids() const;
+
+  // List all registered aliases
+  std::vector<ModelAlias> aliases() const;
+
+  // Check if a provider is available (has factory + entry)
+  bool has_provider(const std::string& provider_id) const;
+
+  // Get provider entry (for inspection)
+  const ProviderEntry* get_entry(const std::string& provider_id) const;
+
+ private:
+  std::shared_ptr<spdlog::logger> logger_;
+
+  std::unordered_map<std::string, ProviderFactory> factories_;
+  std::unordered_map<std::string, ProviderEntry> entries_;
+  std::unordered_map<std::string, std::shared_ptr<LLMProvider>> instances_;
+  std::unordered_map<std::string, std::string> alias_map_;  // alias → target
+
+  // Resolve API key from entry (direct value or env var)
+  std::string resolve_api_key(const ProviderEntry& entry) const;
+};
+
+}  // namespace quantclaw

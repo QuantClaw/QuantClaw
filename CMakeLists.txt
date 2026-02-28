@@ -44,9 +44,14 @@ set(QUANTCLAW_CORE_SOURCES
     src/core/skill_loader.cpp
     src/core/prompt_builder.cpp
     src/core/signal_handler.cpp
+    src/core/session_compaction.cpp
+    src/core/cron_scheduler.cpp
+    src/core/memory_search.cpp
+    src/core/subagent.cpp
     # Providers
     src/providers/openai_provider.cpp
     src/providers/anthropic_provider.cpp
+    src/providers/provider_registry.cpp
     # CLI
     src/cli/cli_manager.cpp
     src/cli/commands.cpp
@@ -60,18 +65,28 @@ set(QUANTCLAW_CORE_SOURCES
     src/gateway/daemon_manager.cpp
     # Session
     src/session/session_manager.cpp
+    src/session/session_maintenance.cpp
     # Tools
     src/tools/tool_registry.cpp
     src/tools/tool_chain.cpp
+    src/tools/browser_tool.cpp
     # MCP
     src/mcp/mcp_server.cpp
     src/mcp/mcp_client.cpp
     src/mcp/mcp_tool_manager.cpp
     # Channels
     src/channels/adapter_manager.cpp
+    src/channels/channel_policy.cpp
+    # Plugins
+    src/plugins/plugin_manifest.cpp
+    src/plugins/plugin_registry.cpp
+    src/plugins/sidecar_manager.cpp
+    src/plugins/hook_manager.cpp
+    src/plugins/plugin_system.cpp
     # Security
     src/security/sandbox.cpp
     src/security/tool_permissions.cpp
+    src/security/exec_approval.cpp
     # Web
     src/web/web_server.cpp
     src/web/api_routes.cpp
@@ -153,6 +168,14 @@ if(BUILD_TESTS)
         tests/test_cli_commands.cpp
         tests/test_rpc_handlers.cpp
         tests/test_e2e.cpp
+        tests/test_plugin_system.cpp
+        tests/test_channel_policy.cpp
+        tests/test_advanced_features.cpp
+        tests/test_exec_approval.cpp
+        tests/test_provider_registry.cpp
+        tests/test_session_maintenance.cpp
+        tests/test_subagent.cpp
+        tests/test_browser_tool.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})

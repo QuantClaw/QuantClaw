@@ -43,33 +43,32 @@ GatewayCommands::GatewayCommands(std::shared_ptr<spdlog::logger> logger)
 }
 
 int GatewayCommands::foreground_command(const std::vector<std::string>& args) {
-    int port = 18789;
-
-    for (size_t i = 0; i < args.size(); ++i) {
-        if (args[i] == "--port" && i + 1 < args.size()) {
-            port = std::stoi(args[++i]);
-        }
-    }
-
-    logger_->info("Starting Gateway in foreground mode on port {}", port);
-
-    // Load configuration
+    // Load configuration first (CLI flags override later)
     quantclaw::QuantClawConfig config;
     try {
         config = quantclaw::QuantClawConfig::load_from_file(
             quantclaw::QuantClawConfig::default_config_path());
-        port = config.gateway.port; // Config overrides default
     } catch (const std::exception& e) {
         logger_->warn("No config file found, using defaults: {}", e.what());
     }
 
-    // Override port from CLI args
+    // Apply CLI flag overrides
     for (size_t i = 0; i < args.size(); ++i) {
         if (args[i] == "--port" && i + 1 < args.size()) {
-            port = std::stoi(args[i + 1]);
-            break;
+            config.gateway.port = std::stoi(args[++i]);
+        } else if (args[i] == "--bind" && i + 1 < args.size()) {
+            config.gateway.bind = args[++i];
+        } else if (args[i] == "--auth" && i + 1 < args.size()) {
+            config.gateway.auth.mode = args[++i];
+        } else if (args[i] == "--token" && i + 1 < args.size()) {
+            config.gateway.auth.token = args[++i];
+        } else if (args[i] == "--verbose") {
+            logger_->set_level(spdlog::level::debug);
         }
     }
+
+    int port = config.gateway.port;
+    logger_->info("Starting Gateway in foreground mode on port {}", port);
 
     // Expand home directory
     std::string home_str;
@@ -78,8 +77,8 @@ int GatewayCommands::foreground_command(const std::vector<std::string>& args) {
     else home_str = "/tmp";
 
     std::filesystem::path base_dir = std::filesystem::path(home_str) / ".quantclaw";
-    std::filesystem::path workspace_dir = base_dir / "agents" / "default" / "workspace";
-    std::filesystem::path sessions_dir = base_dir / "agents" / "default" / "sessions";
+    std::filesystem::path workspace_dir = base_dir / "agents" / "main" / "workspace";
+    std::filesystem::path sessions_dir = base_dir / "agents" / "main" / "sessions";
 
     std::filesystem::create_directories(workspace_dir);
     std::filesystem::create_directories(sessions_dir);
@@ -327,6 +326,45 @@ int GatewayCommands::install_command(const std::vector<std::string>& args) {
 
     gateway::DaemonManager daemon(logger_);
     return daemon.install(port);
+}
+
+int GatewayCommands::uninstall_command(const std::vector<std::string>& /*args*/) {
+    gateway::DaemonManager daemon(logger_);
+    return daemon.uninstall();
+}
+
+int GatewayCommands::call_command(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        std::cerr << "Usage: quantclaw gateway call <method> [json-params]" << std::endl;
+        return 1;
+    }
+
+    std::string method = args[0];
+    nlohmann::json params = nlohmann::json::object();
+    if (args.size() > 1) {
+        try {
+            params = nlohmann::json::parse(args[1]);
+        } catch (const nlohmann::json::exception& e) {
+            std::cerr << "Invalid JSON params: " << e.what() << std::endl;
+            return 1;
+        }
+    }
+
+    try {
+        auto client = std::make_shared<gateway::GatewayClient>(gateway_url_, "", logger_);
+        if (!client->connect(3000)) {
+            std::cerr << "Error: Gateway not running" << std::endl;
+            return 1;
+        }
+
+        auto result = client->call(method, params);
+        client->disconnect();
+        std::cout << result.dump(2) << std::endl;
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
 }
 
 int GatewayCommands::start_command(const std::vector<std::string>& /*args*/) {

@@ -210,6 +210,48 @@ QuantClawConfig QuantClawConfig::from_json(const nlohmann::json& json) {
     }
 
     // ================================================================
+    // Plugins (raw JSON, consumed by PluginRegistry)
+    // ================================================================
+    if (json.contains("plugins") && json["plugins"].is_object()) {
+        config.plugins_config = json["plugins"];
+    }
+
+    // ================================================================
+    // Session maintenance
+    // ================================================================
+    if (json.contains("session") && json["session"].is_object()) {
+        if (json["session"].contains("maintenance")) {
+            config.session_maintenance_config = json["session"]["maintenance"];
+        }
+    }
+
+    // ================================================================
+    // Subagent config
+    // ================================================================
+    if (json.contains("subagents") && json["subagents"].is_object()) {
+        config.subagent_config = json["subagents"];
+    } else if (json.contains("agents") && json["agents"].is_object() &&
+               json["agents"].contains("defaults") &&
+               json["agents"]["defaults"].contains("subagents")) {
+        config.subagent_config = json["agents"]["defaults"]["subagents"];
+    }
+
+    // ================================================================
+    // Browser
+    // ================================================================
+    if (json.contains("browser") && json["browser"].is_object()) {
+        config.browser_config = json["browser"];
+    }
+
+    // ================================================================
+    // Exec approval (from tools.exec section, OpenClaw compatible)
+    // ================================================================
+    if (json.contains("tools") && json["tools"].is_object() &&
+        json["tools"].contains("exec") && json["tools"]["exec"].is_object()) {
+        config.exec_approval_config = json["tools"]["exec"];
+    }
+
+    // ================================================================
     // Tools (permission allow/deny or legacy named configs)
     // ================================================================
     if (json.contains("tools") && json["tools"].is_object()) {
@@ -224,6 +266,97 @@ QuantClawConfig QuantClawConfig::from_json(const nlohmann::json& json) {
     }
 
     return config;
+}
+
+// ---------------------------------------------------------------------------
+// Dot-path config set/unset
+// ---------------------------------------------------------------------------
+
+static std::vector<std::string> split_dot_path(const std::string& path) {
+    std::vector<std::string> parts;
+    std::string::size_type start = 0;
+    while (start < path.size()) {
+        auto dot = path.find('.', start);
+        if (dot == std::string::npos) {
+            parts.push_back(path.substr(start));
+            break;
+        }
+        parts.push_back(path.substr(start, dot - start));
+        start = dot + 1;
+    }
+    return parts;
+}
+
+static nlohmann::json read_json_file(const std::string& filepath) {
+    if (!std::filesystem::exists(filepath)) {
+        return nlohmann::json::object();
+    }
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open config file: " + filepath);
+    }
+    nlohmann::json j;
+    file >> j;
+    return j;
+}
+
+static void write_json_file(const std::string& filepath,
+                             const nlohmann::json& j) {
+    auto parent = std::filesystem::path(filepath).parent_path();
+    if (!parent.empty()) {
+        std::filesystem::create_directories(parent);
+    }
+    if (std::filesystem::exists(filepath)) {
+        std::filesystem::copy_file(
+            filepath, filepath + ".bak",
+            std::filesystem::copy_options::overwrite_existing);
+    }
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot write config file: " + filepath);
+    }
+    file << j.dump(2) << std::endl;
+}
+
+void QuantClawConfig::set_value(const std::string& filepath,
+                                const std::string& dot_path,
+                                const nlohmann::json& value) {
+    std::string expanded = expand_home(filepath);
+    auto root = read_json_file(expanded);
+    auto parts = split_dot_path(dot_path);
+    if (parts.empty()) {
+        throw std::runtime_error("Empty config path");
+    }
+
+    nlohmann::json* node = &root;
+    for (size_t i = 0; i + 1 < parts.size(); ++i) {
+        if (!node->contains(parts[i]) || !(*node)[parts[i]].is_object()) {
+            (*node)[parts[i]] = nlohmann::json::object();
+        }
+        node = &(*node)[parts[i]];
+    }
+    (*node)[parts.back()] = value;
+    write_json_file(expanded, root);
+}
+
+void QuantClawConfig::unset_value(const std::string& filepath,
+                                  const std::string& dot_path) {
+    std::string expanded = expand_home(filepath);
+    auto root = read_json_file(expanded);
+    auto parts = split_dot_path(dot_path);
+    if (parts.empty()) {
+        throw std::runtime_error("Empty config path");
+    }
+
+    nlohmann::json* node = &root;
+    for (size_t i = 0; i + 1 < parts.size(); ++i) {
+        if (!node->contains(parts[i]) || !(*node)[parts[i]].is_object()) {
+            return;  // Path doesn't exist
+        }
+        node = &(*node)[parts[i]];
+    }
+    node->erase(parts.back());
+    write_json_file(expanded, root);
 }
 
 std::string QuantClawConfig::expand_home(const std::string& path) {

@@ -210,7 +210,7 @@ TEST_F(AgentCommandsTest, RequestNoMessageReturnsError) {
         int ret = agent_cmds_->request_command({});
         EXPECT_EQ(ret, 1);
     });
-    EXPECT_NE(err.find("message required"), std::string::npos);
+    EXPECT_NE(err.find("Usage:"), std::string::npos);
 }
 
 TEST_F(AgentCommandsTest, RequestOnlyDashMFlagNoValue) {
@@ -219,7 +219,7 @@ TEST_F(AgentCommandsTest, RequestOnlyDashMFlagNoValue) {
         int ret = agent_cmds_->request_command({"-m"});
         EXPECT_EQ(ret, 1);
     });
-    EXPECT_NE(err.find("message required"), std::string::npos);
+    EXPECT_NE(err.find("Usage:"), std::string::npos);
 }
 
 // ========== SessionCommands tests ==========

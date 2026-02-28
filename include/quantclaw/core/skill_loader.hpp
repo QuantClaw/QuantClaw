@@ -9,6 +9,21 @@
 
 namespace quantclaw {
 
+// Install method for skill auto-install
+struct SkillInstallInfo {
+    std::string method;   // "node", "go", "uv", "download", "apt"
+    std::string formula;  // package/URL to install
+    std::string binary;   // expected binary after install
+};
+
+// Slash command defined in a skill
+struct SkillCommand {
+    std::string name;        // command name (no leading /)
+    std::string description;
+    std::string tool_name;   // tool to invoke
+    std::string arg_mode;    // "freeform", "json", "none"
+};
+
 struct SkillMetadata {
     std::string name;
     std::string description;
@@ -21,6 +36,16 @@ struct SkillMetadata {
     std::string primary_env;                  // primary environment variable
     std::string emoji;                        // display emoji
     std::string content;
+
+    // Phase 3 additions
+    std::filesystem::path root_dir;           // skill root directory
+    std::vector<SkillInstallInfo> installs;   // auto-install instructions
+    std::vector<SkillCommand> commands;       // slash commands
+
+    // Resource directories (absolute paths if they exist)
+    std::string scripts_dir;
+    std::string references_dir;
+    std::string assets_dir;
 };
 
 class SkillLoader {
@@ -40,8 +65,15 @@ public:
     // Check if skill can be loaded based on environment (gating)
     bool check_skill_gating(const SkillMetadata& skill);
 
-    // Get skill content for LLM context
+    // Get skill content for LLM context (includes resource path info)
     std::string get_skill_context(const std::vector<SkillMetadata>& skills) const;
+
+    // Install a skill's dependencies (returns true if all succeed)
+    bool install_skill(const SkillMetadata& skill);
+
+    // Get all slash commands from loaded skills
+    std::vector<SkillCommand> get_all_commands(
+        const std::vector<SkillMetadata>& skills) const;
 
 private:
     // Parse SKILL.md file

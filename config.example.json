@@ -51,7 +51,7 @@
   "security": {
     "sandbox": {
       "enabled": true,
-      "allowedPaths": ["~/.quantclaw/agents/default/workspace"],
+      "allowedPaths": ["~/.quantclaw/agents/main/workspace"],
       "deniedPaths": ["/etc", "/sys", "/proc"]
     }
   },
