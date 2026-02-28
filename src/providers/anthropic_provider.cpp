@@ -1,7 +1,12 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/providers/anthropic_provider.hpp"
+
+#include <sstream>
+
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
-#include <sstream>
 #include <spdlog/spdlog.h>
 
 namespace quantclaw {
@@ -65,6 +70,33 @@ static std::pair<std::string, nlohmann::json> serialize_messages_to_anthropic(
     return {system_prompt, arr};
 }
 
+// Map thinking level string to budget_tokens for Anthropic extended thinking API.
+// Returns 0 if thinking is disabled.
+static int thinking_budget_tokens(const std::string& level) {
+    if (level == "low") return 1024;
+    if (level == "medium") return 4096;
+    if (level == "high") return 16000;
+    return 0;  // "off" or unknown
+}
+
+// Apply thinking parameters to an Anthropic API payload.
+// When thinking is enabled, temperature must be 1 and max_tokens must accommodate budget.
+static void apply_thinking_params(nlohmann::json& payload, const ChatCompletionRequest& request) {
+    int budget = thinking_budget_tokens(request.thinking);
+    if (budget > 0) {
+        payload["thinking"] = {
+            {"type", "enabled"},
+            {"budget_tokens", budget}
+        };
+        // Anthropic requires temperature=1 when thinking is enabled
+        payload["temperature"] = 1;
+        // max_tokens must be > budget_tokens
+        if (request.max_tokens <= budget) {
+            payload["max_tokens"] = budget + 4096;
+        }
+    }
+}
+
 // Convert tools from OpenAI format to Anthropic format.
 // OpenAI: {type:"function", function:{name, description, parameters}}
 // Anthropic: {name, description, input_schema}
@@ -100,7 +132,7 @@ AnthropicProvider::AnthropicProvider(const std::string& api_key,
     logger_->info("AnthropicProvider initialized with base_url: {}", base_url_);
 }
 
-ChatCompletionResponse AnthropicProvider::chat_completion(const ChatCompletionRequest& request) {
+ChatCompletionResponse AnthropicProvider::ChatCompletion(const ChatCompletionRequest& request) {
     auto [system_prompt, messages_json] = serialize_messages_to_anthropic(request.messages);
 
     nlohmann::json payload;
@@ -120,10 +152,12 @@ ChatCompletionResponse AnthropicProvider::chat_completion(const ChatCompletionRe
         }
     }
 
+    apply_thinking_params(payload, request);
+
     std::string json_payload = payload.dump();
     logger_->debug("Sending request to Anthropic API: {}", json_payload);
 
-    std::string response = make_api_request(json_payload);
+    std::string response = MakeApiRequest(json_payload);
     logger_->debug("Received response from Anthropic API: {}", response);
 
     // Parse response
@@ -161,55 +195,42 @@ ChatCompletionResponse AnthropicProvider::chat_completion(const ChatCompletionRe
     return result;
 }
 
-std::string AnthropicProvider::get_provider_name() const {
+std::string AnthropicProvider::GetProviderName() const {
     return "anthropic";
 }
 
-std::string AnthropicProvider::make_api_request(const std::string& json_payload) const {
-    CURL* curl;
-    CURLcode res;
+std::string AnthropicProvider::MakeApiRequest(
+    const std::string& json_payload) const {
     std::string read_buffer;
 
-    curl = curl_easy_init();
-    if (!curl) {
-        throw std::runtime_error("Failed to initialize CURL");
-    }
+    CurlHandle curl;
+    CurlSlist headers = CreateHeaders();
 
-    // Anthropic endpoint: /v1/messages
     std::string url = base_url_ + "/v1/messages";
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-
-    struct curl_slist* headers = create_headers();
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.get());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_payload.c_str());
-
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
-
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout_);
 
-    res = curl_easy_perform(curl);
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-
+    CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        throw std::runtime_error("CURL request failed: " + std::string(curl_easy_strerror(res)));
+        throw std::runtime_error(
+            "CURL request failed: " +
+            std::string(curl_easy_strerror(res)));
     }
 
     return read_buffer;
 }
 
-struct curl_slist* AnthropicProvider::create_headers() const {
-    struct curl_slist* headers = nullptr;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
+CurlSlist AnthropicProvider::CreateHeaders() const {
+    CurlSlist headers;
+    headers.append("Content-Type: application/json");
 
-    // Anthropic uses x-api-key header (not Bearer token)
     std::string api_key_header = "x-api-key: " + api_key_;
-    headers = curl_slist_append(headers, api_key_header.c_str());
-
-    headers = curl_slist_append(headers, "anthropic-version: 2023-06-01");
+    headers.append(api_key_header.c_str());
+    headers.append("anthropic-version: 2023-06-01");
 
     return headers;
 }
@@ -335,7 +356,7 @@ static size_t AnthropicStreamWriteCallback(void* contents, size_t size, size_t n
     return total;
 }
 
-void AnthropicProvider::chat_completion_stream(const ChatCompletionRequest& request,
+void AnthropicProvider::ChatCompletionStream(const ChatCompletionRequest& request,
                                                std::function<void(const ChatCompletionResponse&)> callback) {
     auto [system_prompt, messages_json] = serialize_messages_to_anthropic(request.messages);
 
@@ -357,6 +378,8 @@ void AnthropicProvider::chat_completion_stream(const ChatCompletionRequest& requ
         }
     }
 
+    apply_thinking_params(payload, request);
+
     std::string json_payload = payload.dump();
     logger_->debug("Sending streaming request to Anthropic API");
 
@@ -364,18 +387,13 @@ void AnthropicProvider::chat_completion_stream(const ChatCompletionRequest& requ
     stream_ctx.callback = callback;
     stream_ctx.logger = logger_;
 
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        throw std::runtime_error("Failed to initialize CURL for streaming");
-    }
+    CurlHandle curl;
+    CurlSlist headers = CreateHeaders();
 
     std::string url = base_url_ + "/v1/messages";
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-
-    struct curl_slist* headers = create_headers();
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.get());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_payload.c_str());
-
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AnthropicStreamWriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &stream_ctx);
 
@@ -384,16 +402,14 @@ void AnthropicProvider::chat_completion_stream(const ChatCompletionRequest& requ
     curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 60L);
 
     CURLcode res = curl_easy_perform(curl);
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-
     if (res != CURLE_OK) {
-        throw std::runtime_error("CURL streaming request failed: " + std::string(curl_easy_strerror(res)));
+        throw std::runtime_error(
+            "CURL streaming request failed: " +
+            std::string(curl_easy_strerror(res)));
     }
 }
 
-std::vector<std::string> AnthropicProvider::get_supported_models() const {
+std::vector<std::string> AnthropicProvider::GetSupportedModels() const {
     return {"claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5"};
 }
 

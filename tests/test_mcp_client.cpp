@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <thread>
@@ -118,12 +121,12 @@ TEST_F(MCPClientTest, ListToolsUnreachableThrows) {
     // Port 1 is almost certainly not listening
     MCPClient client("http://127.0.0.1:1", logger_);
     // May throw runtime_error (CURL fail) or parse_error (empty response)
-    EXPECT_ANY_THROW(client.list_tools());
+    EXPECT_ANY_THROW(client.ListTools());
 }
 
 TEST_F(MCPClientTest, CallToolUnreachableReturnsError) {
     MCPClient client("http://127.0.0.1:1", logger_);
-    auto resp = client.call_tool("test", nlohmann::json::object());
+    auto resp = client.CallTool("test", nlohmann::json::object());
     EXPECT_FALSE(resp.error.empty());
     EXPECT_TRUE(resp.result.is_null());
 }
@@ -147,7 +150,7 @@ TEST_F(MCPClientTest, ListToolsParsesSingleTool) {
     ASSERT_GT(port, 0);
 
     MCPClient client("http://127.0.0.1:" + std::to_string(port), logger_);
-    auto tools = client.list_tools();
+    auto tools = client.ListTools();
 
     ASSERT_EQ(tools.size(), 1u);
     EXPECT_EQ(tools[0].name, "my_tool");
@@ -166,7 +169,7 @@ TEST_F(MCPClientTest, ListToolsEmptyResult) {
     ASSERT_GT(port, 0);
 
     MCPClient client("http://127.0.0.1:" + std::to_string(port), logger_);
-    auto tools = client.list_tools();
+    auto tools = client.ListTools();
 
     EXPECT_TRUE(tools.empty());
 }
@@ -188,7 +191,7 @@ TEST_F(MCPClientTest, ListToolsMultipleTools) {
     ASSERT_GT(port, 0);
 
     MCPClient client("http://127.0.0.1:" + std::to_string(port), logger_);
-    auto tools = client.list_tools();
+    auto tools = client.ListTools();
 
     ASSERT_EQ(tools.size(), 3u);
     EXPECT_EQ(tools[0].name, "tool_a");
@@ -212,7 +215,7 @@ TEST_F(MCPClientTest, CallToolSuccess) {
     ASSERT_GT(port, 0);
 
     MCPClient client("http://127.0.0.1:" + std::to_string(port), logger_);
-    auto resp = client.call_tool("my_tool", {{"input", "hello"}});
+    auto resp = client.CallTool("my_tool", {{"input", "hello"}});
 
     EXPECT_TRUE(resp.error.empty());
     EXPECT_TRUE(resp.result.contains("content"));
@@ -233,7 +236,7 @@ TEST_F(MCPClientTest, CallToolServerError) {
     ASSERT_GT(port, 0);
 
     MCPClient client("http://127.0.0.1:" + std::to_string(port), logger_);
-    auto resp = client.call_tool("bad_tool", nlohmann::json::object());
+    auto resp = client.CallTool("bad_tool", nlohmann::json::object());
 
     EXPECT_EQ(resp.error, "Tool not found");
     EXPECT_TRUE(resp.result.is_null());

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include "quantclaw/mcp/mcp_tool_manager.hpp"
 #include "quantclaw/tools/tool_registry.hpp"
@@ -17,12 +20,12 @@ protected:
 // --- Qualified name construction ---
 
 TEST_F(MCPToolManagerTest, MakeQualifiedName) {
-    auto name = quantclaw::mcp::MCPToolManager::make_qualified_name("code-tools", "lint");
+    auto name = quantclaw::mcp::MCPToolManager::MakeQualifiedName("code-tools", "lint");
     EXPECT_EQ(name, "mcp__code-tools__lint");
 }
 
 TEST_F(MCPToolManagerTest, MakeQualifiedNameSpecialChars) {
-    auto name = quantclaw::mcp::MCPToolManager::make_qualified_name("my-server", "run_tests");
+    auto name = quantclaw::mcp::MCPToolManager::MakeQualifiedName("my-server", "run_tests");
     EXPECT_EQ(name, "mcp__my-server__run_tests");
 }
 
@@ -32,26 +35,26 @@ TEST_F(MCPToolManagerTest, EmptyConfigNoTools) {
     quantclaw::mcp::MCPToolManager manager(logger_);
     quantclaw::MCPConfig config;  // No servers
 
-    manager.discover_tools(config);
-    EXPECT_EQ(manager.tool_count(), 0u);
+    manager.DiscoverTools(config);
+    EXPECT_EQ(manager.ToolCount(), 0u);
 }
 
 // --- Name resolution ---
 
 TEST_F(MCPToolManagerTest, IsExternalToolFalseForUnknown) {
     quantclaw::mcp::MCPToolManager manager(logger_);
-    EXPECT_FALSE(manager.is_external_tool("read"));
-    EXPECT_FALSE(manager.is_external_tool("mcp__unknown__tool"));
+    EXPECT_FALSE(manager.IsExternalTool("read"));
+    EXPECT_FALSE(manager.IsExternalTool("mcp__unknown__tool"));
 }
 
 TEST_F(MCPToolManagerTest, GetServerNameEmptyForUnknown) {
     quantclaw::mcp::MCPToolManager manager(logger_);
-    EXPECT_EQ(manager.get_server_name("mcp__unknown__tool"), "");
+    EXPECT_EQ(manager.GetServerName("mcp__unknown__tool"), "");
 }
 
 TEST_F(MCPToolManagerTest, GetOriginalToolNameEmptyForUnknown) {
     quantclaw::mcp::MCPToolManager manager(logger_);
-    EXPECT_EQ(manager.get_original_tool_name("mcp__unknown__tool"), "");
+    EXPECT_EQ(manager.GetOriginalToolName("mcp__unknown__tool"), "");
 }
 
 // --- Discover tools with invalid server (graceful error) ---
@@ -66,8 +69,8 @@ TEST_F(MCPToolManagerTest, DiscoverToolsInvalidServerGraceful) {
     config.servers.push_back(server);
 
     // Should not throw, just log error
-    EXPECT_NO_THROW(manager.discover_tools(config));
-    EXPECT_EQ(manager.tool_count(), 0u);
+    EXPECT_NO_THROW(manager.DiscoverTools(config));
+    EXPECT_EQ(manager.ToolCount(), 0u);
 }
 
 // --- Discover tools skips empty name/url ---
@@ -86,8 +89,8 @@ TEST_F(MCPToolManagerTest, DiscoverToolsSkipsEmptyNameOrUrl) {
     s2.url = "";
     config.servers.push_back(s2);
 
-    EXPECT_NO_THROW(manager.discover_tools(config));
-    EXPECT_EQ(manager.tool_count(), 0u);
+    EXPECT_NO_THROW(manager.DiscoverTools(config));
+    EXPECT_EQ(manager.ToolCount(), 0u);
 }
 
 // --- Register into ToolRegistry ---
@@ -95,11 +98,11 @@ TEST_F(MCPToolManagerTest, DiscoverToolsSkipsEmptyNameOrUrl) {
 TEST_F(MCPToolManagerTest, RegisterIntoEmptyManager) {
     quantclaw::mcp::MCPToolManager manager(logger_);
     quantclaw::ToolRegistry registry(logger_);
-    registry.register_builtin_tools();
+    registry.RegisterBuiltinTools();
 
-    auto schemas_before = registry.get_tool_schemas();
-    manager.register_into(registry);
-    auto schemas_after = registry.get_tool_schemas();
+    auto schemas_before = registry.GetToolSchemas();
+    manager.RegisterInto(registry);
+    auto schemas_after = registry.GetToolSchemas();
 
     // No MCP tools discovered, so count should not change
     EXPECT_EQ(schemas_before.size(), schemas_after.size());
@@ -109,5 +112,5 @@ TEST_F(MCPToolManagerTest, RegisterIntoEmptyManager) {
 
 TEST_F(MCPToolManagerTest, ExecuteToolUnknownThrows) {
     quantclaw::mcp::MCPToolManager manager(logger_);
-    EXPECT_THROW(manager.execute_tool("mcp__unknown__tool", {}), std::runtime_error);
+    EXPECT_THROW(manager.ExecuteTool("mcp__unknown__tool", {}), std::runtime_error);
 }

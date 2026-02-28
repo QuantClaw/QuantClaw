@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/security/sandbox.hpp"
 #include <filesystem>
 #include <regex>
@@ -24,7 +27,7 @@ Sandbox::Sandbox(const std::filesystem::path& workspace_path,
     }
 }
 
-bool Sandbox::is_path_allowed(const std::string& path) const {
+bool Sandbox::IsPathAllowed(const std::string& path) const {
     std::filesystem::path resolved_path = std::filesystem::absolute(path);
 
     // Check against denied paths first
@@ -49,7 +52,7 @@ bool Sandbox::is_path_allowed(const std::string& path) const {
     return true;
 }
 
-bool Sandbox::is_command_allowed(const std::string& command) const {
+bool Sandbox::IsCommandAllowed(const std::string& command) const {
     for (const auto& pattern : denied_cmd_patterns_) {
         if (std::regex_search(command, pattern)) {
             return false;
@@ -58,7 +61,7 @@ bool Sandbox::is_command_allowed(const std::string& command) const {
     return true;
 }
 
-std::string Sandbox::sanitize_path(const std::string& path) const {
+std::string Sandbox::SanitizePath(const std::string& path) const {
     std::filesystem::path clean_path = std::filesystem::path(path).lexically_normal();
     if (clean_path.string().substr(0, 2) == "..") {
         throw std::runtime_error("Path traversal detected: " + path);
@@ -66,7 +69,7 @@ std::string Sandbox::sanitize_path(const std::string& path) const {
     return clean_path.string();
 }
 
-bool Sandbox::validate_file_path(const std::string& path, const std::string& /*workspace*/) {
+bool Sandbox::ValidateFilePath(const std::string& path, const std::string& /*workspace*/) {
     // Basic path traversal check
     std::filesystem::path clean = std::filesystem::path(path).lexically_normal();
     std::string path_str = clean.string();
@@ -76,7 +79,7 @@ bool Sandbox::validate_file_path(const std::string& path, const std::string& /*w
     return true;
 }
 
-bool Sandbox::validate_shell_command(const std::string& command) {
+bool Sandbox::ValidateShellCommand(const std::string& command) {
     // Block obviously dangerous commands
     static const std::vector<std::regex> dangerous_patterns = {
         std::regex(R"(\brm\s+-rf\s+/)", std::regex_constants::icase),
@@ -92,7 +95,7 @@ bool Sandbox::validate_shell_command(const std::string& command) {
     return true;
 }
 
-void Sandbox::apply_resource_limits() {
+void Sandbox::ApplyResourceLimits() {
 #ifdef __linux__
     // Limit CPU time (30s soft, 60s hard)
     struct rlimit cpu_limit;

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <memory>
@@ -23,20 +26,20 @@ class MemorySearch {
   explicit MemorySearch(std::shared_ptr<spdlog::logger> logger);
 
   // Index memory files from a workspace directory
-  void index_directory(const std::filesystem::path& dir);
+  void IndexDirectory(const std::filesystem::path& dir);
 
   // Add a single file to the index
-  void index_file(const std::filesystem::path& file);
+  void IndexFile(const std::filesystem::path& file);
 
   // Search for relevant memory entries
-  std::vector<MemorySearchResult> search(const std::string& query,
+  std::vector<MemorySearchResult> Search(const std::string& query,
                                           int max_results = 10) const;
 
   // Get index stats
-  nlohmann::json stats() const;
+  nlohmann::json Stats() const;
 
   // Clear the index
-  void clear();
+  void Clear();
 
  private:
   struct IndexEntry {

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -16,13 +19,13 @@ struct ChainStep {
     nlohmann::json arguments;  // May contain {{prev.result}}, {{steps[N].result}}
 };
 
-enum class ChainErrorPolicy { StopOnError, ContinueOnError, Retry };
+enum class ChainErrorPolicy { kStopOnError, kContinueOnError, kRetry };
 
 struct ToolChainDef {
     std::string name;
     std::string description;
     std::vector<ChainStep> steps;
-    ChainErrorPolicy error_policy = ChainErrorPolicy::StopOnError;
+    ChainErrorPolicy error_policy = ChainErrorPolicy::kStopOnError;
     int max_retries = 1;
 };
 
@@ -62,10 +65,10 @@ class ToolChainExecutor {
 public:
     ToolChainExecutor(ToolExecutorFn executor, std::shared_ptr<spdlog::logger> logger);
 
-    ChainResult execute(const ToolChainDef& chain);
+    ChainResult Execute(const ToolChainDef& chain);
 
-    static ToolChainDef parse_chain(const nlohmann::json& j);
-    static nlohmann::json result_to_json(const ChainResult& result);
+    static ToolChainDef ParseChain(const nlohmann::json& j);
+    static nlohmann::json ResultToJson(const ChainResult& result);
 
 private:
     ToolExecutorFn executor_;

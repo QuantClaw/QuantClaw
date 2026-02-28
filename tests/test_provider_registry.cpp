@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
@@ -41,31 +44,31 @@ TEST(ModelRefTest, ParseWithDefaultProvider) {
 
 TEST(ProviderRegistryTest, RegisterBuiltinFactories) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
-  reg->register_builtin_factories();
+  reg->RegisterBuiltinFactories();
 
   // Should have factories but no entries yet
-  EXPECT_FALSE(reg->has_provider("nonexistent"));
+  EXPECT_FALSE(reg->HasProvider("nonexistent"));
 }
 
 TEST(ProviderRegistryTest, AddProviderEntry) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
-  reg->register_builtin_factories();
+  reg->RegisterBuiltinFactories();
 
   ProviderEntry entry;
   entry.id = "openai";
   entry.api_key = "test-key";
   entry.base_url = "https://api.openai.com/v1";
-  reg->add_provider(entry);
+  reg->AddProvider(entry);
 
-  EXPECT_TRUE(reg->has_provider("openai"));
-  auto* e = reg->get_entry("openai");
+  EXPECT_TRUE(reg->HasProvider("openai"));
+  auto* e = reg->GetEntry("openai");
   ASSERT_NE(e, nullptr);
   EXPECT_EQ(e->api_key, "test-key");
 }
 
 TEST(ProviderRegistryTest, LoadFromConfig) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
-  reg->register_builtin_factories();
+  reg->RegisterBuiltinFactories();
 
   nlohmann::json config = {
       {"openai",
@@ -76,31 +79,31 @@ TEST(ProviderRegistryTest, LoadFromConfig) {
        {{"apiKey", "ak-test"},
         {"timeout", 45}}},
   };
-  reg->load_from_config(config);
+  reg->LoadFromConfig(config);
 
-  EXPECT_TRUE(reg->has_provider("openai"));
-  EXPECT_TRUE(reg->has_provider("anthropic"));
+  EXPECT_TRUE(reg->HasProvider("openai"));
+  EXPECT_TRUE(reg->HasProvider("anthropic"));
 
-  auto ids = reg->provider_ids();
+  auto ids = reg->ProviderIds();
   EXPECT_EQ(ids.size(), 2);
 }
 
 TEST(ProviderRegistryTest, ModelAliases) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
 
-  reg->add_alias("opus", "anthropic/claude-opus-4-6");
-  reg->add_alias("gpt4", "openai/gpt-4o");
+  reg->AddAlias("opus", "anthropic/claude-opus-4-6");
+  reg->AddAlias("gpt4", "openai/gpt-4o");
 
-  auto ref = reg->resolve_model("opus");
+  auto ref = reg->ResolveModel("opus");
   EXPECT_EQ(ref.provider, "anthropic");
   EXPECT_EQ(ref.model, "claude-opus-4-6");
 
-  ref = reg->resolve_model("gpt4");
+  ref = reg->ResolveModel("gpt4");
   EXPECT_EQ(ref.provider, "openai");
   EXPECT_EQ(ref.model, "gpt-4o");
 
   // Non-aliased should pass through
-  ref = reg->resolve_model("openai/gpt-3.5-turbo");
+  ref = reg->ResolveModel("openai/gpt-3.5-turbo");
   EXPECT_EQ(ref.provider, "openai");
   EXPECT_EQ(ref.model, "gpt-3.5-turbo");
 }
@@ -112,50 +115,50 @@ TEST(ProviderRegistryTest, LoadAliasesFromJson) {
       {"anthropic/claude-opus-4-6", {{"alias", "opus"}}},
       {"openai/gpt-4o", {{"alias", "gpt4"}}},
   };
-  reg->load_aliases(aliases);
+  reg->LoadAliases(aliases);
 
-  auto all = reg->aliases();
+  auto all = reg->Aliases();
   EXPECT_EQ(all.size(), 2);
 
-  auto ref = reg->resolve_model("opus");
+  auto ref = reg->ResolveModel("opus");
   EXPECT_EQ(ref.model, "claude-opus-4-6");
 }
 
 TEST(ProviderRegistryTest, GetProviderCreatesInstance) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
-  reg->register_builtin_factories();
+  reg->RegisterBuiltinFactories();
 
   ProviderEntry entry;
   entry.id = "openai";
   entry.api_key = "test-key";
-  reg->add_provider(entry);
+  reg->AddProvider(entry);
 
-  auto provider = reg->get_provider("openai");
+  auto provider = reg->GetProvider("openai");
   ASSERT_NE(provider, nullptr);
-  EXPECT_EQ(provider->get_provider_name(), "openai");
+  EXPECT_EQ(provider->GetProviderName(), "openai");
 
   // Second call returns same instance
-  auto provider2 = reg->get_provider("openai");
+  auto provider2 = reg->GetProvider("openai");
   EXPECT_EQ(provider.get(), provider2.get());
 }
 
 TEST(ProviderRegistryTest, GetProviderForModel) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
-  reg->register_builtin_factories();
+  reg->RegisterBuiltinFactories();
 
   ProviderEntry entry;
   entry.id = "anthropic";
   entry.api_key = "test-key";
-  reg->add_provider(entry);
+  reg->AddProvider(entry);
 
   auto ref = ModelRef::parse("anthropic/claude-opus-4-6");
-  auto provider = reg->get_provider_for_model(ref);
+  auto provider = reg->GetProviderForModel(ref);
   ASSERT_NE(provider, nullptr);
 }
 
 TEST(ProviderRegistryTest, NullForUnknownProvider) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
-  auto provider = reg->get_provider("nonexistent");
+  auto provider = reg->GetProvider("nonexistent");
   EXPECT_EQ(provider, nullptr);
 }
 
@@ -166,9 +169,9 @@ TEST(ProviderRegistryTest, ProviderEntryInspection) {
   entry.id = "ollama";
   entry.base_url = "http://localhost:11434/v1";
   entry.display_name = "Local Ollama";
-  reg->add_provider(entry);
+  reg->AddProvider(entry);
 
-  auto* e = reg->get_entry("ollama");
+  auto* e = reg->GetEntry("ollama");
   ASSERT_NE(e, nullptr);
   EXPECT_EQ(e->display_name, "Local Ollama");
   EXPECT_EQ(e->base_url, "http://localhost:11434/v1");

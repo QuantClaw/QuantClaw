@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <atomic>
@@ -9,6 +12,8 @@
 #include <thread>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include "quantclaw/platform/process.hpp"
+#include "quantclaw/platform/ipc.hpp"
 
 namespace quantclaw {
 
@@ -27,7 +32,7 @@ struct SidecarResponse {
   std::string error;
   bool ok = true;
 
-  static SidecarResponse from_json(const nlohmann::json& j);
+  static SidecarResponse FromJson(const nlohmann::json& j);
 };
 
 // Manages the Node.js sidecar subprocess lifecycle.
@@ -43,7 +48,7 @@ class SidecarManager {
   struct Options {
     std::string node_binary = "node";
     std::string sidecar_script;  // path to sidecar entry point
-    std::string socket_path;     // Unix domain socket for IPC
+    std::string socket_path;     // IPC path (socket on Unix, pipe name on Win)
     std::string pid_file;
     int heartbeat_interval_ms = 5000;
     int heartbeat_timeout_count = 3;  // miss count before declaring dead
@@ -54,30 +59,30 @@ class SidecarManager {
   };
 
   // Start the sidecar process
-  bool start(const Options& opts);
+  bool Start(const Options& opts);
 
-  // Stop the sidecar gracefully (SIGTERM → wait → SIGKILL)
-  void stop();
+  // Stop the sidecar gracefully
+  void Stop();
 
-  // Reload plugins (SIGHUP to sidecar)
-  bool reload();
+  // Reload plugins (SIGHUP to sidecar on Unix, no-op on Windows)
+  bool Reload();
 
   // Send a JSON-RPC request and wait for response
-  SidecarResponse call(const std::string& method,
+  SidecarResponse Call(const std::string& method,
                        const nlohmann::json& params,
                        int timeout_ms = 30000);
 
   // Check if sidecar is alive
-  bool is_running() const;
+  bool IsRunning() const;
 
   // Get sidecar PID
-  pid_t pid() const { return pid_; }
+  platform::ProcessId pid() const { return pid_; }
 
  private:
   void monitor_loop();
-  bool spawn_process();
-  void kill_process(bool force = false);
-  bool connect_socket();
+  bool spawn_sidecar();
+  void kill_sidecar(bool force = false);
+  bool connect_ipc();
   void write_pid_file();
   void remove_pid_file();
   int next_backoff_ms();
@@ -85,12 +90,12 @@ class SidecarManager {
   std::shared_ptr<spdlog::logger> logger_;
   Options opts_;
 
-  std::atomic<pid_t> pid_{0};
+  std::atomic<platform::ProcessId> pid_{platform::kInvalidPid};
   std::atomic<bool> running_{false};
   std::atomic<bool> stopping_{false};
 
-  int socket_fd_ = -1;
-  std::mutex socket_mu_;
+  platform::IpcHandle ipc_handle_ = platform::kInvalidIpc;
+  std::mutex ipc_mu_;
 
   std::thread monitor_thread_;
   int restart_count_ = 0;

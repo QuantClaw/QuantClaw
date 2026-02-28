@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/core/cron_scheduler.hpp"
 #include <algorithm>
 #include <fstream>
@@ -9,7 +12,7 @@ namespace quantclaw {
 
 // --- CronJob ---
 
-nlohmann::json CronJob::to_json() const {
+nlohmann::json CronJob::ToJson() const {
   nlohmann::json j;
   j["id"] = id;
   j["name"] = name;
@@ -34,7 +37,7 @@ nlohmann::json CronJob::to_json() const {
   return j;
 }
 
-CronJob CronJob::from_json(const nlohmann::json& j) {
+CronJob CronJob::FromJson(const nlohmann::json& j) {
   CronJob job;
   job.id = j.value("id", "");
   job.name = j.value("name", "");
@@ -104,7 +107,7 @@ bool CronExpression::field_matches(const Field& f, int value) {
   return std::find(f.values.begin(), f.values.end(), value) != f.values.end();
 }
 
-bool CronExpression::matches(const std::tm& tm) const {
+bool CronExpression::Matches(const std::tm& tm) const {
   return field_matches(minute_, tm.tm_min) &&
          field_matches(hour_, tm.tm_hour) &&
          field_matches(day_of_month_, tm.tm_mday) &&
@@ -112,7 +115,7 @@ bool CronExpression::matches(const std::tm& tm) const {
          field_matches(day_of_week_, tm.tm_wday);
 }
 
-std::chrono::system_clock::time_point CronExpression::next_after(
+std::chrono::system_clock::time_point CronExpression::NextAfter(
     std::chrono::system_clock::time_point after) const {
   // Start from next minute
   auto t = std::chrono::system_clock::to_time_t(after);
@@ -123,7 +126,7 @@ std::chrono::system_clock::time_point CronExpression::next_after(
 
   // Search up to 366 days ahead
   for (int i = 0; i < 525960; ++i) {  // 366 * 24 * 60
-    if (matches(tm)) {
+    if (Matches(tm)) {
       return std::chrono::system_clock::from_time_t(std::mktime(&tm));
     }
     tm.tm_min += 1;
@@ -140,10 +143,10 @@ CronScheduler::CronScheduler(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
 CronScheduler::~CronScheduler() {
-  stop();
+  Stop();
 }
 
-void CronScheduler::load(const std::string& filepath) {
+void CronScheduler::Load(const std::string& filepath) {
   storage_path_ = filepath;
 
   if (!std::filesystem::exists(filepath)) return;
@@ -157,10 +160,10 @@ void CronScheduler::load(const std::string& filepath) {
     jobs_.clear();
     if (j.is_array()) {
       for (const auto& item : j) {
-        auto job = CronJob::from_json(item);
+        auto job = CronJob::FromJson(item);
         if (!job.id.empty() && !job.schedule.empty()) {
           CronExpression expr(job.schedule);
-          job.next_run = expr.next_after(std::chrono::system_clock::now());
+          job.next_run = expr.NextAfter(std::chrono::system_clock::now());
           jobs_.push_back(std::move(job));
         }
       }
@@ -171,12 +174,12 @@ void CronScheduler::load(const std::string& filepath) {
   }
 }
 
-void CronScheduler::save(const std::string& filepath) const {
+void CronScheduler::Save(const std::string& filepath) const {
   std::lock_guard<std::mutex> lock(mu_);
 
   nlohmann::json arr = nlohmann::json::array();
   for (const auto& job : jobs_) {
-    arr.push_back(job.to_json());
+    arr.push_back(job.ToJson());
   }
 
   auto parent = std::filesystem::path(filepath).parent_path();
@@ -188,7 +191,7 @@ void CronScheduler::save(const std::string& filepath) const {
   ofs << arr.dump(2) << std::endl;
 }
 
-std::string CronScheduler::add_job(const std::string& name,
+std::string CronScheduler::AddJob(const std::string& name,
                                    const std::string& schedule,
                                    const std::string& message,
                                    const std::string& session_key) {
@@ -201,7 +204,7 @@ std::string CronScheduler::add_job(const std::string& name,
   job.schedule = schedule;
   job.message = message;
   job.session_key = session_key;
-  job.next_run = expr.next_after(std::chrono::system_clock::now());
+  job.next_run = expr.NextAfter(std::chrono::system_clock::now());
 
   std::string id = job.id;
 
@@ -210,13 +213,13 @@ std::string CronScheduler::add_job(const std::string& name,
     jobs_.push_back(std::move(job));
   }
 
-  if (!storage_path_.empty()) save(storage_path_);
+  if (!storage_path_.empty()) Save(storage_path_);
 
   logger_->info("Added cron job '{}' ({}): {}", name, id, schedule);
   return id;
 }
 
-bool CronScheduler::remove_job(const std::string& id) {
+bool CronScheduler::RemoveJob(const std::string& id) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = std::remove_if(jobs_.begin(), jobs_.end(),
                             [&id](const CronJob& j) { return j.id == id; });
@@ -227,7 +230,7 @@ bool CronScheduler::remove_job(const std::string& id) {
   if (!storage_path_.empty()) {
     // Save outside lock would deadlock, so save inline
     nlohmann::json arr = nlohmann::json::array();
-    for (const auto& j : jobs_) arr.push_back(j.to_json());
+    for (const auto& j : jobs_) arr.push_back(j.ToJson());
     std::ofstream ofs(storage_path_);
     ofs << arr.dump(2) << std::endl;
   }
@@ -235,12 +238,12 @@ bool CronScheduler::remove_job(const std::string& id) {
   return true;
 }
 
-std::vector<CronJob> CronScheduler::list_jobs() const {
+std::vector<CronJob> CronScheduler::ListJobs() const {
   std::lock_guard<std::mutex> lock(mu_);
   return jobs_;
 }
 
-void CronScheduler::start(JobHandler handler) {
+void CronScheduler::Start(JobHandler handler) {
   if (running_) return;
 
   handler_ = std::move(handler);
@@ -248,7 +251,7 @@ void CronScheduler::start(JobHandler handler) {
   thread_ = std::thread([this] { scheduler_loop(); });
 }
 
-void CronScheduler::stop() {
+void CronScheduler::Stop() {
   running_ = false;
   if (thread_.joinable()) {
     thread_.join();
@@ -282,11 +285,11 @@ void CronScheduler::scheduler_loop() {
       // Update last_run and compute next_run
       job->last_run = now;
       CronExpression expr(job->schedule);
-      job->next_run = expr.next_after(now);
+      job->next_run = expr.NextAfter(now);
     }
 
     if (!due_jobs.empty() && !storage_path_.empty()) {
-      save(storage_path_);
+      Save(storage_path_);
     }
 
     // Sleep 30 seconds between checks

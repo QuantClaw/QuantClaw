@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -15,7 +18,7 @@ enum class MaintenanceMode {
   kWarn,     // Log warnings only
 };
 
-MaintenanceMode maintenance_mode_from_string(const std::string& s);
+MaintenanceMode MaintenanceModeFromString(const std::string& s);
 
 // Session maintenance configuration
 struct SessionMaintenanceConfig {
@@ -38,7 +41,7 @@ struct SessionMaintenanceConfig {
   // Minimum interval between maintenance sweeps (seconds)
   int sweep_interval_seconds = 300;  // 5 minutes
 
-  static SessionMaintenanceConfig from_json(const nlohmann::json& j);
+  static SessionMaintenanceConfig FromJson(const nlohmann::json& j);
 };
 
 // Result of a maintenance sweep
@@ -57,20 +60,20 @@ class SessionMaintenance {
                      std::shared_ptr<spdlog::logger> logger);
 
   // Configure maintenance settings
-  void configure(const SessionMaintenanceConfig& config);
+  void Configure(const SessionMaintenanceConfig& config);
 
   // Run a maintenance sweep. Returns result of actions taken.
   // Will skip if called too soon after last sweep (respects sweep_interval).
-  MaintenanceResult sweep(bool force = false);
+  MaintenanceResult Sweep(bool force = false);
 
   // Parse a duration string ("7d", "168h", "2w") to seconds
-  static int parse_duration_seconds(const std::string& s);
+  static int ParseDurationSeconds(const std::string& s);
 
   // Parse a size string ("10MB", "1GB") to bytes
-  static int64_t parse_size_bytes(const std::string& s);
+  static int64_t ParseSizeBytes(const std::string& s);
 
   // Get current config
-  const SessionMaintenanceConfig& config() const { return config_; }
+  const SessionMaintenanceConfig& GetConfig() const { return config_; }
 
  private:
   std::filesystem::path sessions_dir_;

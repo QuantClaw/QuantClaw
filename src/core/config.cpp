@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/config.hpp"
 #include <fstream>
 #include <filesystem>
@@ -5,16 +8,17 @@
 
 namespace quantclaw {
 
-AgentConfig AgentConfig::from_json(const nlohmann::json& json) {
+AgentConfig AgentConfig::FromJson(const nlohmann::json& json) {
     AgentConfig config;
     config.model = json.value("model", "qwen-max");
     config.max_iterations = json.value("maxIterations", json.value("max_iterations", 15));
     config.temperature = json.value("temperature", 0.7);
     config.max_tokens = json.value("maxTokens", json.value("max_tokens", 4096));
+    config.thinking = json.value("thinking", "off");
     return config;
 }
 
-ProviderConfig ProviderConfig::from_json(const nlohmann::json& json) {
+ProviderConfig ProviderConfig::FromJson(const nlohmann::json& json) {
     ProviderConfig config;
     config.api_key = json.value("apiKey", json.value("api_key", ""));
     config.base_url = json.value("baseUrl", json.value("base_url", ""));
@@ -22,7 +26,7 @@ ProviderConfig ProviderConfig::from_json(const nlohmann::json& json) {
     return config;
 }
 
-ChannelConfig ChannelConfig::from_json(const nlohmann::json& json) {
+ChannelConfig ChannelConfig::FromJson(const nlohmann::json& json) {
     ChannelConfig config;
     config.enabled = json.value("enabled", false);
     config.token = json.value("token", "");
@@ -32,7 +36,7 @@ ChannelConfig ChannelConfig::from_json(const nlohmann::json& json) {
     return config;
 }
 
-ToolConfig ToolConfig::from_json(const nlohmann::json& json) {
+ToolConfig ToolConfig::FromJson(const nlohmann::json& json) {
     ToolConfig config;
     config.enabled = json.value("enabled", true);
     config.allowed_paths = json.value("allowed_paths", std::vector<std::string>{});
@@ -43,14 +47,14 @@ ToolConfig ToolConfig::from_json(const nlohmann::json& json) {
     return config;
 }
 
-ToolPermissionConfig ToolPermissionConfig::from_json(const nlohmann::json& json) {
+ToolPermissionConfig ToolPermissionConfig::FromJson(const nlohmann::json& json) {
     ToolPermissionConfig config;
     config.allow = json.value("allow", std::vector<std::string>{"group:fs", "group:runtime"});
     config.deny = json.value("deny", std::vector<std::string>{});
     return config;
 }
 
-MCPServerConfig MCPServerConfig::from_json(const nlohmann::json& json) {
+MCPServerConfig MCPServerConfig::FromJson(const nlohmann::json& json) {
     MCPServerConfig config;
     config.name = json.value("name", "");
     config.url = json.value("url", "");
@@ -58,29 +62,29 @@ MCPServerConfig MCPServerConfig::from_json(const nlohmann::json& json) {
     return config;
 }
 
-MCPConfig MCPConfig::from_json(const nlohmann::json& json) {
+MCPConfig MCPConfig::FromJson(const nlohmann::json& json) {
     MCPConfig config;
     if (json.contains("servers") && json["servers"].is_array()) {
         for (const auto& server_json : json["servers"]) {
-            config.servers.push_back(MCPServerConfig::from_json(server_json));
+            config.servers.push_back(MCPServerConfig::FromJson(server_json));
         }
     }
     return config;
 }
 
-SkillEntryConfig SkillEntryConfig::from_json(const nlohmann::json& json) {
+SkillEntryConfig SkillEntryConfig::FromJson(const nlohmann::json& json) {
     SkillEntryConfig config;
     config.enabled = json.value("enabled", true);
     return config;
 }
 
-SkillsLoadConfig SkillsLoadConfig::from_json(const nlohmann::json& json) {
+SkillsLoadConfig SkillsLoadConfig::FromJson(const nlohmann::json& json) {
     SkillsLoadConfig config;
     config.extra_dirs = json.value("extraDirs", std::vector<std::string>{});
     return config;
 }
 
-SkillsConfig SkillsConfig::from_json(const nlohmann::json& json) {
+SkillsConfig SkillsConfig::FromJson(const nlohmann::json& json) {
     SkillsConfig config;
 
     // OpenClaw simple format: skills.path, skills.autoApprove, skills.configs
@@ -92,7 +96,7 @@ SkillsConfig SkillsConfig::from_json(const nlohmann::json& json) {
 
     // QuantClaw format: skills.load, skills.entries
     if (json.contains("load") && json["load"].is_object()) {
-        config.load = SkillsLoadConfig::from_json(json["load"]);
+        config.load = SkillsLoadConfig::FromJson(json["load"]);
     }
     // OpenClaw path → extraDirs compatibility
     if (!config.path.empty() && config.load.extra_dirs.empty()) {
@@ -101,33 +105,33 @@ SkillsConfig SkillsConfig::from_json(const nlohmann::json& json) {
 
     if (json.contains("entries") && json["entries"].is_object()) {
         for (const auto& [key, value] : json["entries"].items()) {
-            config.entries[key] = SkillEntryConfig::from_json(value);
+            config.entries[key] = SkillEntryConfig::FromJson(value);
         }
     }
     return config;
 }
 
-GatewayConfig GatewayConfig::from_json(const nlohmann::json& json) {
+GatewayConfig GatewayConfig::FromJson(const nlohmann::json& json) {
     GatewayConfig config;
     config.port = json.value("port", 18789);
     config.bind = json.value("bind", "loopback");
     if (json.contains("auth")) {
-        config.auth = GatewayAuthConfig::from_json(json["auth"]);
+        config.auth = GatewayAuthConfig::FromJson(json["auth"]);
     }
     if (json.contains("controlUi")) {
-        config.control_ui = GatewayControlUiConfig::from_json(json["controlUi"]);
+        config.control_ui = GatewayControlUiConfig::FromJson(json["controlUi"]);
     }
     return config;
 }
 
-QuantClawConfig QuantClawConfig::from_json(const nlohmann::json& json) {
+QuantClawConfig QuantClawConfig::FromJson(const nlohmann::json& json) {
     QuantClawConfig config;
 
     // ================================================================
     // OpenClaw "system" section → system config + gateway port
     // ================================================================
     if (json.contains("system") && json["system"].is_object()) {
-        config.system = SystemConfig::from_json(json["system"]);
+        config.system = SystemConfig::FromJson(json["system"]);
         // system.port overrides gateway.controlUi.port (HTTP port)
         if (config.system.port > 0) {
             config.gateway.control_ui.port = config.system.port;
@@ -157,17 +161,17 @@ QuantClawConfig QuantClawConfig::from_json(const nlohmann::json& json) {
     // QuantClaw "agent" section (takes priority over llm if both exist)
     // ================================================================
     if (json.contains("agent") && json["agent"].is_object()) {
-        config.agent = AgentConfig::from_json(json["agent"]);
+        config.agent = AgentConfig::FromJson(json["agent"]);
     } else if (json.contains("agents") && json["agents"].contains("defaults")) {
         // Legacy format
-        config.agent = AgentConfig::from_json(json["agents"]["defaults"]);
+        config.agent = AgentConfig::FromJson(json["agents"]["defaults"]);
     }
 
     // ================================================================
     // Gateway
     // ================================================================
     if (json.contains("gateway") && json["gateway"].is_object()) {
-        config.gateway = GatewayConfig::from_json(json["gateway"]);
+        config.gateway = GatewayConfig::FromJson(json["gateway"]);
     }
 
     // ================================================================
@@ -175,7 +179,7 @@ QuantClawConfig QuantClawConfig::from_json(const nlohmann::json& json) {
     // ================================================================
     if (json.contains("providers") && json["providers"].is_object()) {
         for (const auto& [key, value] : json["providers"].items()) {
-            config.providers[key] = ProviderConfig::from_json(value);
+            config.providers[key] = ProviderConfig::FromJson(value);
         }
     }
 
@@ -184,7 +188,7 @@ QuantClawConfig QuantClawConfig::from_json(const nlohmann::json& json) {
     // ================================================================
     if (json.contains("channels") && json["channels"].is_object()) {
         for (const auto& [key, value] : json["channels"].items()) {
-            config.channels[key] = ChannelConfig::from_json(value);
+            config.channels[key] = ChannelConfig::FromJson(value);
         }
     }
 
@@ -192,21 +196,21 @@ QuantClawConfig QuantClawConfig::from_json(const nlohmann::json& json) {
     // Security (OpenClaw format)
     // ================================================================
     if (json.contains("security") && json["security"].is_object()) {
-        config.security = SecurityConfig::from_json(json["security"]);
+        config.security = SecurityConfig::FromJson(json["security"]);
     }
 
     // ================================================================
     // MCP
     // ================================================================
     if (json.contains("mcp") && json["mcp"].is_object()) {
-        config.mcp = MCPConfig::from_json(json["mcp"]);
+        config.mcp = MCPConfig::FromJson(json["mcp"]);
     }
 
     // ================================================================
     // Skills (both OpenClaw and QuantClaw format)
     // ================================================================
     if (json.contains("skills") && json["skills"].is_object()) {
-        config.skills = SkillsConfig::from_json(json["skills"]);
+        config.skills = SkillsConfig::FromJson(json["skills"]);
     }
 
     // ================================================================
@@ -257,10 +261,10 @@ QuantClawConfig QuantClawConfig::from_json(const nlohmann::json& json) {
     if (json.contains("tools") && json["tools"].is_object()) {
         const auto& tools_json = json["tools"];
         if (tools_json.contains("allow") || tools_json.contains("deny")) {
-            config.tools_permission = ToolPermissionConfig::from_json(tools_json);
+            config.tools_permission = ToolPermissionConfig::FromJson(tools_json);
         } else {
             for (const auto& [key, value] : tools_json.items()) {
-                config.tools[key] = ToolConfig::from_json(value);
+                config.tools[key] = ToolConfig::FromJson(value);
             }
         }
     }
@@ -318,10 +322,10 @@ static void write_json_file(const std::string& filepath,
     file << j.dump(2) << std::endl;
 }
 
-void QuantClawConfig::set_value(const std::string& filepath,
+void QuantClawConfig::SetValue(const std::string& filepath,
                                 const std::string& dot_path,
                                 const nlohmann::json& value) {
-    std::string expanded = expand_home(filepath);
+    std::string expanded = ExpandHome(filepath);
     auto root = read_json_file(expanded);
     auto parts = split_dot_path(dot_path);
     if (parts.empty()) {
@@ -339,9 +343,9 @@ void QuantClawConfig::set_value(const std::string& filepath,
     write_json_file(expanded, root);
 }
 
-void QuantClawConfig::unset_value(const std::string& filepath,
+void QuantClawConfig::UnsetValue(const std::string& filepath,
                                   const std::string& dot_path) {
-    std::string expanded = expand_home(filepath);
+    std::string expanded = ExpandHome(filepath);
     auto root = read_json_file(expanded);
     auto parts = split_dot_path(dot_path);
     if (parts.empty()) {
@@ -359,10 +363,13 @@ void QuantClawConfig::unset_value(const std::string& filepath,
     write_json_file(expanded, root);
 }
 
-std::string QuantClawConfig::expand_home(const std::string& path) {
+std::string QuantClawConfig::ExpandHome(const std::string& path) {
     std::string expanded = path;
     if (expanded.size() >= 2 && expanded.substr(0, 2) == "~/") {
         const char* home = std::getenv("HOME");
+#ifdef _WIN32
+        if (!home) home = std::getenv("USERPROFILE");
+#endif
         if (home) {
             expanded = std::string(home) + expanded.substr(1);
         }
@@ -370,12 +377,12 @@ std::string QuantClawConfig::expand_home(const std::string& path) {
     return expanded;
 }
 
-std::string QuantClawConfig::default_config_path() {
-    return expand_home("~/.quantclaw/quantclaw.json");
+std::string QuantClawConfig::DefaultConfigPath() {
+    return ExpandHome("~/.quantclaw/quantclaw.json");
 }
 
-QuantClawConfig QuantClawConfig::load_from_file(const std::string& filepath) {
-    std::string expanded_path = expand_home(filepath);
+QuantClawConfig QuantClawConfig::LoadFromFile(const std::string& filepath) {
+    std::string expanded_path = ExpandHome(filepath);
 
     if (!std::filesystem::exists(expanded_path)) {
         throw std::runtime_error("Config file not found: " + expanded_path);
@@ -390,7 +397,7 @@ QuantClawConfig QuantClawConfig::load_from_file(const std::string& filepath) {
     file >> json;
     file.close();
 
-    return from_json(json);
+    return FromJson(json);
 }
 
 } // namespace quantclaw

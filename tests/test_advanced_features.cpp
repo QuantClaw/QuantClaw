@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <fstream>
 #include <filesystem>
@@ -42,14 +45,14 @@ TEST_F(CompactionTest, NoCompactionNeeded) {
   auto msgs = make_messages(10);
   quantclaw::SessionCompaction::Options opts;
   opts.max_messages = 100;
-  EXPECT_FALSE(compaction_->needs_compaction(msgs, opts));
+  EXPECT_FALSE(compaction_->NeedsCompaction(msgs, opts));
 }
 
 TEST_F(CompactionTest, CompactionNeededByMessageCount) {
   auto msgs = make_messages(150);
   quantclaw::SessionCompaction::Options opts;
   opts.max_messages = 100;
-  EXPECT_TRUE(compaction_->needs_compaction(msgs, opts));
+  EXPECT_TRUE(compaction_->NeedsCompaction(msgs, opts));
 }
 
 TEST_F(CompactionTest, TruncateKeepsRecent) {
@@ -57,7 +60,7 @@ TEST_F(CompactionTest, TruncateKeepsRecent) {
   quantclaw::SessionCompaction::Options opts;
   opts.keep_recent = 10;
 
-  auto result = compaction_->truncate(msgs, opts);
+  auto result = compaction_->Truncate(msgs, opts);
   // 1 system truncation note + 10 recent
   EXPECT_EQ(result.size(), 11);
   EXPECT_EQ(result[0]["role"], "system");
@@ -71,7 +74,7 @@ TEST_F(CompactionTest, CompactWithSummary) {
   opts.max_messages = 30;
   opts.keep_recent = 10;
 
-  auto result = compaction_->compact(msgs, opts,
+  auto result = compaction_->Compact(msgs, opts,
       [](const std::vector<nlohmann::json>& old_msgs) {
         return "Summary of " + std::to_string(old_msgs.size()) + " messages";
       });
@@ -89,7 +92,7 @@ TEST_F(CompactionTest, CompactFallsBackToTruncate) {
   opts.max_messages = 30;
   opts.keep_recent = 10;
 
-  auto result = compaction_->compact(msgs, opts,
+  auto result = compaction_->Compact(msgs, opts,
       [](const std::vector<nlohmann::json>&) {
         return "";  // empty summary → fallback
       });
@@ -100,7 +103,7 @@ TEST_F(CompactionTest, CompactFallsBackToTruncate) {
 
 TEST_F(CompactionTest, EstimateTokens) {
   auto msgs = make_messages(10);
-  int tokens = compaction_->estimate_tokens(msgs);
+  int tokens = compaction_->EstimateTokens(msgs);
   EXPECT_GT(tokens, 0);
 }
 
@@ -109,7 +112,7 @@ TEST_F(CompactionTest, SmallMessageListNotTruncated) {
   quantclaw::SessionCompaction::Options opts;
   opts.keep_recent = 10;
 
-  auto result = compaction_->truncate(msgs, opts);
+  auto result = compaction_->Truncate(msgs, opts);
   EXPECT_EQ(result.size(), 5);  // unchanged
 }
 
@@ -123,7 +126,7 @@ TEST(CronExpressionTest, EveryMinute) {
   tm.tm_mday = 15;
   tm.tm_mon = 2;  // March
   tm.tm_wday = 3;
-  EXPECT_TRUE(expr.matches(tm));
+  EXPECT_TRUE(expr.Matches(tm));
 }
 
 TEST(CronExpressionTest, SpecificMinute) {
@@ -134,10 +137,10 @@ TEST(CronExpressionTest, SpecificMinute) {
   tm.tm_mday = 15;
   tm.tm_mon = 2;
   tm.tm_wday = 3;
-  EXPECT_TRUE(expr.matches(tm));
+  EXPECT_TRUE(expr.Matches(tm));
 
   tm.tm_min = 15;
-  EXPECT_FALSE(expr.matches(tm));
+  EXPECT_FALSE(expr.Matches(tm));
 }
 
 TEST(CronExpressionTest, StepExpression) {
@@ -149,15 +152,15 @@ TEST(CronExpressionTest, StepExpression) {
   tm.tm_wday = 1;
 
   tm.tm_min = 0;
-  EXPECT_TRUE(expr.matches(tm));
+  EXPECT_TRUE(expr.Matches(tm));
   tm.tm_min = 15;
-  EXPECT_TRUE(expr.matches(tm));
+  EXPECT_TRUE(expr.Matches(tm));
   tm.tm_min = 30;
-  EXPECT_TRUE(expr.matches(tm));
+  EXPECT_TRUE(expr.Matches(tm));
   tm.tm_min = 45;
-  EXPECT_TRUE(expr.matches(tm));
+  EXPECT_TRUE(expr.Matches(tm));
   tm.tm_min = 10;
-  EXPECT_FALSE(expr.matches(tm));
+  EXPECT_FALSE(expr.Matches(tm));
 }
 
 TEST(CronExpressionTest, HourlyAt30) {
@@ -168,7 +171,7 @@ TEST(CronExpressionTest, HourlyAt30) {
   tm.tm_mday = 1;
   tm.tm_mon = 0;
   tm.tm_wday = 1;
-  EXPECT_TRUE(expr.matches(tm));
+  EXPECT_TRUE(expr.Matches(tm));
 }
 
 TEST(CronExpressionTest, RangeExpression) {
@@ -180,19 +183,19 @@ TEST(CronExpressionTest, RangeExpression) {
   tm.tm_wday = 1;
 
   tm.tm_hour = 9;
-  EXPECT_TRUE(expr.matches(tm));
+  EXPECT_TRUE(expr.Matches(tm));
   tm.tm_hour = 17;
-  EXPECT_TRUE(expr.matches(tm));
+  EXPECT_TRUE(expr.Matches(tm));
   tm.tm_hour = 8;
-  EXPECT_FALSE(expr.matches(tm));
+  EXPECT_FALSE(expr.Matches(tm));
   tm.tm_hour = 18;
-  EXPECT_FALSE(expr.matches(tm));
+  EXPECT_FALSE(expr.Matches(tm));
 }
 
 TEST(CronExpressionTest, NextAfter) {
   quantclaw::CronExpression expr("0 12 * * *");  // noon daily
   auto now = std::chrono::system_clock::now();
-  auto next = expr.next_after(now);
+  auto next = expr.NextAfter(now);
   EXPECT_GT(next, now);
 
   auto t = std::chrono::system_clock::to_time_t(next);
@@ -221,10 +224,10 @@ class CronSchedulerTest : public ::testing::Test {
 
 TEST_F(CronSchedulerTest, AddAndListJobs) {
   quantclaw::CronScheduler sched(logger_);
-  auto id = sched.add_job("test", "*/5 * * * *", "Hello", "agent:main:main");
+  auto id = sched.AddJob("test", "*/5 * * * *", "Hello", "agent:main:main");
   EXPECT_FALSE(id.empty());
 
-  auto jobs = sched.list_jobs();
+  auto jobs = sched.ListJobs();
   ASSERT_EQ(jobs.size(), 1);
   EXPECT_EQ(jobs[0].name, "test");
   EXPECT_EQ(jobs[0].schedule, "*/5 * * * *");
@@ -233,14 +236,14 @@ TEST_F(CronSchedulerTest, AddAndListJobs) {
 
 TEST_F(CronSchedulerTest, RemoveJob) {
   quantclaw::CronScheduler sched(logger_);
-  auto id = sched.add_job("to-remove", "0 * * * *", "msg");
-  EXPECT_TRUE(sched.remove_job(id));
-  EXPECT_TRUE(sched.list_jobs().empty());
+  auto id = sched.AddJob("to-remove", "0 * * * *", "msg");
+  EXPECT_TRUE(sched.RemoveJob(id));
+  EXPECT_TRUE(sched.ListJobs().empty());
 }
 
 TEST_F(CronSchedulerTest, RemoveNonexistentFails) {
   quantclaw::CronScheduler sched(logger_);
-  EXPECT_FALSE(sched.remove_job("nonexistent"));
+  EXPECT_FALSE(sched.RemoveJob("nonexistent"));
 }
 
 TEST_F(CronSchedulerTest, PersistAndLoad) {
@@ -248,15 +251,15 @@ TEST_F(CronSchedulerTest, PersistAndLoad) {
 
   {
     quantclaw::CronScheduler sched(logger_);
-    sched.load(filepath);
-    sched.add_job("persist-test", "0 8 * * *", "good morning");
-    sched.save(filepath);
+    sched.Load(filepath);
+    sched.AddJob("persist-test", "0 8 * * *", "good morning");
+    sched.Save(filepath);
   }
 
   {
     quantclaw::CronScheduler sched2(logger_);
-    sched2.load(filepath);
-    auto jobs = sched2.list_jobs();
+    sched2.Load(filepath);
+    auto jobs = sched2.ListJobs();
     ASSERT_EQ(jobs.size(), 1);
     EXPECT_EQ(jobs[0].name, "persist-test");
     EXPECT_EQ(jobs[0].schedule, "0 8 * * *");
@@ -272,7 +275,7 @@ TEST_F(CronSchedulerTest, JobToJson) {
   job.session_key = "agent:main:main";
   job.enabled = true;
 
-  auto j = job.to_json();
+  auto j = job.ToJson();
   EXPECT_EQ(j["id"], "abc123");
   EXPECT_EQ(j["name"], "daily");
   EXPECT_EQ(j["schedule"], "0 9 * * *");
@@ -307,9 +310,9 @@ TEST_F(MemorySearchTest, IndexAndSearch) {
                          "The weather today is sunny and warm.\n");
 
   quantclaw::MemorySearch search(logger_);
-  search.index_directory(test_dir_);
+  search.IndexDirectory(test_dir_);
 
-  auto results = search.search("machine learning artificial intelligence");
+  auto results = search.Search("machine learning artificial intelligence");
   ASSERT_FALSE(results.empty());
   EXPECT_TRUE(results[0].content.find("machine learning") != std::string::npos ||
               results[0].content.find("Machine learning") != std::string::npos);
@@ -318,18 +321,18 @@ TEST_F(MemorySearchTest, IndexAndSearch) {
 TEST_F(MemorySearchTest, EmptyQueryReturnsEmpty) {
   write_file("test.md", "Some content here");
   quantclaw::MemorySearch search(logger_);
-  search.index_directory(test_dir_);
+  search.IndexDirectory(test_dir_);
 
-  auto results = search.search("");
+  auto results = search.Search("");
   EXPECT_TRUE(results.empty());
 }
 
 TEST_F(MemorySearchTest, NoMatchReturnsEmpty) {
   write_file("test.md", "The quick brown fox");
   quantclaw::MemorySearch search(logger_);
-  search.index_directory(test_dir_);
+  search.IndexDirectory(test_dir_);
 
-  auto results = search.search("quantum computing blockchain");
+  auto results = search.Search("quantum computing blockchain");
   EXPECT_TRUE(results.empty());
 }
 
@@ -341,9 +344,9 @@ TEST_F(MemorySearchTest, MaxResultsLimited) {
   write_file("big.md", content);
 
   quantclaw::MemorySearch search(logger_);
-  search.index_directory(test_dir_);
+  search.IndexDirectory(test_dir_);
 
-  auto results = search.search("data entry", 5);
+  auto results = search.Search("data entry", 5);
   EXPECT_LE(results.size(), 5u);
 }
 
@@ -352,20 +355,20 @@ TEST_F(MemorySearchTest, Stats) {
   write_file("b.md", "Third paragraph.\n");
 
   quantclaw::MemorySearch search(logger_);
-  search.index_directory(test_dir_);
+  search.IndexDirectory(test_dir_);
 
-  auto stats = search.stats();
+  auto stats = search.Stats();
   EXPECT_GT(stats["indexed_entries"].get<int>(), 0);
 }
 
 TEST_F(MemorySearchTest, ClearIndex) {
   write_file("test.md", "Some content");
   quantclaw::MemorySearch search(logger_);
-  search.index_directory(test_dir_);
-  EXPECT_GT(search.stats()["indexed_entries"].get<int>(), 0);
+  search.IndexDirectory(test_dir_);
+  EXPECT_GT(search.Stats()["indexed_entries"].get<int>(), 0);
 
-  search.clear();
-  EXPECT_EQ(search.stats()["indexed_entries"].get<int>(), 0);
+  search.Clear();
+  EXPECT_EQ(search.Stats()["indexed_entries"].get<int>(), 0);
 }
 
 TEST_F(MemorySearchTest, ScoreRelevance) {
@@ -374,9 +377,9 @@ TEST_F(MemorySearchTest, ScoreRelevance) {
   write_file("irrelevant.md", "The weather is sunny today\n\nCooking recipes for pasta\n");
 
   quantclaw::MemorySearch search(logger_);
-  search.index_directory(test_dir_);
+  search.IndexDirectory(test_dir_);
 
-  auto results = search.search("kubernetes container deployment");
+  auto results = search.Search("kubernetes container deployment");
   ASSERT_FALSE(results.empty());
   // Most relevant result should be from relevant.md
   EXPECT_TRUE(results[0].source.find("relevant.md") != std::string::npos);

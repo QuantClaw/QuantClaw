@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include "quantclaw/plugins/plugin_manifest.hpp"
@@ -47,23 +50,23 @@ class PluginRegistry {
   explicit PluginRegistry(std::shared_ptr<spdlog::logger> logger);
 
   // Discover and load all plugins
-  void discover(const QuantClawConfig& config,
+  void Discover(const QuantClawConfig& config,
                 const std::filesystem::path& workspace_dir);
 
   // Get all plugin records
-  const std::vector<PluginRecord>& plugins() const { return plugins_; }
+  const std::vector<PluginRecord>& Plugins() const { return plugins_; }
 
   // Find a plugin by ID
-  const PluginRecord* find(const std::string& id) const;
+  const PluginRecord* Find(const std::string& id) const;
 
   // Get enabled plugin IDs
-  std::vector<std::string> enabled_plugin_ids() const;
+  std::vector<std::string> EnabledPluginIds() const;
 
   // Check if a plugin is enabled
-  bool is_enabled(const std::string& id) const;
+  bool IsEnabled(const std::string& id) const;
 
   // JSON summary of all plugins
-  nlohmann::json to_json() const;
+  nlohmann::json ToJson() const;
 
  private:
   // Discovery helpers

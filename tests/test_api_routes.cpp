@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <thread>
@@ -24,14 +27,14 @@
 // Mock LLM provider
 class ApiMockLLMProvider : public quantclaw::LLMProvider {
 public:
-    quantclaw::ChatCompletionResponse chat_completion(const quantclaw::ChatCompletionRequest&) override {
+    quantclaw::ChatCompletionResponse ChatCompletion(const quantclaw::ChatCompletionRequest&) override {
         quantclaw::ChatCompletionResponse resp;
         resp.content = "mock api reply";
         resp.finish_reason = "stop";
         return resp;
     }
 
-    void chat_completion_stream(const quantclaw::ChatCompletionRequest&,
+    void ChatCompletionStream(const quantclaw::ChatCompletionRequest&,
                                 std::function<void(const quantclaw::ChatCompletionResponse&)> cb) override {
         quantclaw::ChatCompletionResponse delta;
         delta.content = "mock api reply";
@@ -43,8 +46,8 @@ public:
         cb(end);
     }
 
-    std::string get_provider_name() const override { return "api-mock"; }
-    std::vector<std::string> get_supported_models() const override { return {"mock"}; }
+    std::string GetProviderName() const override { return "api-mock"; }
+    std::vector<std::string> GetSupportedModels() const override { return {"mock"}; }
 };
 
 class ApiRoutesTest : public ::testing::Test {
@@ -69,7 +72,7 @@ protected:
         memory_manager_ = std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
         skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
         tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
-        tool_registry_->register_builtin_tools();
+        tool_registry_->RegisterBuiltinTools();
 
         mock_llm_ = std::make_shared<ApiMockLLMProvider>();
         agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
@@ -80,24 +83,24 @@ protected:
 
         // Gateway server (needed for uptime/connections in /api/health and /api/status)
         gateway_server_ = std::make_unique<quantclaw::gateway::GatewayServer>(gw_port_, logger_);
-        gateway_server_->set_auth("none", "");
-        gateway_server_->start();
+        gateway_server_->SetAuth("none", "");
+        gateway_server_->Start();
 
         // HTTP API server
         http_server_ = std::make_unique<quantclaw::web::WebServer>(http_port_, logger_);
-        http_server_->enable_cors("*");
+        http_server_->EnableCors("*");
 
         quantclaw::web::register_api_routes(
             *http_server_, session_manager_, agent_loop_, prompt_builder_,
             tool_registry_, config_, *gateway_server_, logger_);
 
-        http_server_->start();
+        http_server_->Start();
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
     void TearDown() override {
-        if (http_server_) { http_server_->stop(); http_server_.reset(); }
-        if (gateway_server_) { gateway_server_->stop(); gateway_server_.reset(); }
+        if (http_server_) { http_server_->Stop(); http_server_.reset(); }
+        if (gateway_server_) { gateway_server_->Stop(); gateway_server_.reset(); }
         if (std::filesystem::exists(test_dir_)) {
             std::filesystem::remove_all(test_dir_);
         }
@@ -254,8 +257,8 @@ TEST_F(ApiRoutesTest, AgentStop) {
 
 TEST_F(ApiRoutesTest, SessionsHistory) {
     // Create a session with a message first
-    session_manager_->get_or_create("api:hist:test");
-    session_manager_->append_message("api:hist:test", "user", "hello");
+    session_manager_->GetOrCreate("api:hist:test");
+    session_manager_->AppendMessage("api:hist:test", "user", "hello");
 
     auto cli = make_client();
     auto res = cli.Get("/api/sessions/history?sessionKey=api:hist:test");
@@ -280,7 +283,7 @@ TEST_F(ApiRoutesTest, SessionsHistoryMissingKey) {
 // --- Sessions delete ---
 
 TEST_F(ApiRoutesTest, SessionsDelete) {
-    session_manager_->get_or_create("api:del:test");
+    session_manager_->GetOrCreate("api:del:test");
 
     auto cli = make_client();
     auto res = cli.Post("/api/sessions/delete",
@@ -290,7 +293,7 @@ TEST_F(ApiRoutesTest, SessionsDelete) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 200);
 
-    auto sessions = session_manager_->list_sessions();
+    auto sessions = session_manager_->ListSessions();
     EXPECT_TRUE(sessions.empty());
 }
 
@@ -349,23 +352,23 @@ protected:
             memory_manager_, skill_loader_, tool_registry_);
 
         gateway_server_ = std::make_unique<quantclaw::gateway::GatewayServer>(gw_port_, logger_);
-        gateway_server_->set_auth("none", "");
-        gateway_server_->start();
+        gateway_server_->SetAuth("none", "");
+        gateway_server_->Start();
 
         http_server_ = std::make_unique<quantclaw::web::WebServer>(http_port_, logger_);
-        http_server_->set_auth_token("secret-token-123");
+        http_server_->SetAuthToken("secret-token-123");
 
         quantclaw::web::register_api_routes(
             *http_server_, session_manager_, agent_loop_, prompt_builder_,
             tool_registry_, config_, *gateway_server_, logger_);
 
-        http_server_->start();
+        http_server_->Start();
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
     void TearDown() override {
-        if (http_server_) { http_server_->stop(); http_server_.reset(); }
-        if (gateway_server_) { gateway_server_->stop(); gateway_server_.reset(); }
+        if (http_server_) { http_server_->Stop(); http_server_.reset(); }
+        if (gateway_server_) { gateway_server_->Stop(); gateway_server_.reset(); }
         if (std::filesystem::exists(test_dir_)) {
             std::filesystem::remove_all(test_dir_);
         }
@@ -443,7 +446,7 @@ protected:
         memory_manager_ = std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
         skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
         tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
-        tool_registry_->register_builtin_tools();
+        tool_registry_->RegisterBuiltinTools();
 
         mock_llm_ = std::make_shared<ApiMockLLMProvider>();
         agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
@@ -456,23 +459,23 @@ protected:
         reload_fn_ = [this]() { reload_called_ = true; };
 
         gateway_server_ = std::make_unique<quantclaw::gateway::GatewayServer>(gw_port_, logger_);
-        gateway_server_->set_auth("none", "");
-        gateway_server_->start();
+        gateway_server_->SetAuth("none", "");
+        gateway_server_->Start();
 
         http_server_ = std::make_unique<quantclaw::web::WebServer>(http_port_, logger_);
-        http_server_->enable_cors("*");
+        http_server_->EnableCors("*");
 
         quantclaw::web::register_api_routes(
             *http_server_, session_manager_, agent_loop_, prompt_builder_,
             tool_registry_, config_, *gateway_server_, logger_, reload_fn_);
 
-        http_server_->start();
+        http_server_->Start();
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
     void TearDown() override {
-        if (http_server_) { http_server_->stop(); http_server_.reset(); }
-        if (gateway_server_) { gateway_server_->stop(); gateway_server_.reset(); }
+        if (http_server_) { http_server_->Stop(); http_server_.reset(); }
+        if (gateway_server_) { gateway_server_->Stop(); gateway_server_.reset(); }
         if (std::filesystem::exists(test_dir_)) {
             std::filesystem::remove_all(test_dir_);
         }
@@ -545,7 +548,7 @@ protected:
         memory_manager_ = std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
         skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
         tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
-        tool_registry_->register_builtin_tools();
+        tool_registry_->RegisterBuiltinTools();
 
         mock_llm_ = std::make_shared<ApiMockLLMProvider>();
         agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
@@ -555,11 +558,11 @@ protected:
             memory_manager_, skill_loader_, tool_registry_);
 
         gateway_server_ = std::make_unique<quantclaw::gateway::GatewayServer>(gw_port_, logger_);
-        gateway_server_->set_auth("none", "");
-        gateway_server_->start();
+        gateway_server_->SetAuth("none", "");
+        gateway_server_->Start();
 
         http_server_ = std::make_unique<quantclaw::web::WebServer>(http_port_, logger_);
-        http_server_->enable_cors("*");
+        http_server_->EnableCors("*");
 
         quantclaw::web::register_api_routes(
             *http_server_, session_manager_, agent_loop_, prompt_builder_,
@@ -567,7 +570,7 @@ protected:
 
         // Add gateway-info endpoint (same as in gateway_commands.cpp)
         int ws_port = gw_port_;
-        http_server_->add_raw_route("/api/gateway-info", "GET",
+        http_server_->AddRawRoute("/api/gateway-info", "GET",
             [ws_port](const httplib::Request&, httplib::Response& res) {
                 nlohmann::json info = {
                     {"wsUrl", "ws://localhost:" + std::to_string(ws_port)},
@@ -579,13 +582,13 @@ protected:
             }
         );
 
-        http_server_->start();
+        http_server_->Start();
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
     void TearDown() override {
-        if (http_server_) { http_server_->stop(); http_server_.reset(); }
-        if (gateway_server_) { gateway_server_->stop(); gateway_server_.reset(); }
+        if (http_server_) { http_server_->Stop(); http_server_.reset(); }
+        if (gateway_server_) { gateway_server_->Stop(); gateway_server_.reset(); }
         if (std::filesystem::exists(test_dir_)) {
             std::filesystem::remove_all(test_dir_);
         }

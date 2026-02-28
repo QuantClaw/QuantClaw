@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -50,45 +53,45 @@ class ProviderRegistry {
   explicit ProviderRegistry(std::shared_ptr<spdlog::logger> logger);
 
   // Register a provider factory (e.g. "openai", "anthropic", "ollama")
-  void register_factory(const std::string& provider_id,
-                        ProviderFactory factory);
+  void RegisterFactory(const std::string& provider_id,
+                       ProviderFactory factory);
 
   // Register built-in provider factories (openai, anthropic, ollama, gemini)
-  void register_builtin_factories();
+  void RegisterBuiltinFactories();
 
   // Add a provider entry (from config)
-  void add_provider(const ProviderEntry& entry);
+  void AddProvider(const ProviderEntry& entry);
 
   // Add a model alias
-  void add_alias(const std::string& alias, const std::string& target);
+  void AddAlias(const std::string& alias, const std::string& target);
 
   // Load providers from config JSON
-  void load_from_config(const nlohmann::json& providers_json);
+  void LoadFromConfig(const nlohmann::json& providers_json);
 
   // Load model aliases from config JSON
-  void load_aliases(const nlohmann::json& aliases_json);
+  void LoadAliases(const nlohmann::json& aliases_json);
 
   // Resolve a model string to a full ModelRef, expanding aliases
-  ModelRef resolve_model(const std::string& raw,
-                         const std::string& default_provider = "openai") const;
+  ModelRef ResolveModel(const std::string& raw,
+                        const std::string& default_provider = "openai") const;
 
   // Get or create a provider instance for a given provider ID
-  std::shared_ptr<LLMProvider> get_provider(const std::string& provider_id);
+  std::shared_ptr<LLMProvider> GetProvider(const std::string& provider_id);
 
   // Get or create a provider for a model ref
-  std::shared_ptr<LLMProvider> get_provider_for_model(const ModelRef& ref);
+  std::shared_ptr<LLMProvider> GetProviderForModel(const ModelRef& ref);
 
   // List all registered provider IDs
-  std::vector<std::string> provider_ids() const;
+  std::vector<std::string> ProviderIds() const;
 
   // List all registered aliases
-  std::vector<ModelAlias> aliases() const;
+  std::vector<ModelAlias> Aliases() const;
 
   // Check if a provider is available (has factory + entry)
-  bool has_provider(const std::string& provider_id) const;
+  bool HasProvider(const std::string& provider_id) const;
 
   // Get provider entry (for inspection)
-  const ProviderEntry* get_entry(const std::string& provider_id) const;
+  const ProviderEntry* GetEntry(const std::string& provider_id) const;
 
  private:
   std::shared_ptr<spdlog::logger> logger_;

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include "quantclaw/providers/openai_provider.hpp"
@@ -14,7 +17,7 @@ public:
     // Configurable response
     quantclaw::ChatCompletionResponse next_response;
 
-    quantclaw::ChatCompletionResponse chat_completion(const quantclaw::ChatCompletionRequest& request) override {
+    quantclaw::ChatCompletionResponse ChatCompletion(const quantclaw::ChatCompletionRequest& request) override {
         last_request = request;
         if (next_response.content.empty() && next_response.tool_calls.empty()) {
             quantclaw::ChatCompletionResponse response;
@@ -28,7 +31,7 @@ public:
     // Stream emits multiple chunks
     std::vector<quantclaw::ChatCompletionResponse> stream_chunks;
 
-    void chat_completion_stream(const quantclaw::ChatCompletionRequest& /*request*/,
+    void ChatCompletionStream(const quantclaw::ChatCompletionRequest& /*request*/,
                                 std::function<void(const quantclaw::ChatCompletionResponse&)> callback) override {
         if (stream_chunks.empty()) {
             quantclaw::ChatCompletionResponse response;
@@ -67,18 +70,18 @@ TEST_F(OpenAIProviderTest, ChatCompletion) {
     request.temperature = 0.7;
     request.max_tokens = 100;
 
-    auto response = provider_->chat_completion(request);
+    auto response = provider_->ChatCompletion(request);
 
     EXPECT_EQ(response.content, "Mock response for: Hello, QuantClaw!");
     EXPECT_EQ(response.finish_reason, "stop");
 }
 
 TEST_F(OpenAIProviderTest, ProviderName) {
-    EXPECT_EQ(provider_->get_provider_name(), "openai");
+    EXPECT_EQ(provider_->GetProviderName(), "openai");
 }
 
 TEST_F(OpenAIProviderTest, SupportedModels) {
-    auto models = provider_->get_supported_models();
+    auto models = provider_->GetSupportedModels();
     EXPECT_FALSE(models.empty());
     // Should include common models
     bool has_gpt4 = false;
@@ -93,7 +96,7 @@ TEST_F(OpenAIProviderTest, StreamingCompletion) {
     request.messages.push_back({"user", "Hello"});
 
     bool called = false;
-    provider_->chat_completion_stream(request,
+    provider_->ChatCompletionStream(request,
         [&called](const quantclaw::ChatCompletionResponse& resp) {
             called = true;
             EXPECT_TRUE(resp.is_stream_end);
@@ -142,7 +145,7 @@ TEST_F(OpenAIProviderTest, ChatCompletionPassesModel) {
     request.temperature = 0.5;
     request.max_tokens = 200;
 
-    provider_->chat_completion(request);
+    provider_->ChatCompletion(request);
 
     EXPECT_EQ(provider_->last_request.model, "custom-model");
     EXPECT_DOUBLE_EQ(provider_->last_request.temperature, 0.5);
@@ -156,7 +159,7 @@ TEST_F(OpenAIProviderTest, ChatCompletionMultipleMessages) {
     request.messages.push_back({"assistant", "First reply"});
     request.messages.push_back({"user", "Second message"});
 
-    auto response = provider_->chat_completion(request);
+    auto response = provider_->ChatCompletion(request);
 
     EXPECT_EQ(provider_->last_request.messages.size(), 4u);
     EXPECT_EQ(response.content, "Mock response for: Second message");
@@ -175,7 +178,7 @@ TEST_F(OpenAIProviderTest, ResponseWithToolCalls) {
     quantclaw::ChatCompletionRequest request;
     request.messages.push_back({"user", "List files"});
 
-    auto response = provider_->chat_completion(request);
+    auto response = provider_->ChatCompletion(request);
 
     EXPECT_EQ(response.finish_reason, "tool_calls");
     ASSERT_EQ(response.tool_calls.size(), 1u);
@@ -199,7 +202,7 @@ TEST_F(OpenAIProviderTest, StreamingMultipleChunks) {
     std::string accumulated;
     bool saw_end = false;
 
-    provider_->chat_completion_stream(request,
+    provider_->ChatCompletionStream(request,
         [&](const quantclaw::ChatCompletionResponse& resp) {
             accumulated += resp.content;
             if (resp.is_stream_end) saw_end = true;

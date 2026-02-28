@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/mcp/mcp_server.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -9,7 +12,7 @@ namespace quantclaw::mcp {
 MCPTool::MCPTool(const std::string& name, const std::string& description)
     : name_(name), description_(description) {}
 
-void MCPTool::add_parameter(const std::string& name, const std::string& type, 
+void MCPTool::AddParameter(const std::string& name, const std::string& type, 
                           const std::string& description, bool required) {
     Parameter param;
     param.name = name;
@@ -19,7 +22,7 @@ void MCPTool::add_parameter(const std::string& name, const std::string& type,
     parameters_.push_back(param);
 }
 
-nlohmann::json MCPTool::get_schema() const {
+nlohmann::json MCPTool::GetSchema() const {
     nlohmann::json schema;
     schema["name"] = name_;
     schema["description"] = description_;
@@ -44,7 +47,7 @@ nlohmann::json MCPTool::get_schema() const {
     return schema;
 }
 
-std::string MCPTool::call(const nlohmann::json& arguments) {
+std::string MCPTool::Call(const nlohmann::json& arguments) {
     return execute(arguments);
 }
 
@@ -53,13 +56,13 @@ MCPServer::MCPServer(std::shared_ptr<spdlog::logger> logger)
     logger_->info("MCPServer initialized");
 }
 
-void MCPServer::register_tool(std::unique_ptr<MCPTool> tool) {
-    auto name = tool->get_name();
+void MCPServer::RegisterTool(std::unique_ptr<MCPTool> tool) {
+    auto name = tool->GetName();
     tools_[name] = std::move(tool);
     logger_->debug("Registered MCP tool: {}", name);
 }
 
-nlohmann::json MCPServer::handle_request(const nlohmann::json& request) {
+nlohmann::json MCPServer::HandleRequest(const nlohmann::json& request) {
     try {
         std::string method = request.value("method", "");
         nlohmann::json id = request.value("id", nlohmann::json(nullptr));
@@ -93,7 +96,7 @@ nlohmann::json MCPServer::handle_initialize(const nlohmann::json& /*request*/, c
 nlohmann::json MCPServer::handle_list_tools(const nlohmann::json& /*request*/, const nlohmann::json& id) {
     nlohmann::json tools_array = nlohmann::json::array();
     for (const auto& [name, tool] : tools_) {
-        tools_array.push_back(tool->get_schema());
+        tools_array.push_back(tool->GetSchema());
     }
     
     nlohmann::json result;
@@ -111,7 +114,7 @@ nlohmann::json MCPServer::handle_call_tool(const nlohmann::json& request, const 
             return create_error_response(id, -32602, "Tool not found: " + tool_name);
         }
         
-        std::string result = tools_[tool_name]->call(arguments);
+        std::string result = tools_[tool_name]->Call(arguments);
         
         nlohmann::json response;
         response["content"] = {{

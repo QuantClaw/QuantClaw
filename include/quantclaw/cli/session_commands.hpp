@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -11,10 +14,10 @@ class SessionCommands {
 public:
     explicit SessionCommands(std::shared_ptr<spdlog::logger> logger);
 
-    int list_command(const std::vector<std::string>& args);
-    int history_command(const std::vector<std::string>& args);
-    int delete_command(const std::vector<std::string>& args);
-    int reset_command(const std::vector<std::string>& args);
+    int ListCommand(const std::vector<std::string>& args);
+    int HistoryCommand(const std::vector<std::string>& args);
+    int DeleteCommand(const std::vector<std::string>& args);
+    int ResetCommand(const std::vector<std::string>& args);
 
 private:
     std::shared_ptr<spdlog::logger> logger_;

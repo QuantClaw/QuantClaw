@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
@@ -60,7 +63,7 @@ TEST(BrowserToolConfigTest, FromJson) {
       {"viewportHeight", 1080},
       {"navigationTimeoutMs", 60000},
   };
-  auto c = BrowserToolConfig::from_json(j);
+  auto c = BrowserToolConfig::FromJson(j);
   EXPECT_EQ(c.mode, BrowserToolConfig::Mode::kRemote);
   EXPECT_EQ(c.remote_cdp_url, "ws://localhost:9222");
   EXPECT_FALSE(c.headless);
@@ -70,7 +73,7 @@ TEST(BrowserToolConfigTest, FromJson) {
 }
 
 TEST(BrowserToolConfigTest, Defaults) {
-  auto c = BrowserToolConfig::from_json(nlohmann::json::object());
+  auto c = BrowserToolConfig::FromJson(nlohmann::json::object());
   EXPECT_EQ(c.mode, BrowserToolConfig::Mode::kLocal);
   EXPECT_TRUE(c.headless);
   EXPECT_EQ(c.viewport_width, 1280);
@@ -83,7 +86,7 @@ TEST(BrowserToolConfigTest, SsrfConfig) {
        {{"blockedHosts", nlohmann::json::array({"evil.com"})},
         {"allowedHosts", nlohmann::json::array({"safe.com"})}}},
   };
-  auto c = BrowserToolConfig::from_json(j);
+  auto c = BrowserToolConfig::FromJson(j);
   EXPECT_EQ(c.ssrf_policy.blocked_hosts.size(), 1);
   EXPECT_EQ(c.ssrf_policy.allowed_hosts.size(), 1);
 }

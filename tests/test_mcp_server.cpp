@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include "quantclaw/mcp/mcp_server.hpp"
@@ -7,7 +10,7 @@
 class TestMCPTool : public quantclaw::mcp::MCPTool {
 public:
     TestMCPTool() : MCPTool("test_tool", "A test tool for testing") {
-        add_parameter("input", "string", "Input string", true);
+        AddParameter("input", "string", "Input string", true);
     }
 
 private:
@@ -24,7 +27,7 @@ protected:
         logger_ = std::make_shared<spdlog::logger>("test", null_sink);
 
         server_ = std::make_unique<quantclaw::mcp::MCPServer>(logger_);
-        server_->register_tool(std::make_unique<TestMCPTool>());
+        server_->RegisterTool(std::make_unique<TestMCPTool>());
     }
 
     std::shared_ptr<spdlog::logger> logger_;
@@ -39,7 +42,7 @@ TEST_F(MCPServerTest, Initialize) {
         {"params", {}}
     };
 
-    auto response = server_->handle_request(request);
+    auto response = server_->HandleRequest(request);
 
     EXPECT_EQ(response["id"], 1);
     EXPECT_EQ(response["result"]["protocol_version"], "2024-11-15");
@@ -53,7 +56,7 @@ TEST_F(MCPServerTest, ListTools) {
         {"params", {}}
     };
 
-    auto response = server_->handle_request(request);
+    auto response = server_->HandleRequest(request);
 
     EXPECT_EQ(response["id"], 2);
     auto tools = response["result"]["tools"];
@@ -72,7 +75,7 @@ TEST_F(MCPServerTest, CallTool) {
         }}
     };
 
-    auto response = server_->handle_request(request);
+    auto response = server_->HandleRequest(request);
 
     EXPECT_EQ(response["id"], 3);
     auto content = response["result"]["content"];
@@ -87,7 +90,7 @@ TEST_F(MCPServerTest, UnknownMethod) {
         {"params", {}}
     };
 
-    auto response = server_->handle_request(request);
+    auto response = server_->HandleRequest(request);
 
     EXPECT_EQ(response["id"], 4);
     EXPECT_TRUE(response.contains("error"));

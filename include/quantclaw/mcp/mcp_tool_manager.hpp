@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -19,26 +22,26 @@ public:
     explicit MCPToolManager(std::shared_ptr<spdlog::logger> logger);
 
     // Connect to all configured MCP servers and discover their tools
-    void discover_tools(const MCPConfig& config);
+    void DiscoverTools(const MCPConfig& config);
 
     // Register discovered tools into a ToolRegistry
-    void register_into(ToolRegistry& registry);
+    void RegisterInto(ToolRegistry& registry);
 
     // Execute an external tool by its qualified name
-    std::string execute_tool(const std::string& qualified_name,
-                             const nlohmann::json& arguments);
+    std::string ExecuteTool(const std::string& qualified_name,
+                            const nlohmann::json& arguments);
 
     // Name resolution helpers
-    bool is_external_tool(const std::string& name) const;
-    std::string get_server_name(const std::string& qualified_name) const;
-    std::string get_original_tool_name(const std::string& qualified_name) const;
+    bool IsExternalTool(const std::string& name) const;
+    std::string GetServerName(const std::string& qualified_name) const;
+    std::string GetOriginalToolName(const std::string& qualified_name) const;
 
     // Get count of discovered tools
-    size_t tool_count() const { return tool_to_server_.size(); }
+    size_t ToolCount() const { return tool_to_server_.size(); }
 
     // Build qualified name: mcp__{server}__{tool}
-    static std::string make_qualified_name(const std::string& server_name,
-                                           const std::string& tool_name);
+    static std::string MakeQualifiedName(const std::string& server_name,
+                                          const std::string& tool_name);
 
 private:
     std::shared_ptr<spdlog::logger> logger_;

@@ -1,7 +1,12 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/providers/openai_provider.hpp"
+
+#include <sstream>
+
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
-#include <sstream>
 #include <spdlog/spdlog.h>
 
 namespace quantclaw {
@@ -88,7 +93,7 @@ OpenAIProvider::OpenAIProvider(const std::string& api_key,
     logger_->info("OpenAIProvider initialized with base_url: {}", base_url_);
 }
 
-ChatCompletionResponse OpenAIProvider::chat_completion(const ChatCompletionRequest& request) {
+ChatCompletionResponse OpenAIProvider::ChatCompletion(const ChatCompletionRequest& request) {
     // Build JSON payload
     nlohmann::json payload;
     payload["model"] = request.model;
@@ -109,7 +114,7 @@ ChatCompletionResponse OpenAIProvider::chat_completion(const ChatCompletionReque
     std::string json_payload = payload.dump();
     logger_->debug("Sending request to OpenAI API: {}", json_payload);
     
-    std::string response = make_api_request(json_payload);
+    std::string response = MakeApiRequest(json_payload);
     logger_->debug("Received response from OpenAI API: {}", response);
     
     // Parse response
@@ -146,59 +151,42 @@ ChatCompletionResponse OpenAIProvider::chat_completion(const ChatCompletionReque
     return result;
 }
 
-std::string OpenAIProvider::get_provider_name() const {
+std::string OpenAIProvider::GetProviderName() const {
     return "openai";
 }
 
-std::string OpenAIProvider::make_api_request(const std::string& json_payload) const {
-    CURL* curl;
-    CURLcode res;
+std::string OpenAIProvider::MakeApiRequest(
+    const std::string& json_payload) const {
     std::string read_buffer;
-    
-    curl = curl_easy_init();
-    if (!curl) {
-        throw std::runtime_error("Failed to initialize CURL");
-    }
-    
-    // Set URL
+
+    CurlHandle curl;
+    CurlSlist headers = CreateHeaders();
+
     std::string url = base_url_ + "/chat/completions";
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    
-    // Set headers
-    struct curl_slist* headers = create_headers();
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    
-    // Set POST data
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.get());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_payload.c_str());
-    
-    // Set write callback
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
-    
-    // Set timeout
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout_);
-    
-    // Perform request
-    res = curl_easy_perform(curl);
-    
-    // Cleanup
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-    
+
+    CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        throw std::runtime_error("CURL request failed: " + std::string(curl_easy_strerror(res)));
+        throw std::runtime_error(
+            "CURL request failed: " +
+            std::string(curl_easy_strerror(res)));
     }
-    
+
     return read_buffer;
 }
 
-struct curl_slist* OpenAIProvider::create_headers() const {
-    struct curl_slist* headers = nullptr;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
-    
+CurlSlist OpenAIProvider::CreateHeaders() const {
+    CurlSlist headers;
+    headers.append("Content-Type: application/json");
+
     std::string auth_header = "Authorization: Bearer " + api_key_;
-    headers = curl_slist_append(headers, auth_header.c_str());
-    
+    headers.append(auth_header.c_str());
+
     return headers;
 }
 
@@ -327,7 +315,7 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb, voi
     return total;
 }
 
-void OpenAIProvider::chat_completion_stream(const ChatCompletionRequest& request,
+void OpenAIProvider::ChatCompletionStream(const ChatCompletionRequest& request,
                                            std::function<void(const ChatCompletionResponse&)> callback) {
     // Build JSON payload with stream=true
     nlohmann::json payload;
@@ -352,18 +340,13 @@ void OpenAIProvider::chat_completion_stream(const ChatCompletionRequest& request
     stream_ctx.callback = callback;
     stream_ctx.logger = logger_;
 
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        throw std::runtime_error("Failed to initialize CURL for streaming");
-    }
+    CurlHandle curl;
+    CurlSlist headers = CreateHeaders();
 
     std::string url = base_url_ + "/chat/completions";
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-
-    struct curl_slist* headers = create_headers();
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.get());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_payload.c_str());
-
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, StreamWriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &stream_ctx);
 
@@ -372,16 +355,14 @@ void OpenAIProvider::chat_completion_stream(const ChatCompletionRequest& request
     curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 60L);
 
     CURLcode res = curl_easy_perform(curl);
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-
     if (res != CURLE_OK) {
-        throw std::runtime_error("CURL streaming request failed: " + std::string(curl_easy_strerror(res)));
+        throw std::runtime_error(
+            "CURL streaming request failed: " +
+            std::string(curl_easy_strerror(res)));
     }
 }
 
-std::vector<std::string> OpenAIProvider::get_supported_models() const {
+std::vector<std::string> OpenAIProvider::GetSupportedModels() const {
     return {"gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"};
 }
 

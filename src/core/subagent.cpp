@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/core/subagent.hpp"
 
 #include <algorithm>
@@ -23,7 +26,7 @@ SpawnMode spawn_mode_from_string(const std::string& s) {
 
 // --- SubagentConfig ---
 
-SubagentConfig SubagentConfig::from_json(const nlohmann::json& j) {
+SubagentConfig SubagentConfig::FromJson(const nlohmann::json& j) {
   SubagentConfig c;
   c.max_depth = j.value("maxDepth", 5);
   c.max_children = j.value("maxChildren", 5);
@@ -40,15 +43,15 @@ SubagentConfig SubagentConfig::from_json(const nlohmann::json& j) {
 SubagentManager::SubagentManager(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
-void SubagentManager::configure(const SubagentConfig& config) {
+void SubagentManager::Configure(const SubagentConfig& config) {
   config_ = config;
 }
 
-void SubagentManager::set_agent_runner(AgentRunFn runner) {
+void SubagentManager::SetAgentRunner(AgentRunFn runner) {
   agent_runner_ = std::move(runner);
 }
 
-SpawnResult SubagentManager::spawn(const SpawnParams& params,
+SpawnResult SubagentManager::Spawn(const SpawnParams& params,
                                     const std::string& parent_session_key,
                                     int current_depth) {
   SpawnResult result;
@@ -134,10 +137,10 @@ SpawnResult SubagentManager::spawn(const SpawnParams& params,
           agent_runner_(child_key, params.task, params.model, extra_prompt);
       // If agent_runner returns synchronously, mark complete
       if (!agent_result.empty()) {
-        complete_run(run_id, agent_result);
+        CompleteRun(run_id, agent_result);
       }
     } catch (const std::exception& e) {
-      fail_run(run_id, e.what());
+      FailRun(run_id, e.what());
       result.status = SpawnResult::kError;
       result.error = e.what();
       return result;
@@ -152,7 +155,7 @@ SpawnResult SubagentManager::spawn(const SpawnParams& params,
   return result;
 }
 
-void SubagentManager::complete_run(const std::string& run_id,
+void SubagentManager::CompleteRun(const std::string& run_id,
                                     const std::string& result_summary) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = runs_.find(run_id);
@@ -163,7 +166,7 @@ void SubagentManager::complete_run(const std::string& run_id,
   }
 }
 
-void SubagentManager::fail_run(const std::string& run_id,
+void SubagentManager::FailRun(const std::string& run_id,
                                 const std::string& error) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = runs_.find(run_id);
@@ -174,7 +177,7 @@ void SubagentManager::fail_run(const std::string& run_id,
   }
 }
 
-bool SubagentManager::cancel_run(const std::string& run_id) {
+bool SubagentManager::CancelRun(const std::string& run_id) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = runs_.find(run_id);
   if (it == runs_.end() || it->second.state != SubagentRun::kRunning) {
@@ -185,7 +188,7 @@ bool SubagentManager::cancel_run(const std::string& run_id) {
   return true;
 }
 
-std::vector<SubagentRun> SubagentManager::active_children(
+std::vector<SubagentRun> SubagentManager::ActiveChildren(
     const std::string& parent_session_key) const {
   std::lock_guard<std::mutex> lock(mu_);
   std::vector<SubagentRun> result;
@@ -201,7 +204,7 @@ std::vector<SubagentRun> SubagentManager::active_children(
   return result;
 }
 
-std::vector<SubagentRun> SubagentManager::all_runs() const {
+std::vector<SubagentRun> SubagentManager::AllRuns() const {
   std::lock_guard<std::mutex> lock(mu_);
   std::vector<SubagentRun> result;
   for (const auto& [id, run] : runs_) {
@@ -210,13 +213,13 @@ std::vector<SubagentRun> SubagentManager::all_runs() const {
   return result;
 }
 
-const SubagentRun* SubagentManager::get_run(const std::string& run_id) const {
+const SubagentRun* SubagentManager::GetRun(const std::string& run_id) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = runs_.find(run_id);
   return it != runs_.end() ? &it->second : nullptr;
 }
 
-int SubagentManager::cleanup_completed() {
+int SubagentManager::CleanupCompleted() {
   std::lock_guard<std::mutex> lock(mu_);
   std::vector<std::string> to_remove;
 

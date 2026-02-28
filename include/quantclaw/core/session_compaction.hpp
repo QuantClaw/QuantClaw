@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <memory>
@@ -22,7 +25,7 @@ class SessionCompaction {
   };
 
   // Check if compaction is needed
-  bool needs_compaction(const std::vector<nlohmann::json>& messages,
+  bool NeedsCompaction(const std::vector<nlohmann::json>& messages,
                         const Options& opts) const;
 
   // Compact messages: returns new message list with older messages summarized.
@@ -30,18 +33,18 @@ class SessionCompaction {
   // should return a summary string (typically via LLM).
   using SummaryFn = std::function<std::string(const std::vector<nlohmann::json>&)>;
 
-  std::vector<nlohmann::json> compact(
+  std::vector<nlohmann::json> Compact(
       const std::vector<nlohmann::json>& messages,
       const Options& opts,
       SummaryFn summary_fn);
 
   // Simple truncation without LLM summary (just keeps recent messages)
-  std::vector<nlohmann::json> truncate(
+  std::vector<nlohmann::json> Truncate(
       const std::vector<nlohmann::json>& messages,
       const Options& opts);
 
   // Estimate token count for a message list
-  int estimate_tokens(const std::vector<nlohmann::json>& messages) const;
+  int EstimateTokens(const std::vector<nlohmann::json>& messages) const;
 
  private:
   std::shared_ptr<spdlog::logger> logger_;

@@ -1,29 +1,27 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/tools/browser_tool.hpp"
 
 #include <algorithm>
-#include <csignal>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <regex>
 #include <sstream>
-#include <sys/wait.h>
-#include <unistd.h>
 
 namespace quantclaw {
 
 // --- SsrfPolicy ---
 
 bool SsrfPolicy::is_allowed(const std::string& host) const {
-  // Check blocked hosts
   for (const auto& blocked : blocked_hosts) {
     if (host == blocked) return false;
   }
 
-  // Check blocked ranges (simplified: just check common private prefixes)
   for (const auto& range : blocked_ranges) {
     if (range == "10.0.0.0/8" && host.substr(0, 3) == "10.") return false;
     if (range == "172.16.0.0/12" && host.substr(0, 4) == "172.") {
-      // Simplified check
       return false;
     }
     if (range == "192.168.0.0/16" && host.substr(0, 8) == "192.168.") {
@@ -31,7 +29,6 @@ bool SsrfPolicy::is_allowed(const std::string& host) const {
     }
   }
 
-  // Check allowed hosts (whitelist mode)
   if (!allowed_hosts.empty()) {
     for (const auto& allowed : allowed_hosts) {
       if (host == allowed) return true;
@@ -51,7 +48,7 @@ SsrfPolicy SsrfPolicy::default_policy() {
 
 // --- BrowserToolConfig ---
 
-BrowserToolConfig BrowserToolConfig::from_json(const nlohmann::json& j) {
+BrowserToolConfig BrowserToolConfig::FromJson(const nlohmann::json& j) {
   BrowserToolConfig c;
   if (j.contains("mode") && j["mode"].is_string()) {
     c.mode = (j["mode"] == "remote") ? BrowserToolConfig::Mode::kRemote
@@ -102,11 +99,10 @@ bool BrowserSession::initialize(const BrowserToolConfig& config) {
 }
 
 void BrowserSession::close() {
-  if (browser_pid_ > 0) {
-    kill(browser_pid_, SIGTERM);
-    int status;
-    waitpid(browser_pid_, &status, WNOHANG);
-    browser_pid_ = 0;
+  if (browser_pid_ != platform::kInvalidPid) {
+    platform::terminate_process(browser_pid_);
+    platform::wait_process(browser_pid_, 0);  // non-blocking reap
+    browser_pid_ = platform::kInvalidPid;
     logger_->info("Browser process terminated");
   }
   connection_.is_running = false;
@@ -166,16 +162,6 @@ std::string BrowserSession::screenshot_base64(bool full_page) {
   return cdp_send("Page.captureScreenshot", params);
 }
 
-std::string BrowserSession::get_page_text() const {
-  // Would use CDP to get document text; simplified stub
-  return "";
-}
-
-std::string BrowserSession::get_accessibility_tree() const {
-  // Would use CDP to get accessibility snapshot; simplified stub
-  return "";
-}
-
 PageState BrowserSession::get_state() const {
   std::lock_guard<std::mutex> lock(mu_);
   return state_;
@@ -195,10 +181,9 @@ bool BrowserSession::launch_local() {
     return false;
   }
 
-  // Build args
   std::vector<std::string> args = {
       chromium,
-      "--remote-debugging-port=0",  // Let OS pick port
+      "--remote-debugging-port=0",
       "--no-first-run",
       "--no-default-browser-check",
       "--disable-background-networking",
@@ -210,26 +195,18 @@ bool BrowserSession::launch_local() {
   args.push_back("--window-size=" + std::to_string(config_.viewport_width) +
                  "," + std::to_string(config_.viewport_height));
 
-  // Fork and exec
-  pid_t pid = fork();
-  if (pid == 0) {
-    // Child
-    std::vector<char*> c_args;
-    for (auto& a : args) c_args.push_back(const_cast<char*>(a.c_str()));
-    c_args.push_back(nullptr);
-    execvp(c_args[0], c_args.data());
-    _exit(127);
-  } else if (pid > 0) {
-    browser_pid_ = pid;
-    connection_.pid_or_id = std::to_string(pid);
-    connection_.is_remote = false;
-    connection_.is_running = true;
-    logger_->info("Launched browser: PID={}, binary={}", pid, chromium);
-    return true;
+  auto pid = platform::spawn_process(args);
+  if (pid == platform::kInvalidPid) {
+    logger_->error("Failed to launch browser process");
+    return false;
   }
 
-  logger_->error("Failed to fork browser process");
-  return false;
+  browser_pid_ = pid;
+  connection_.pid_or_id = std::to_string(pid);
+  connection_.is_remote = false;
+  connection_.is_running = true;
+  logger_->info("Launched browser: PID={}, binary={}", pid, chromium);
+  return true;
 }
 
 bool BrowserSession::connect_remote() {
@@ -247,17 +224,44 @@ bool BrowserSession::connect_remote() {
 
 std::string BrowserSession::cdp_send(const std::string& method,
                                       const nlohmann::json& params) {
-  // In production, this would use WebSocket to send CDP commands.
-  // This is a placeholder implementation.
   logger_->debug("CDP: {} params={}", method, params.dump());
-
-  // For now, return empty indicating the command was "sent"
-  // Full CDP WebSocket implementation would go here.
   return "{}";
 }
 
 std::string BrowserSession::find_chromium() {
-  // Check common paths on Linux
+#ifdef _WIN32
+  // Check common Windows Chrome paths
+  std::vector<std::string> candidates;
+  const char* pf = std::getenv("PROGRAMFILES");
+  const char* pf86 = std::getenv("PROGRAMFILES(X86)");
+  const char* localappdata = std::getenv("LOCALAPPDATA");
+
+  if (pf) {
+    candidates.push_back(std::string(pf) + "\\Google\\Chrome\\Application\\chrome.exe");
+  }
+  if (pf86) {
+    candidates.push_back(std::string(pf86) + "\\Google\\Chrome\\Application\\chrome.exe");
+  }
+  if (localappdata) {
+    candidates.push_back(std::string(localappdata) + "\\Google\\Chrome\\Application\\chrome.exe");
+    candidates.push_back(std::string(localappdata) + "\\Chromium\\Application\\chrome.exe");
+  }
+
+  for (const auto& path : candidates) {
+    if (std::filesystem::exists(path)) {
+      return path;
+    }
+  }
+
+  // Try `where` command
+  auto result = platform::exec_capture("where chrome.exe 2>nul", 5);
+  if (result.exit_code == 0 && !result.output.empty()) {
+    auto line = result.output.substr(0, result.output.find('\n'));
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (!line.empty()) return line;
+  }
+#else
+  // Check common Linux paths
   std::vector<std::string> candidates = {
       "/usr/bin/chromium-browser",
       "/usr/bin/chromium",
@@ -267,35 +271,29 @@ std::string BrowserSession::find_chromium() {
   };
 
   for (const auto& path : candidates) {
-    if (access(path.c_str(), X_OK) == 0) {
+    if (std::filesystem::exists(path)) {
       return path;
     }
   }
 
   // Try `which`
-  FILE* pipe = popen("which chromium-browser chromium google-chrome 2>/dev/null", "r");
-  if (pipe) {
-    char buf[256];
-    if (fgets(buf, sizeof(buf), pipe)) {
-      std::string result(buf);
-      // Remove trailing newline
-      if (!result.empty() && result.back() == '\n') result.pop_back();
-      pclose(pipe);
-      if (!result.empty()) return result;
-    } else {
-      pclose(pipe);
-    }
+  auto result = platform::exec_capture(
+      "which chromium-browser chromium google-chrome 2>/dev/null", 5);
+  if (result.exit_code == 0 && !result.output.empty()) {
+    auto line = result.output.substr(0, result.output.find('\n'));
+    if (!line.empty() && line.back() == '\n') line.pop_back();
+    if (!line.empty()) return line;
   }
+#endif
 
   return "";
 }
 
 bool BrowserSession::check_navigation(const std::string& url) const {
-  // Extract host from URL
   std::regex url_re(R"(https?://([^/:]+))");
   std::smatch match;
   if (!std::regex_search(url, match, url_re)) {
-    return true;  // Non-HTTP URLs pass through
+    return true;
   }
   std::string host = match[1].str();
   return config_.ssrf_policy.is_allowed(host);

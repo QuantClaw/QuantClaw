@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/channels/channel_policy.hpp"
 #include <algorithm>
 #include <random>
@@ -6,12 +9,12 @@
 
 namespace quantclaw {
 
-DmPolicy dm_policy_from_string(const std::string& s) {
+DmPolicy DmPolicyFromString(const std::string& s) {
   if (s == "pairing") return DmPolicy::kPairing;
   return DmPolicy::kOpen;
 }
 
-std::string dm_policy_to_string(DmPolicy p) {
+std::string DmPolicyToString(DmPolicy p) {
   switch (p) {
     case DmPolicy::kPairing: return "pairing";
     case DmPolicy::kOpen:    return "open";
@@ -19,7 +22,7 @@ std::string dm_policy_to_string(DmPolicy p) {
   return "open";
 }
 
-DmScope dm_scope_from_string(const std::string& s) {
+DmScope DmScopeFromString(const std::string& s) {
   if (s == "main")                  return DmScope::kMain;
   if (s == "per-peer")              return DmScope::kPerPeer;
   if (s == "per-channel-peer")      return DmScope::kPerChannelPeer;
@@ -27,7 +30,7 @@ DmScope dm_scope_from_string(const std::string& s) {
   return DmScope::kPerChannelPeer;
 }
 
-std::string dm_scope_to_string(DmScope s) {
+std::string DmScopeToString(DmScope s) {
   switch (s) {
     case DmScope::kMain:                  return "main";
     case DmScope::kPerPeer:               return "per-peer";
@@ -37,16 +40,16 @@ std::string dm_scope_to_string(DmScope s) {
   return "per-channel-peer";
 }
 
-GroupActivation group_activation_from_string(const std::string& s) {
+GroupActivation GroupActivationFromString(const std::string& s) {
   if (s == "always") return GroupActivation::kAlways;
   return GroupActivation::kMention;
 }
 
-ChannelPolicyConfig ChannelPolicyConfig::from_json(const nlohmann::json& j) {
+ChannelPolicyConfig ChannelPolicyConfig::FromJson(const nlohmann::json& j) {
   ChannelPolicyConfig c;
-  c.dm_policy = dm_policy_from_string(j.value("dmPolicy", "open"));
-  c.dm_scope = dm_scope_from_string(j.value("dmScope", "per-channel-peer"));
-  c.group_activation = group_activation_from_string(
+  c.dm_policy = DmPolicyFromString(j.value("dmPolicy", "open"));
+  c.dm_scope = DmScopeFromString(j.value("dmScope", "per-channel-peer"));
+  c.group_activation = GroupActivationFromString(
       j.value("groupActivation", "mention"));
   c.group_chunk_size = j.value("groupChunkSize", 2000);
   c.bot_name = j.value("botName", "");
@@ -64,7 +67,7 @@ ChannelPolicyConfig ChannelPolicyConfig::from_json(const nlohmann::json& j) {
 PairingManager::PairingManager(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
-std::string PairingManager::generate_code(const std::string& channel_id) {
+std::string PairingManager::GenerateCode(const std::string& channel_id) {
   // Generate a 6-digit numeric code
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -79,7 +82,7 @@ std::string PairingManager::generate_code(const std::string& channel_id) {
   return code;
 }
 
-bool PairingManager::verify_code(const std::string& channel_id,
+bool PairingManager::VerifyCode(const std::string& channel_id,
                                  const std::string& code,
                                  const std::string& sender_id) {
   std::lock_guard<std::mutex> lock(mu_);
@@ -97,7 +100,7 @@ bool PairingManager::verify_code(const std::string& channel_id,
   return true;
 }
 
-bool PairingManager::is_paired(const std::string& channel_id,
+bool PairingManager::IsPaired(const std::string& channel_id,
                                const std::string& sender_id) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = paired_.find(channel_id);
@@ -105,7 +108,7 @@ bool PairingManager::is_paired(const std::string& channel_id,
   return it->second.count(sender_id) > 0;
 }
 
-std::vector<std::string> PairingManager::paired_senders(
+std::vector<std::string> PairingManager::PairedSenders(
     const std::string& channel_id) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = paired_.find(channel_id);
@@ -113,7 +116,7 @@ std::vector<std::string> PairingManager::paired_senders(
   return {it->second.begin(), it->second.end()};
 }
 
-void PairingManager::unpair(const std::string& channel_id,
+void PairingManager::Unpair(const std::string& channel_id,
                             const std::string& sender_id) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = paired_.find(channel_id);
@@ -124,7 +127,7 @@ void PairingManager::unpair(const std::string& channel_id,
 
 // --- SessionResolver ---
 
-std::string SessionResolver::resolve_session_key(
+std::string SessionResolver::ResolveSessionKey(
     DmScope scope,
     const std::string& agent_id,
     const std::string& channel_id,
@@ -150,7 +153,7 @@ std::string SessionResolver::resolve_session_key(
   return "agent:" + agent_id + ":main";
 }
 
-bool SessionResolver::should_activate_group(
+bool SessionResolver::ShouldActivateGroup(
     GroupActivation mode,
     const std::string& message,
     const std::string& bot_name,
@@ -177,8 +180,8 @@ bool SessionResolver::should_activate_group(
     try {
       std::regex re(pattern, std::regex::icase);
       if (std::regex_search(message, re)) return true;
-    } catch (...) {
-      // Invalid regex, skip
+    } catch (const std::exception&) {
+      // Invalid regex pattern, skip
     }
   }
 

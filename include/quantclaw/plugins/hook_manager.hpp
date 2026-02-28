@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <functional>
@@ -58,28 +61,28 @@ class HookManager {
   explicit HookManager(std::shared_ptr<spdlog::logger> logger);
 
   // Register a native C++ hook handler
-  void register_hook(const std::string& hook_name,
-                     const std::string& plugin_id,
-                     HookHandler handler,
-                     int priority = 0);
+  void RegisterHook(const std::string& hook_name,
+                    const std::string& plugin_id,
+                    HookHandler handler,
+                    int priority = 0);
 
   // Set the sidecar for forwarding hooks to plugins
-  void set_sidecar(std::shared_ptr<SidecarManager> sidecar);
+  void SetSidecar(std::shared_ptr<SidecarManager> sidecar);
 
   // Fire a hook event. Runs all registered handlers (native + sidecar)
   // sorted by priority (highest first). Returns merged results.
-  nlohmann::json fire(const std::string& hook_name,
+  nlohmann::json Fire(const std::string& hook_name,
                       const nlohmann::json& event);
 
   // Fire a hook asynchronously (fire-and-forget)
-  void fire_async(const std::string& hook_name,
-                  const nlohmann::json& event);
+  void FireAsync(const std::string& hook_name,
+                 const nlohmann::json& event);
 
   // List all registered hooks
-  std::vector<std::string> registered_hooks() const;
+  std::vector<std::string> RegisteredHooks() const;
 
   // Number of handlers for a specific hook
-  size_t handler_count(const std::string& hook_name) const;
+  size_t HandlerCount(const std::string& hook_name) const;
 
  private:
   std::shared_ptr<spdlog::logger> logger_;

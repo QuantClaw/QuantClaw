@@ -1,19 +1,20 @@
 ---
 # QuantClaw C++ Code Style Configuration
-# Based on Google C++ Style Guide with modifications
+# Strictly follows Google C++ Style Guide
+# Reference: https://google.github.io/styleguide/cppguide.html
 
 BasedOnStyle: Google
 
 Language: Cpp
 Standard: c++17
 
-# Indentation
-IndentWidth: 4
-TabWidth: 4
+# Indentation: 2-space (Google standard)
+IndentWidth: 2
+TabWidth: 2
 UseTab: Never
-ColumnLimit: 120
+ColumnLimit: 80
 
-# Braces
+# Braces: K&R / Attach style
 BreakBeforeBraces: Attach
 BraceWrapping:
   AfterClass: false
@@ -52,7 +53,7 @@ AlignEscapedNewlines: Left
 AlignOperands: true
 AlignTrailingComments: true
 
-# Line breaks
+# Line breaks — enforce braces on all control flow
 AllowShortBlocksOnASingleLine: Empty
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Empty
@@ -75,18 +76,31 @@ BreakStringLiterals: true
 DerivePointerAlignment: false
 PointerAlignment: Left
 
-# Include ordering
+# Include ordering (Google style)
+# Order: (1) related header, (2) C system, (3) C++ stdlib,
+#         (4) third-party libs, (5) project headers
 IncludeBlocks: Regroup
 SortIncludes: true
+IncludeIsMainRegex: '([-_](test|unittest))?$'
 IncludeCategories:
-  - Regex:           '^"quantclaw/'
+  # C system headers
+  - Regex:           '^<(sys|arpa|netinet|linux|unistd|signal|fcntl|dlfcn)/'
     Priority:        1
-  - Regex:           '^<[^/]+>'
+  - Regex:           '^<(unistd|signal|fcntl|errno|dirent)\.h>'
+    Priority:        1
+  # C++ standard library
+  - Regex:           '^<[a-z_]+>'
     Priority:        2
-  - Regex:           '^<'
+  # Third-party libraries (nlohmann, spdlog, curl, ix, httplib)
+  - Regex:           '^<(nlohmann|spdlog|curl|ix|httplib)/'
     Priority:        3
-  - Regex:           '.*'
+  - Regex:           '^<(nlohmann|spdlog|curl|ixwebsocket|httplib)'
+    Priority:        3
+  # Project headers
+  - Regex:           '^"quantclaw/'
     Priority:        4
+  - Regex:           '.*'
+    Priority:        5
 
 # Namespace
 NamespaceIndentation: None
@@ -95,8 +109,8 @@ CompactNamespaces: false
 # Comments
 ReflowComments: true
 
-# Other
-AccessModifierOffset: -4
+# Other (Google defaults)
+AccessModifierOffset: -1
 ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/core/session_compaction.hpp"
 
 namespace quantclaw {
@@ -5,19 +8,19 @@ namespace quantclaw {
 SessionCompaction::SessionCompaction(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
-bool SessionCompaction::needs_compaction(
+bool SessionCompaction::NeedsCompaction(
     const std::vector<nlohmann::json>& messages,
     const Options& opts) const {
   if (static_cast<int>(messages.size()) > opts.max_messages) return true;
-  if (estimate_tokens(messages) > opts.max_tokens) return true;
+  if (EstimateTokens(messages) > opts.max_tokens) return true;
   return false;
 }
 
-std::vector<nlohmann::json> SessionCompaction::compact(
+std::vector<nlohmann::json> SessionCompaction::Compact(
     const std::vector<nlohmann::json>& messages,
     const Options& opts,
     SummaryFn summary_fn) {
-  if (!needs_compaction(messages, opts)) {
+  if (!NeedsCompaction(messages, opts)) {
     return messages;
   }
 
@@ -43,12 +46,12 @@ std::vector<nlohmann::json> SessionCompaction::compact(
     } catch (const std::exception& e) {
       logger_->error("Compaction summary failed: {}", e.what());
       // Fallback to truncation
-      return truncate(messages, opts);
+      return Truncate(messages, opts);
     }
   }
 
   if (summary.empty()) {
-    return truncate(messages, opts);
+    return Truncate(messages, opts);
   }
 
   // Build compacted message list: system summary + recent messages
@@ -68,7 +71,7 @@ std::vector<nlohmann::json> SessionCompaction::compact(
   return result;
 }
 
-std::vector<nlohmann::json> SessionCompaction::truncate(
+std::vector<nlohmann::json> SessionCompaction::Truncate(
     const std::vector<nlohmann::json>& messages,
     const Options& opts) {
   int total = static_cast<int>(messages.size());
@@ -91,7 +94,7 @@ std::vector<nlohmann::json> SessionCompaction::truncate(
   return result;
 }
 
-int SessionCompaction::estimate_tokens(
+int SessionCompaction::EstimateTokens(
     const std::vector<nlohmann::json>& messages) const {
   int total_chars = 0;
   for (const auto& msg : messages) {

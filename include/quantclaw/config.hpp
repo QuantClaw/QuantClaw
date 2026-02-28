@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -14,8 +17,9 @@ struct AgentConfig {
     int max_iterations = 15;
     double temperature = 0.7;
     int max_tokens = 4096;
+    std::string thinking = "off";  // "off" | "low" | "medium" | "high"
 
-    static AgentConfig from_json(const nlohmann::json& json);
+    static AgentConfig FromJson(const nlohmann::json& json);
 };
 
 struct ProviderConfig {
@@ -23,7 +27,7 @@ struct ProviderConfig {
     std::string base_url;
     int timeout = 30;
 
-    static ProviderConfig from_json(const nlohmann::json& json);
+    static ProviderConfig FromJson(const nlohmann::json& json);
 };
 
 // --- Channels (OpenClaw compatible) ---
@@ -38,7 +42,7 @@ struct ChannelConfig {
     // Contains all platform-specific fields (clientId, robotCode, dmPolicy, etc.)
     nlohmann::json raw;
 
-    static ChannelConfig from_json(const nlohmann::json& json);
+    static ChannelConfig FromJson(const nlohmann::json& json);
 };
 
 // --- Tools ---
@@ -51,14 +55,14 @@ struct ToolConfig {
     std::vector<std::string> denied_cmds;
     int timeout = 30;
 
-    static ToolConfig from_json(const nlohmann::json& json);
+    static ToolConfig FromJson(const nlohmann::json& json);
 };
 
 struct ToolPermissionConfig {
     std::vector<std::string> allow;  // e.g. ["group:fs", "group:runtime"]
     std::vector<std::string> deny;
 
-    static ToolPermissionConfig from_json(const nlohmann::json& json);
+    static ToolPermissionConfig FromJson(const nlohmann::json& json);
 };
 
 // --- MCP ---
@@ -68,13 +72,13 @@ struct MCPServerConfig {
     std::string url;
     int timeout = 30;
 
-    static MCPServerConfig from_json(const nlohmann::json& json);
+    static MCPServerConfig FromJson(const nlohmann::json& json);
 };
 
 struct MCPConfig {
     std::vector<MCPServerConfig> servers;
 
-    static MCPConfig from_json(const nlohmann::json& json);
+    static MCPConfig FromJson(const nlohmann::json& json);
 };
 
 // --- Gateway ---
@@ -83,7 +87,7 @@ struct GatewayAuthConfig {
     std::string mode = "token";  // "token" | "none"
     std::string token;
 
-    static GatewayAuthConfig from_json(const nlohmann::json& json) {
+    static GatewayAuthConfig FromJson(const nlohmann::json& json) {
         GatewayAuthConfig c;
         c.mode = json.value("mode", "token");
         c.token = json.value("token", "");
@@ -95,7 +99,7 @@ struct GatewayControlUiConfig {
     bool enabled = true;
     int port = 18790;
 
-    static GatewayControlUiConfig from_json(const nlohmann::json& json) {
+    static GatewayControlUiConfig FromJson(const nlohmann::json& json) {
         GatewayControlUiConfig c;
         c.enabled = json.value("enabled", true);
         c.port = json.value("port", 18790);
@@ -109,7 +113,7 @@ struct GatewayConfig {
     GatewayAuthConfig auth;
     GatewayControlUiConfig control_ui;
 
-    static GatewayConfig from_json(const nlohmann::json& json);
+    static GatewayConfig FromJson(const nlohmann::json& json);
 };
 
 // --- System (OpenClaw format) ---
@@ -120,7 +124,7 @@ struct SystemConfig {
     std::string log_level = "info";
     int port = 0;  // 0 = not set, use gateway.port
 
-    static SystemConfig from_json(const nlohmann::json& json) {
+    static SystemConfig FromJson(const nlohmann::json& json) {
         SystemConfig c;
         c.name = json.value("name", "QuantClaw");
         c.version = json.value("version", "0.2.0");
@@ -136,7 +140,7 @@ struct SecurityConfig {
     std::string permission_level = "auto";  // "auto" | "strict" | "permissive"
     bool allow_local_execute = true;
 
-    static SecurityConfig from_json(const nlohmann::json& json) {
+    static SecurityConfig FromJson(const nlohmann::json& json) {
         SecurityConfig c;
         c.permission_level = json.value("permissionLevel", "auto");
         c.allow_local_execute = json.value("allowLocalExecute", true);
@@ -148,12 +152,12 @@ struct SecurityConfig {
 
 struct SkillEntryConfig {
     bool enabled = true;
-    static SkillEntryConfig from_json(const nlohmann::json& json);
+    static SkillEntryConfig FromJson(const nlohmann::json& json);
 };
 
 struct SkillsLoadConfig {
     std::vector<std::string> extra_dirs;
-    static SkillsLoadConfig from_json(const nlohmann::json& json);
+    static SkillsLoadConfig FromJson(const nlohmann::json& json);
 };
 
 struct SkillsConfig {
@@ -163,7 +167,7 @@ struct SkillsConfig {
     std::unordered_map<std::string, SkillEntryConfig> entries;
     nlohmann::json configs;  // OpenClaw: skills.configs
 
-    static SkillsConfig from_json(const nlohmann::json& json);
+    static SkillsConfig FromJson(const nlohmann::json& json);
 };
 
 // --- Top-level config ---
@@ -197,19 +201,19 @@ struct QuantClawConfig {
     // Legacy compatibility
     std::unordered_map<std::string, ToolConfig> tools;
 
-    static QuantClawConfig from_json(const nlohmann::json& json);
-    static QuantClawConfig load_from_file(const std::string& filepath);
+    static QuantClawConfig FromJson(const nlohmann::json& json);
+    static QuantClawConfig LoadFromFile(const std::string& filepath);
 
     // Write a dot-path value (e.g. "agent.model") into the config file.
     // Creates a backup (.bak) before writing.
-    static void set_value(const std::string& filepath, const std::string& dot_path,
-                          const nlohmann::json& value);
+    static void SetValue(const std::string& filepath, const std::string& dot_path,
+                         const nlohmann::json& value);
 
     // Remove a dot-path key from the config file.
-    static void unset_value(const std::string& filepath, const std::string& dot_path);
+    static void UnsetValue(const std::string& filepath, const std::string& dot_path);
 
-    static std::string expand_home(const std::string& path);
-    static std::string default_config_path();
+    static std::string ExpandHome(const std::string& path);
+    static std::string DefaultConfigPath();
 };
 
 } // namespace quantclaw

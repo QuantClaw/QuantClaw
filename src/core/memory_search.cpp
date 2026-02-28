@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/core/memory_search.hpp"
 #include <algorithm>
 #include <cctype>
@@ -12,7 +15,7 @@ namespace quantclaw {
 MemorySearch::MemorySearch(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
-void MemorySearch::index_directory(const std::filesystem::path& dir) {
+void MemorySearch::IndexDirectory(const std::filesystem::path& dir) {
   if (!std::filesystem::exists(dir)) return;
 
   std::error_code ec;
@@ -21,14 +24,14 @@ void MemorySearch::index_directory(const std::filesystem::path& dir) {
     if (!entry.is_regular_file()) continue;
     auto ext = entry.path().extension().string();
     if (ext == ".md" || ext == ".txt" || ext == ".jsonl") {
-      index_file(entry.path());
+      IndexFile(entry.path());
     }
   }
 
   logger_->info("Indexed {} entries from {}", entries_.size(), dir.string());
 }
 
-void MemorySearch::index_file(const std::filesystem::path& file) {
+void MemorySearch::IndexFile(const std::filesystem::path& file) {
   std::ifstream ifs(file);
   if (!ifs.is_open()) return;
 
@@ -70,7 +73,7 @@ void MemorySearch::index_file(const std::filesystem::path& file) {
   flush_paragraph();
 }
 
-std::vector<MemorySearchResult> MemorySearch::search(
+std::vector<MemorySearchResult> MemorySearch::Search(
     const std::string& query, int max_results) const {
   auto query_tokens = tokenize(query);
   if (query_tokens.empty()) return {};
@@ -100,14 +103,14 @@ std::vector<MemorySearchResult> MemorySearch::search(
   return results;
 }
 
-nlohmann::json MemorySearch::stats() const {
+nlohmann::json MemorySearch::Stats() const {
   return {
       {"indexed_entries", entries_.size()},
       {"total_documents", total_documents_},
   };
 }
 
-void MemorySearch::clear() {
+void MemorySearch::Clear() {
   entries_.clear();
   total_documents_ = 0;
 }

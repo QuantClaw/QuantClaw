@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/plugins/hook_manager.hpp"
 #include "quantclaw/plugins/sidecar_manager.hpp"
 #include <algorithm>
@@ -8,7 +11,7 @@ namespace quantclaw {
 HookManager::HookManager(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
-void HookManager::register_hook(const std::string& hook_name,
+void HookManager::RegisterHook(const std::string& hook_name,
                                 const std::string& plugin_id,
                                 HookHandler handler,
                                 int priority) {
@@ -23,12 +26,12 @@ void HookManager::register_hook(const std::string& hook_name,
             });
 }
 
-void HookManager::set_sidecar(std::shared_ptr<SidecarManager> sidecar) {
+void HookManager::SetSidecar(std::shared_ptr<SidecarManager> sidecar) {
   std::lock_guard<std::mutex> lock(mu_);
   sidecar_ = std::move(sidecar);
 }
 
-nlohmann::json HookManager::fire(const std::string& hook_name,
+nlohmann::json HookManager::Fire(const std::string& hook_name,
                                  const nlohmann::json& event) {
   nlohmann::json merged_result = nlohmann::json::object();
 
@@ -58,12 +61,12 @@ nlohmann::json HookManager::fire(const std::string& hook_name,
     sidecar = sidecar_;
   }
 
-  if (sidecar && sidecar->is_running()) {
+  if (sidecar && sidecar->IsRunning()) {
     nlohmann::json params = {
         {"hookName", hook_name},
         {"event", event},
     };
-    auto resp = sidecar->call("plugin.hooks", params);
+    auto resp = sidecar->Call("plugin.hooks", params);
     if (resp.ok && resp.result.is_object()) {
       merged_result.merge_patch(resp.result);
     } else if (!resp.ok) {
@@ -74,13 +77,13 @@ nlohmann::json HookManager::fire(const std::string& hook_name,
   return merged_result;
 }
 
-void HookManager::fire_async(const std::string& hook_name,
+void HookManager::FireAsync(const std::string& hook_name,
                               const nlohmann::json& event) {
   // Capture by value for thread safety
   auto logger = logger_;
   auto self_hooks = [this, hook_name, event, logger]() {
     try {
-      fire(hook_name, event);
+      Fire(hook_name, event);
     } catch (const std::exception& e) {
       logger->error("Async hook {} failed: {}", hook_name, e.what());
     }
@@ -88,7 +91,7 @@ void HookManager::fire_async(const std::string& hook_name,
   std::thread(std::move(self_hooks)).detach();
 }
 
-std::vector<std::string> HookManager::registered_hooks() const {
+std::vector<std::string> HookManager::RegisteredHooks() const {
   std::lock_guard<std::mutex> lock(mu_);
   std::vector<std::string> names;
   for (const auto& [name, _] : hooks_) {
@@ -97,7 +100,7 @@ std::vector<std::string> HookManager::registered_hooks() const {
   return names;
 }
 
-size_t HookManager::handler_count(const std::string& hook_name) const {
+size_t HookManager::HandlerCount(const std::string& hook_name) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = hooks_.find(hook_name);
   if (it == hooks_.end()) return 0;

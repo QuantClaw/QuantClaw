@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -11,6 +14,8 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include "quantclaw/gateway/protocol.hpp"
+#include "quantclaw/security/rbac.hpp"
+#include "quantclaw/security/rate_limiter.hpp"
 
 namespace quantclaw::gateway {
 
@@ -76,24 +81,33 @@ public:
     GatewayServer(int port, std::shared_ptr<spdlog::logger> logger);
     ~GatewayServer();
 
-    void start();
-    void stop();
-    bool is_running() const;
+    void Start();
+    void Stop();
+    bool IsRunning() const;
 
-    void register_handler(const std::string& method, RpcHandler handler);
-    void broadcast_event(const std::string& event, const nlohmann::json& payload);
-    void send_event_to(const std::string& connection_id, const RpcEvent& event);
+    void RegisterHandler(const std::string& method, RpcHandler handler);
+    void BroadcastEvent(const std::string& event, const nlohmann::json& payload);
+    void SendEventTo(const std::string& connection_id, const RpcEvent& event);
 
-    int get_port() const { return port_; }
-    size_t get_connection_count() const;
-    int64_t get_uptime_seconds() const;
+    int GetPort() const { return port_; }
+    size_t GetConnectionCount() const;
+    int64_t GetUptimeSeconds() const;
 
     // Configure authentication
-    void set_auth(const std::string& mode, const std::string& token);
-    const std::string& get_auth_mode() const { return auth_mode_; }
+    void SetAuth(const std::string& mode, const std::string& token);
+    std::string GetAuthMode() const {
+        std::lock_guard<std::mutex> lock(auth_mutex_);
+        return auth_mode_;
+    }
 
     // Set HTTP port for redirect when plain HTTP hits the WS port
-    void set_http_redirect_port(int port) { http_redirect_port_ = port; }
+    void SetHttpRedirectPort(int port) { http_redirect_port_ = port; }
+
+    // Enable RBAC enforcement
+    void SetRbac(std::shared_ptr<RBACChecker> checker) { rbac_checker_ = std::move(checker); }
+
+    // Enable rate limiting
+    void SetRateLimiter(std::shared_ptr<RateLimiter> limiter) { rate_limiter_ = std::move(limiter); }
 
 private:
     void on_connection(std::shared_ptr<ix::ConnectionState> state,
@@ -114,9 +128,10 @@ private:
     std::shared_ptr<spdlog::logger> logger_;
     std::unique_ptr<ix::WebSocketServer> server_;
     std::atomic<bool> running_{false};
-    int64_t start_time_ = 0;
+    std::atomic<int64_t> start_time_{0};
 
-    // Auth config
+    // Auth config (protected by auth_mutex_)
+    mutable std::mutex auth_mutex_;
     std::string auth_mode_ = "token";
     std::string expected_token_;
 
@@ -125,10 +140,17 @@ private:
 
     mutable std::mutex connections_mutex_;
     std::unordered_map<std::string, ClientConnection> connections_;
+    // Non-owning WebSocket pointers. Lifetime managed by ixwebsocket:
+    // valid from Open callback until Close callback. Always access under
+    // connections_mutex_ and verify key exists in connections_ first.
     std::unordered_map<std::string, ix::WebSocket*> ws_connections_;
 
     std::mutex handlers_mutex_;
     std::unordered_map<std::string, RpcHandler> handlers_;
+
+    // Security
+    std::shared_ptr<RBACChecker> rbac_checker_;
+    std::shared_ptr<RateLimiter> rate_limiter_;
 };
 
 } // namespace quantclaw::gateway

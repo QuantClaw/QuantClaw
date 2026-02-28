@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/core/prompt_builder.hpp"
 #include "quantclaw/core/memory_manager.hpp"
 #include "quantclaw/config.hpp"
@@ -20,7 +23,7 @@ PromptBuilder::PromptBuilder(std::shared_ptr<MemoryManager> memory_manager,
     , config_(config) {
 }
 
-std::string PromptBuilder::build_full(const std::string& /*agent_id*/) const {
+std::string PromptBuilder::BuildFull(const std::string& /*agent_id*/) const {
     std::ostringstream prompt;
 
     // 1. SOUL.md - identity
@@ -44,14 +47,14 @@ std::string PromptBuilder::build_full(const std::string& /*agent_id*/) const {
     // 4. Loaded skills (multi-dir if config available, single-dir fallback)
     std::vector<SkillMetadata> skills;
     if (config_) {
-        skills = skill_loader_->load_skills(
-            config_->skills, memory_manager_->get_workspace_path());
+        skills = skill_loader_->LoadSkills(
+            config_->skills, memory_manager_->GetWorkspacePath());
     } else {
-        skills = skill_loader_->load_skills_from_directory(
-            memory_manager_->get_workspace_path() / "skills");
+        skills = skill_loader_->LoadSkillsFromDirectory(
+            memory_manager_->GetWorkspacePath() / "skills");
     }
     if (!skills.empty()) {
-        prompt << "## Available Skills\n" << skill_loader_->get_skill_context(skills) << "\n\n";
+        prompt << "## Available Skills\n" << skill_loader_->GetSkillContext(skills) << "\n\n";
     }
 
     // 5. Memory context (recent daily memory)
@@ -60,13 +63,13 @@ std::string PromptBuilder::build_full(const std::string& /*agent_id*/) const {
         if (!memory_content.empty()) {
             prompt << "## Memory\n" << memory_content << "\n\n";
         }
-    } catch (...) {}
+    } catch (const std::exception&) {}
 
     // 6. Runtime info
     prompt << "## Runtime Information\n" << get_runtime_info() << "\n\n";
 
     // 7. Available tools
-    auto tool_schemas = tool_registry_->get_tool_schemas();
+    auto tool_schemas = tool_registry_->GetToolSchemas();
     if (!tool_schemas.empty()) {
         prompt << "## Available Tools\n";
         for (const auto& schema : tool_schemas) {
@@ -83,7 +86,7 @@ std::string PromptBuilder::build_full(const std::string& /*agent_id*/) const {
     return prompt.str();
 }
 
-std::string PromptBuilder::build_minimal(const std::string& /*agent_id*/) const {
+std::string PromptBuilder::BuildMinimal(const std::string& /*agent_id*/) const {
     std::ostringstream prompt;
 
     // Identity only
@@ -93,7 +96,7 @@ std::string PromptBuilder::build_minimal(const std::string& /*agent_id*/) const 
     }
 
     // Tools
-    auto tool_schemas = tool_registry_->get_tool_schemas();
+    auto tool_schemas = tool_registry_->GetToolSchemas();
     if (!tool_schemas.empty()) {
         prompt << "## Available Tools\n";
         for (const auto& schema : tool_schemas) {
@@ -109,7 +112,7 @@ std::string PromptBuilder::build_minimal(const std::string& /*agent_id*/) const 
 
 std::string PromptBuilder::get_section(const std::string& filename) const {
     try {
-        return memory_manager_->read_identity_file(filename);
+        return memory_manager_->ReadIdentityFile(filename);
     } catch (const std::exception&) {
         return "";
     }
@@ -129,7 +132,7 @@ std::string PromptBuilder::get_runtime_info() const {
 #endif
 
     info << "- Current time: " << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ") << "\n";
-    info << "- Workspace: " << memory_manager_->get_workspace_path().string() << "\n";
+    info << "- Workspace: " << memory_manager_->GetWorkspacePath().string() << "\n";
     info << "- Platform: "
 #ifdef __linux__
          << "linux"

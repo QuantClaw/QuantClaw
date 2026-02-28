@@ -1,10 +1,13 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/plugins/plugin_manifest.hpp"
 #include <fstream>
 #include <stdexcept>
 
 namespace quantclaw {
 
-PluginManifest PluginManifest::parse(const nlohmann::json& j) {
+PluginManifest PluginManifest::Parse(const nlohmann::json& j) {
   PluginManifest m;
 
   if (!j.contains("id") || !j["id"].is_string()) {
@@ -60,7 +63,7 @@ PluginManifest PluginManifest::parse(const nlohmann::json& j) {
   return m;
 }
 
-PluginManifest PluginManifest::load_from_file(const std::filesystem::path& path) {
+PluginManifest PluginManifest::LoadFromFile(const std::filesystem::path& path) {
   std::ifstream ifs(path);
   if (!ifs.is_open()) {
     throw std::runtime_error("Cannot open plugin manifest: " + path.string());
@@ -71,10 +74,10 @@ PluginManifest PluginManifest::load_from_file(const std::filesystem::path& path)
   } catch (const nlohmann::json::parse_error& e) {
     throw std::runtime_error("Invalid JSON in " + path.string() + ": " + e.what());
   }
-  return parse(j);
+  return Parse(j);
 }
 
-nlohmann::json PluginManifest::to_json() const {
+nlohmann::json PluginManifest::ToJson() const {
   nlohmann::json j;
   j["id"] = id;
   if (!name.empty() && name != id) j["name"] = name;

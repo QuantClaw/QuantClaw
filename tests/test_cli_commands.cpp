@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <sstream>
@@ -86,7 +89,7 @@ protected:
         handler_argc_ = 0;
 
         // Register a test command
-        cli_->add_command({"test", "A test command", {"t"},
+        cli_->AddCommand({"test", "A test command", {"t"},
             [this](int argc, char** argv) -> int {
                 handler_called_ = true;
                 handler_argc_ = argc;
@@ -103,7 +106,7 @@ protected:
 TEST_F(CLIManagerTest, VersionFlag) {
     ArgHelper args{"quantclaw", "--version"};
     auto output = capture_stdout([&]() {
-        int ret = cli_->run(args.argc(), args.argv());
+        int ret = cli_->Run(args.argc(), args.argv());
         EXPECT_EQ(ret, 0);
     });
     EXPECT_NE(output.find("0.2.0"), std::string::npos);
@@ -112,7 +115,7 @@ TEST_F(CLIManagerTest, VersionFlag) {
 TEST_F(CLIManagerTest, VersionShortFlag) {
     ArgHelper args{"quantclaw", "-v"};
     auto output = capture_stdout([&]() {
-        int ret = cli_->run(args.argc(), args.argv());
+        int ret = cli_->Run(args.argc(), args.argv());
         EXPECT_EQ(ret, 0);
     });
     EXPECT_NE(output.find("0.2.0"), std::string::npos);
@@ -121,7 +124,7 @@ TEST_F(CLIManagerTest, VersionShortFlag) {
 TEST_F(CLIManagerTest, HelpFlag) {
     ArgHelper args{"quantclaw", "--help"};
     auto output = capture_stdout([&]() {
-        int ret = cli_->run(args.argc(), args.argv());
+        int ret = cli_->Run(args.argc(), args.argv());
         EXPECT_EQ(ret, 0);
     });
     EXPECT_NE(output.find("Usage:"), std::string::npos);
@@ -131,7 +134,7 @@ TEST_F(CLIManagerTest, HelpFlag) {
 TEST_F(CLIManagerTest, HelpShortFlag) {
     ArgHelper args{"quantclaw", "-h"};
     auto output = capture_stdout([&]() {
-        int ret = cli_->run(args.argc(), args.argv());
+        int ret = cli_->Run(args.argc(), args.argv());
         EXPECT_EQ(ret, 0);
     });
     EXPECT_NE(output.find("Usage:"), std::string::npos);
@@ -140,7 +143,7 @@ TEST_F(CLIManagerTest, HelpShortFlag) {
 TEST_F(CLIManagerTest, NoArgsShowsHelp) {
     ArgHelper args{"quantclaw"};
     auto output = capture_stdout([&]() {
-        int ret = cli_->run(args.argc(), args.argv());
+        int ret = cli_->Run(args.argc(), args.argv());
         EXPECT_EQ(ret, 1);
     });
     EXPECT_NE(output.find("Usage:"), std::string::npos);
@@ -149,7 +152,7 @@ TEST_F(CLIManagerTest, NoArgsShowsHelp) {
 TEST_F(CLIManagerTest, UnknownCommandReturnsError) {
     ArgHelper args{"quantclaw", "nonexistent"};
     auto err = capture_stderr([&]() {
-        int ret = cli_->run(args.argc(), args.argv());
+        int ret = cli_->Run(args.argc(), args.argv());
         EXPECT_EQ(ret, 1);
     });
     EXPECT_NE(err.find("Unknown command"), std::string::npos);
@@ -157,19 +160,19 @@ TEST_F(CLIManagerTest, UnknownCommandReturnsError) {
 
 TEST_F(CLIManagerTest, CommandDispatchByName) {
     ArgHelper args{"quantclaw", "test"};
-    cli_->run(args.argc(), args.argv());
+    cli_->Run(args.argc(), args.argv());
     EXPECT_TRUE(handler_called_);
 }
 
 TEST_F(CLIManagerTest, CommandDispatchByAlias) {
     ArgHelper args{"quantclaw", "t"};
-    cli_->run(args.argc(), args.argv());
+    cli_->Run(args.argc(), args.argv());
     EXPECT_TRUE(handler_called_);
 }
 
 TEST_F(CLIManagerTest, CommandReceivesSubArgs) {
     ArgHelper args{"quantclaw", "test", "--foo", "bar"};
-    cli_->run(args.argc(), args.argv());
+    cli_->Run(args.argc(), args.argv());
     EXPECT_TRUE(handler_called_);
     // handler gets argc-1 (argv[0]="test", argv[1]="--foo", argv[2]="bar")
     EXPECT_EQ(handler_argc_, 3);
@@ -177,7 +180,7 @@ TEST_F(CLIManagerTest, CommandReceivesSubArgs) {
 
 TEST_F(CLIManagerTest, MultipleCommands) {
     bool second_called = false;
-    cli_->add_command({"other", "Another command", {},
+    cli_->AddCommand({"other", "Another command", {},
         [&second_called](int, char**) -> int {
             second_called = true;
             return 42;
@@ -185,7 +188,7 @@ TEST_F(CLIManagerTest, MultipleCommands) {
     });
 
     ArgHelper args{"quantclaw", "other"};
-    int ret = cli_->run(args.argc(), args.argv());
+    int ret = cli_->Run(args.argc(), args.argv());
     EXPECT_TRUE(second_called);
     EXPECT_EQ(ret, 42);
     EXPECT_FALSE(handler_called_);
@@ -207,7 +210,7 @@ protected:
 
 TEST_F(AgentCommandsTest, RequestNoMessageReturnsError) {
     auto err = capture_stderr([&]() {
-        int ret = agent_cmds_->request_command({});
+        int ret = agent_cmds_->RequestCommand({});
         EXPECT_EQ(ret, 1);
     });
     EXPECT_NE(err.find("Usage:"), std::string::npos);
@@ -216,7 +219,7 @@ TEST_F(AgentCommandsTest, RequestNoMessageReturnsError) {
 TEST_F(AgentCommandsTest, RequestOnlyDashMFlagNoValue) {
     // -m with no following argument → treated as no message
     auto err = capture_stderr([&]() {
-        int ret = agent_cmds_->request_command({"-m"});
+        int ret = agent_cmds_->RequestCommand({"-m"});
         EXPECT_EQ(ret, 1);
     });
     EXPECT_NE(err.find("Usage:"), std::string::npos);
@@ -238,7 +241,7 @@ protected:
 
 TEST_F(SessionCommandsTest, HistoryNoSessionKeyReturnsError) {
     auto err = capture_stderr([&]() {
-        int ret = session_cmds_->history_command({});
+        int ret = session_cmds_->HistoryCommand({});
         EXPECT_EQ(ret, 1);
     });
     EXPECT_NE(err.find("session key required"), std::string::npos);
@@ -247,7 +250,7 @@ TEST_F(SessionCommandsTest, HistoryNoSessionKeyReturnsError) {
 TEST_F(SessionCommandsTest, HistoryOnlyFlagsNoKey) {
     // Only flags, no positional session key
     auto err = capture_stderr([&]() {
-        int ret = session_cmds_->history_command({"--json", "--limit", "10"});
+        int ret = session_cmds_->HistoryCommand({"--json", "--limit", "10"});
         EXPECT_EQ(ret, 1);
     });
     EXPECT_NE(err.find("session key required"), std::string::npos);

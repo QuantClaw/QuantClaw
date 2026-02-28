@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <filesystem>
@@ -17,7 +20,7 @@ public:
     std::string response_text = "I am QuantClaw.";
     mutable quantclaw::ChatCompletionRequest last_request;
 
-    quantclaw::ChatCompletionResponse chat_completion(const quantclaw::ChatCompletionRequest& request) override {
+    quantclaw::ChatCompletionResponse ChatCompletion(const quantclaw::ChatCompletionRequest& request) override {
         last_request = request;
         quantclaw::ChatCompletionResponse resp;
         resp.content = response_text;
@@ -25,7 +28,7 @@ public:
         return resp;
     }
 
-    void chat_completion_stream(const quantclaw::ChatCompletionRequest& request,
+    void ChatCompletionStream(const quantclaw::ChatCompletionRequest& request,
                                 std::function<void(const quantclaw::ChatCompletionResponse&)> callback) override {
         last_request = request;
         quantclaw::ChatCompletionResponse resp;
@@ -34,8 +37,8 @@ public:
         callback(resp);
     }
 
-    std::string get_provider_name() const override { return "mock"; }
-    std::vector<std::string> get_supported_models() const override { return {"mock-model"}; }
+    std::string GetProviderName() const override { return "mock"; }
+    std::vector<std::string> GetSupportedModels() const override { return {"mock-model"}; }
 };
 
 class AgentLoopTest : public ::testing::Test {
@@ -50,7 +53,7 @@ protected:
         memory_manager_ = std::make_shared<quantclaw::MemoryManager>(test_dir_, logger_);
         skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
         tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
-        tool_registry_->register_builtin_tools();
+        tool_registry_->RegisterBuiltinTools();
 
         mock_provider_ = std::make_shared<MockLLMProvider>();
 
@@ -82,7 +85,7 @@ protected:
 TEST_F(AgentLoopTest, ProcessMessageReturnsResponse) {
     mock_provider_->response_text = "Hello! I am QuantClaw.";
 
-    auto new_msgs = agent_loop_->process_message(
+    auto new_msgs = agent_loop_->ProcessMessage(
         "Hello", {}, "You are a helpful assistant.");
 
     ASSERT_FALSE(new_msgs.empty());
@@ -97,7 +100,7 @@ TEST_F(AgentLoopTest, ProcessMessageWithHistory) {
 
     mock_provider_->response_text = "You asked about my name.";
 
-    auto new_msgs = agent_loop_->process_message(
+    auto new_msgs = agent_loop_->ProcessMessage(
         "What did I just ask?", history, "You are helpful.");
 
     ASSERT_FALSE(new_msgs.empty());
@@ -107,7 +110,7 @@ TEST_F(AgentLoopTest, ProcessMessageWithHistory) {
 TEST_F(AgentLoopTest, ProcessMessageWithEmptySystemPrompt) {
     mock_provider_->response_text = "Response without system prompt.";
 
-    auto new_msgs = agent_loop_->process_message("Test", {}, "");
+    auto new_msgs = agent_loop_->ProcessMessage("Test", {}, "");
 
     ASSERT_FALSE(new_msgs.empty());
     EXPECT_EQ(new_msgs.back().content[0].text, "Response without system prompt.");
@@ -117,7 +120,7 @@ TEST_F(AgentLoopTest, StreamingCallback) {
     mock_provider_->response_text = "Streamed response.";
 
     std::vector<quantclaw::AgentEvent> events;
-    agent_loop_->process_message_stream("Hello", {}, "System.",
+    agent_loop_->ProcessMessageStream("Hello", {}, "System.",
         [&events](const quantclaw::AgentEvent& event) {
             events.push_back(event);
         }
@@ -128,19 +131,19 @@ TEST_F(AgentLoopTest, StreamingCallback) {
 }
 
 TEST_F(AgentLoopTest, StopInterruptsProcessing) {
-    agent_loop_->stop();
+    agent_loop_->Stop();
 
-    auto new_msgs = agent_loop_->process_message("Hello", {}, "System.");
+    auto new_msgs = agent_loop_->ProcessMessage("Hello", {}, "System.");
 
     // Should return stop message or the mock response (depending on timing)
     EXPECT_FALSE(new_msgs.empty());
 }
 
 TEST_F(AgentLoopTest, SetMaxIterations) {
-    agent_loop_->set_max_iterations(3);
+    agent_loop_->SetMaxIterations(3);
     // Should not throw
     mock_provider_->response_text = "ok";
-    auto new_msgs = agent_loop_->process_message("test", {}, "sys");
+    auto new_msgs = agent_loop_->ProcessMessage("test", {}, "sys");
     ASSERT_FALSE(new_msgs.empty());
     EXPECT_EQ(new_msgs.back().content[0].text, "ok");
 }
@@ -149,21 +152,21 @@ TEST_F(AgentLoopTest, SetMaxIterations) {
 
 TEST_F(AgentLoopTest, UsesConfigModel) {
     mock_provider_->response_text = "ok";
-    agent_loop_->process_message("test", {}, "sys");
+    agent_loop_->ProcessMessage("test", {}, "sys");
 
     EXPECT_EQ(mock_provider_->last_request.model, "test-model");
 }
 
 TEST_F(AgentLoopTest, UsesConfigTemperature) {
     mock_provider_->response_text = "ok";
-    agent_loop_->process_message("test", {}, "sys");
+    agent_loop_->ProcessMessage("test", {}, "sys");
 
     EXPECT_DOUBLE_EQ(mock_provider_->last_request.temperature, 0.5);
 }
 
 TEST_F(AgentLoopTest, UsesConfigMaxTokens) {
     mock_provider_->response_text = "ok";
-    agent_loop_->process_message("test", {}, "sys");
+    agent_loop_->ProcessMessage("test", {}, "sys");
 
     EXPECT_EQ(mock_provider_->last_request.max_tokens, 2048);
 }
@@ -175,10 +178,10 @@ TEST_F(AgentLoopTest, SetConfigUpdatesModel) {
     new_config.max_tokens = 8192;
     new_config.max_iterations = 5;
 
-    agent_loop_->set_config(new_config);
+    agent_loop_->SetConfig(new_config);
 
     mock_provider_->response_text = "ok";
-    agent_loop_->process_message("test", {}, "sys");
+    agent_loop_->ProcessMessage("test", {}, "sys");
 
     EXPECT_EQ(mock_provider_->last_request.model, "new-model");
     EXPECT_DOUBLE_EQ(mock_provider_->last_request.temperature, 0.9);
@@ -188,7 +191,7 @@ TEST_F(AgentLoopTest, SetConfigUpdatesModel) {
 TEST_F(AgentLoopTest, StreamingUsesConfigModel) {
     mock_provider_->response_text = "streamed";
     std::vector<quantclaw::AgentEvent> events;
-    agent_loop_->process_message_stream("test", {}, "sys",
+    agent_loop_->ProcessMessageStream("test", {}, "sys",
         [&events](const quantclaw::AgentEvent& event) {
             events.push_back(event);
         }
@@ -199,7 +202,7 @@ TEST_F(AgentLoopTest, StreamingUsesConfigModel) {
 }
 
 TEST_F(AgentLoopTest, GetConfigReturnsCurrentConfig) {
-    const auto& config = agent_loop_->get_config();
+    const auto& config = agent_loop_->GetConfig();
     EXPECT_EQ(config.model, "test-model");
     EXPECT_DOUBLE_EQ(config.temperature, 0.5);
     EXPECT_EQ(config.max_tokens, 2048);
@@ -211,7 +214,7 @@ TEST_F(AgentLoopTest, StreamReturnsNewMessages) {
     mock_provider_->response_text = "Final answer.";
 
     std::vector<quantclaw::AgentEvent> events;
-    auto new_msgs = agent_loop_->process_message_stream("Hello", {}, "System.",
+    auto new_msgs = agent_loop_->ProcessMessageStream("Hello", {}, "System.",
         [&events](const quantclaw::AgentEvent& event) {
             events.push_back(event);
         }
@@ -228,7 +231,7 @@ TEST_F(AgentLoopTest, StreamReturnsNewMessages) {
 TEST_F(AgentLoopTest, NonStreamReturnsNewMessages) {
     mock_provider_->response_text = "Non-stream final.";
 
-    auto new_msgs = agent_loop_->process_message("Hello", {}, "System.");
+    auto new_msgs = agent_loop_->ProcessMessage("Hello", {}, "System.");
 
     ASSERT_FALSE(new_msgs.empty());
     EXPECT_EQ(new_msgs.back().role, "assistant");

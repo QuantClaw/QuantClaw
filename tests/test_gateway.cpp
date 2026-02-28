@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <thread>
@@ -20,7 +23,7 @@ protected:
 
     void TearDown() override {
         if (server_) {
-            server_->stop();
+            server_->Stop();
             server_.reset();
         }
     }
@@ -41,26 +44,26 @@ TEST_F(GatewayTest, ServerStartStop) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
 
-    EXPECT_FALSE(server_->is_running());
-    server_->start();
-    EXPECT_TRUE(server_->is_running());
-    EXPECT_EQ(server_->get_port(), port);
-    EXPECT_EQ(server_->get_connection_count(), 0u);
+    EXPECT_FALSE(server_->IsRunning());
+    server_->Start();
+    EXPECT_TRUE(server_->IsRunning());
+    EXPECT_EQ(server_->GetPort(), port);
+    EXPECT_EQ(server_->GetConnectionCount(), 0u);
 
-    server_->stop();
-    EXPECT_FALSE(server_->is_running());
+    server_->Stop();
+    EXPECT_FALSE(server_->IsRunning());
 }
 
 TEST_F(GatewayTest, UptimeIncreases) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
-    server_->start();
+    server_->Start();
 
-    EXPECT_GE(server_->get_uptime_seconds(), 0);
+    EXPECT_GE(server_->GetUptimeSeconds(), 0);
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    EXPECT_GE(server_->get_uptime_seconds(), 1);
+    EXPECT_GE(server_->GetUptimeSeconds(), 1);
 
-    server_->stop();
+    server_->Stop();
 }
 
 // --- RPC handler registration ---
@@ -70,7 +73,7 @@ TEST_F(GatewayTest, RegisterHandler) {
     server_ = std::make_unique<GatewayServer>(port, logger_);
 
     bool called = false;
-    server_->register_handler("test.method", [&called](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
+    server_->RegisterHandler("test.method", [&called](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
         called = true;
         return {{"result", "ok"}};
     });
@@ -85,65 +88,65 @@ TEST_F(GatewayTest, ClientConnectAndCall) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
 
-    server_->register_handler("test.echo", [](const nlohmann::json& params, ClientConnection&) -> nlohmann::json {
+    server_->RegisterHandler("test.echo", [](const nlohmann::json& params, ClientConnection&) -> nlohmann::json {
         return {{"echo", params.value("msg", "")}};
     });
 
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // Create client
     std::string url = "ws://127.0.0.1:" + std::to_string(port);
     GatewayClient client(url, "", logger_);
 
-    ASSERT_TRUE(client.connect(5000));
-    EXPECT_TRUE(client.is_connected());
+    ASSERT_TRUE(client.Connect(5000));
+    EXPECT_TRUE(client.IsConnected());
 
     // RPC call
-    auto result = client.call("test.echo", {{"msg", "hello"}});
+    auto result = client.Call("test.echo", {{"msg", "hello"}});
     EXPECT_EQ(result["echo"], "hello");
 
-    client.disconnect();
-    EXPECT_FALSE(client.is_connected());
+    client.Disconnect();
+    EXPECT_FALSE(client.IsConnected());
 }
 
 TEST_F(GatewayTest, HealthRpc) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
 
-    server_->register_handler(methods::GATEWAY_HEALTH,
+    server_->RegisterHandler(methods::kGatewayHealth,
         [](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
             return {{"status", "ok"}, {"version", "0.2.0"}};
         }
     );
 
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     std::string url = "ws://127.0.0.1:" + std::to_string(port);
     GatewayClient client(url, "", logger_);
-    ASSERT_TRUE(client.connect(5000));
+    ASSERT_TRUE(client.Connect(5000));
 
-    auto result = client.call("gateway.health");
+    auto result = client.Call("gateway.health");
     EXPECT_EQ(result["status"], "ok");
     EXPECT_EQ(result["version"], "0.2.0");
 
-    client.disconnect();
+    client.Disconnect();
 }
 
 TEST_F(GatewayTest, UnknownMethodReturnsError) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     std::string url = "ws://127.0.0.1:" + std::to_string(port);
     GatewayClient client(url, "", logger_);
-    ASSERT_TRUE(client.connect(5000));
+    ASSERT_TRUE(client.Connect(5000));
 
-    EXPECT_THROW(client.call("nonexistent.method"), std::runtime_error);
+    EXPECT_THROW(client.Call("nonexistent.method"), std::runtime_error);
 
-    client.disconnect();
+    client.Disconnect();
 }
 
 // --- Multiple clients ---
@@ -152,11 +155,11 @@ TEST_F(GatewayTest, MultipleClients) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
 
-    server_->register_handler("test.ping", [](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
+    server_->RegisterHandler("test.ping", [](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
         return {{"pong", true}};
     });
 
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     std::string url = "ws://127.0.0.1:" + std::to_string(port);
@@ -164,20 +167,20 @@ TEST_F(GatewayTest, MultipleClients) {
     GatewayClient c1(url, "", logger_);
     GatewayClient c2(url, "", logger_);
 
-    ASSERT_TRUE(c1.connect(5000));
-    ASSERT_TRUE(c2.connect(5000));
+    ASSERT_TRUE(c1.Connect(5000));
+    ASSERT_TRUE(c2.Connect(5000));
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    EXPECT_GE(server_->get_connection_count(), 2u);
+    EXPECT_GE(server_->GetConnectionCount(), 2u);
 
-    auto r1 = c1.call("test.ping");
-    auto r2 = c2.call("test.ping");
+    auto r1 = c1.Call("test.ping");
+    auto r2 = c2.Call("test.ping");
 
     EXPECT_TRUE(r1["pong"]);
     EXPECT_TRUE(r2["pong"]);
 
-    c1.disconnect();
-    c2.disconnect();
+    c1.Disconnect();
+    c2.Disconnect();
 }
 
 // --- Broadcast events ---
@@ -185,23 +188,23 @@ TEST_F(GatewayTest, MultipleClients) {
 TEST_F(GatewayTest, BroadcastEvent) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     std::string url = "ws://127.0.0.1:" + std::to_string(port);
     GatewayClient client(url, "", logger_);
-    ASSERT_TRUE(client.connect(5000));
+    ASSERT_TRUE(client.Connect(5000));
 
     // Subscribe to events
     bool received = false;
     std::string received_data;
-    client.subscribe("test.event", [&](const std::string&, const nlohmann::json& payload) {
+    client.Subscribe("test.event", [&](const std::string&, const nlohmann::json& payload) {
         received = true;
         received_data = payload.value("msg", "");
     });
 
     // Broadcast
-    server_->broadcast_event("test.event", {{"msg", "broadcast!"}});
+    server_->BroadcastEvent("test.event", {{"msg", "broadcast!"}});
 
     // Wait for delivery
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -209,7 +212,7 @@ TEST_F(GatewayTest, BroadcastEvent) {
     EXPECT_TRUE(received);
     EXPECT_EQ(received_data, "broadcast!");
 
-    client.disconnect();
+    client.Disconnect();
 }
 
 // --- Auth enforcement ---
@@ -217,58 +220,58 @@ TEST_F(GatewayTest, BroadcastEvent) {
 TEST_F(GatewayTest, AuthModeNoneAllowsAll) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
-    server_->set_auth("none", "");
+    server_->SetAuth("none", "");
 
-    server_->register_handler("test.ping", [](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
+    server_->RegisterHandler("test.ping", [](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
         return {{"pong", true}};
     });
 
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     std::string url = "ws://127.0.0.1:" + std::to_string(port);
     GatewayClient client(url, "", logger_);
-    ASSERT_TRUE(client.connect(5000));
+    ASSERT_TRUE(client.Connect(5000));
 
-    auto result = client.call("test.ping");
+    auto result = client.Call("test.ping");
     EXPECT_TRUE(result["pong"]);
 
-    client.disconnect();
+    client.Disconnect();
 }
 
 TEST_F(GatewayTest, AuthTokenValidationSuccess) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
-    server_->set_auth("token", "secret123");
+    server_->SetAuth("token", "secret123");
 
-    server_->register_handler("test.ping", [](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
+    server_->RegisterHandler("test.ping", [](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
         return {{"pong", true}};
     });
 
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // Client with correct token
     std::string url = "ws://127.0.0.1:" + std::to_string(port);
     GatewayClient client(url, "secret123", logger_);
-    ASSERT_TRUE(client.connect(5000));
+    ASSERT_TRUE(client.Connect(5000));
 
-    auto result = client.call("test.ping");
+    auto result = client.Call("test.ping");
     EXPECT_TRUE(result["pong"]);
 
-    client.disconnect();
+    client.Disconnect();
 }
 
 TEST_F(GatewayTest, AuthTokenValidationFailure) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
-    server_->set_auth("token", "correct-token");
+    server_->SetAuth("token", "correct-token");
 
-    server_->register_handler("test.ping", [](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
+    server_->RegisterHandler("test.ping", [](const nlohmann::json&, ClientConnection&) -> nlohmann::json {
         return {{"pong", true}};
     });
 
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // Client with wrong token — hello should fail, subsequent RPC should fail
@@ -278,30 +281,30 @@ TEST_F(GatewayTest, AuthTokenValidationFailure) {
     // connect() attempts hello with the token; server should reject
     // The client may or may not report connected depending on implementation
     // but RPC calls should fail
-    bool connected = client.connect(3000);
+    bool connected = client.Connect(3000);
     if (connected) {
         // Even if WebSocket connected, RPC should fail (not authenticated)
-        EXPECT_THROW(client.call("test.ping", {}, 3000), std::runtime_error);
+        EXPECT_THROW(client.Call("test.ping", {}, 3000), std::runtime_error);
     }
 
-    client.disconnect();
+    client.Disconnect();
 }
 
 TEST_F(GatewayTest, SetAuthMode) {
     int port = find_free_port();
     server_ = std::make_unique<GatewayServer>(port, logger_);
 
-    server_->set_auth("none", "");
-    EXPECT_EQ(server_->get_auth_mode(), "none");
+    server_->SetAuth("none", "");
+    EXPECT_EQ(server_->GetAuthMode(), "none");
 
-    server_->set_auth("token", "secret");
-    EXPECT_EQ(server_->get_auth_mode(), "token");
+    server_->SetAuth("token", "secret");
+    EXPECT_EQ(server_->GetAuthMode(), "token");
 }
 
 // --- Client to unreachable server ---
 
 TEST_F(GatewayTest, ClientConnectFails) {
     GatewayClient client("ws://127.0.0.1:1", "", logger_);
-    EXPECT_FALSE(client.connect(1000));
-    EXPECT_FALSE(client.is_connected());
+    EXPECT_FALSE(client.Connect(1000));
+    EXPECT_FALSE(client.IsConnected());
 }

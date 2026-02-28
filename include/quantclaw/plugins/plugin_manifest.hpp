@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -29,9 +32,9 @@ struct PluginManifest {
   nlohmann::json config_schema;
   std::map<std::string, PluginConfigUiHint> ui_hints;
 
-  static PluginManifest parse(const nlohmann::json& j);
-  static PluginManifest load_from_file(const std::filesystem::path& path);
-  nlohmann::json to_json() const;
+  static PluginManifest Parse(const nlohmann::json& j);
+  static PluginManifest LoadFromFile(const std::filesystem::path& path);
+  nlohmann::json ToJson() const;
 };
 
 enum class PluginOrigin {

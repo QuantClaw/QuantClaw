@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>
@@ -22,7 +25,7 @@ protected:
         memory_manager_ = std::make_shared<quantclaw::MemoryManager>(test_dir_, logger_);
         skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
         tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
-        tool_registry_->register_builtin_tools();
+        tool_registry_->RegisterBuiltinTools();
 
         builder_ = std::make_unique<quantclaw::PromptBuilder>(
             memory_manager_, skill_loader_, tool_registry_);
@@ -49,44 +52,44 @@ protected:
     std::unique_ptr<quantclaw::PromptBuilder> builder_;
 };
 
-// --- build_full tests ---
+// --- BuildFull tests ---
 
 TEST_F(PromptBuilderTest, BuildFullContainsDefaultIdentity) {
-    auto prompt = builder_->build_full();
+    auto prompt = builder_->BuildFull();
     EXPECT_NE(prompt.find("You are QuantClaw"), std::string::npos);
     EXPECT_NE(prompt.find("personal AI assistant"), std::string::npos);
 }
 
 TEST_F(PromptBuilderTest, BuildFullIncludesSoulSection) {
     write_file("SOUL.md", "I am a quantum trading bot.");
-    auto prompt = builder_->build_full();
+    auto prompt = builder_->BuildFull();
     EXPECT_NE(prompt.find("## Your Identity"), std::string::npos);
     EXPECT_NE(prompt.find("I am a quantum trading bot."), std::string::npos);
 }
 
 TEST_F(PromptBuilderTest, BuildFullIncludesAgentsSection) {
     write_file("AGENTS.md", "Always be concise and direct.");
-    auto prompt = builder_->build_full();
+    auto prompt = builder_->BuildFull();
     EXPECT_NE(prompt.find("## Agent Behavior"), std::string::npos);
     EXPECT_NE(prompt.find("Always be concise and direct."), std::string::npos);
 }
 
 TEST_F(PromptBuilderTest, BuildFullIncludesToolsSection) {
     write_file("TOOLS.md", "Use read for file operations.");
-    auto prompt = builder_->build_full();
+    auto prompt = builder_->BuildFull();
     EXPECT_NE(prompt.find("## Tool Usage Guide"), std::string::npos);
     EXPECT_NE(prompt.find("Use read for file operations."), std::string::npos);
 }
 
 TEST_F(PromptBuilderTest, BuildFullIncludesMemorySection) {
     write_file("MEMORY.md", "User prefers short answers.");
-    auto prompt = builder_->build_full();
+    auto prompt = builder_->BuildFull();
     EXPECT_NE(prompt.find("## Memory"), std::string::npos);
     EXPECT_NE(prompt.find("User prefers short answers."), std::string::npos);
 }
 
 TEST_F(PromptBuilderTest, BuildFullIncludesRuntimeInfo) {
-    auto prompt = builder_->build_full();
+    auto prompt = builder_->BuildFull();
     EXPECT_NE(prompt.find("## Runtime Information"), std::string::npos);
     EXPECT_NE(prompt.find("Current time:"), std::string::npos);
     EXPECT_NE(prompt.find("Workspace:"), std::string::npos);
@@ -94,7 +97,7 @@ TEST_F(PromptBuilderTest, BuildFullIncludesRuntimeInfo) {
 }
 
 TEST_F(PromptBuilderTest, BuildFullIncludesToolSchemas) {
-    auto prompt = builder_->build_full();
+    auto prompt = builder_->BuildFull();
     EXPECT_NE(prompt.find("## Available Tools"), std::string::npos);
     // Built-in tools should be listed
     EXPECT_NE(prompt.find("read"), std::string::npos);
@@ -104,7 +107,7 @@ TEST_F(PromptBuilderTest, BuildFullIncludesToolSchemas) {
 
 TEST_F(PromptBuilderTest, BuildFullOmitsMissingSections) {
     // No SOUL.md, AGENTS.md, TOOLS.md, MEMORY.md exist
-    auto prompt = builder_->build_full();
+    auto prompt = builder_->BuildFull();
     EXPECT_EQ(prompt.find("## Your Identity"), std::string::npos);
     EXPECT_EQ(prompt.find("## Agent Behavior"), std::string::npos);
     EXPECT_EQ(prompt.find("## Tool Usage Guide"), std::string::npos);
@@ -114,10 +117,10 @@ TEST_F(PromptBuilderTest, BuildFullOmitsMissingSections) {
     EXPECT_NE(prompt.find("## Available Tools"), std::string::npos);
 }
 
-// --- build_minimal tests ---
+// --- BuildMinimal tests ---
 
 TEST_F(PromptBuilderTest, BuildMinimalContainsIdentityFallback) {
-    auto prompt = builder_->build_minimal();
+    auto prompt = builder_->BuildMinimal();
     EXPECT_NE(prompt.find("You are QuantClaw"), std::string::npos);
     EXPECT_NE(prompt.find("helpful AI assistant"), std::string::npos);
 }
@@ -125,7 +128,7 @@ TEST_F(PromptBuilderTest, BuildMinimalContainsIdentityFallback) {
 TEST_F(PromptBuilderTest, BuildMinimalIncludesSoulButNotAgents) {
     write_file("SOUL.md", "I am a quantum bot.");
     write_file("AGENTS.md", "Be verbose.");
-    auto prompt = builder_->build_minimal();
+    auto prompt = builder_->BuildMinimal();
     EXPECT_NE(prompt.find("I am a quantum bot."), std::string::npos);
     // Minimal should NOT include agents section
     EXPECT_EQ(prompt.find("## Agent Behavior"), std::string::npos);
@@ -133,17 +136,17 @@ TEST_F(PromptBuilderTest, BuildMinimalIncludesSoulButNotAgents) {
 }
 
 TEST_F(PromptBuilderTest, BuildMinimalIncludesTools) {
-    auto prompt = builder_->build_minimal();
+    auto prompt = builder_->BuildMinimal();
     EXPECT_NE(prompt.find("## Available Tools"), std::string::npos);
     EXPECT_NE(prompt.find("read"), std::string::npos);
 }
 
 TEST_F(PromptBuilderTest, BuildMinimalNoRuntimeInfo) {
-    auto prompt = builder_->build_minimal();
+    auto prompt = builder_->BuildMinimal();
     EXPECT_EQ(prompt.find("## Runtime Information"), std::string::npos);
 }
 
-// --- build_full with all sections populated ---
+// --- BuildFull with all sections populated ---
 
 TEST_F(PromptBuilderTest, BuildFullWithAllSections) {
     write_file("SOUL.md", "SOUL_CONTENT");
@@ -151,7 +154,7 @@ TEST_F(PromptBuilderTest, BuildFullWithAllSections) {
     write_file("TOOLS.md", "TOOLS_CONTENT");
     write_file("MEMORY.md", "MEMORY_CONTENT");
 
-    auto prompt = builder_->build_full();
+    auto prompt = builder_->BuildFull();
 
     // Verify section order: Identity before Agent Behavior before Tool Usage
     auto soul_pos = prompt.find("## Your Identity");
@@ -182,7 +185,7 @@ TEST_F(PromptBuilderTest, BuildFullNoToolsRegistered) {
     auto empty_registry = std::make_shared<quantclaw::ToolRegistry>(logger_);
     auto builder = quantclaw::PromptBuilder(memory_manager_, skill_loader_, empty_registry);
 
-    auto prompt = builder.build_full();
+    auto prompt = builder.BuildFull();
     EXPECT_EQ(prompt.find("## Available Tools"), std::string::npos);
     // Default identity should still be there
     EXPECT_NE(prompt.find("You are QuantClaw"), std::string::npos);

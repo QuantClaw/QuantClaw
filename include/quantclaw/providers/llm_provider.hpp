@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -15,7 +18,7 @@ struct Message {
     Message() = default;
     Message(std::string role, std::string text)
         : role(std::move(role)) {
-        if (!text.empty()) content.push_back(ContentBlock::make_text(std::move(text)));
+        if (!text.empty()) content.push_back(ContentBlock::MakeText(std::move(text)));
     }
     std::string text() const {
         std::string r;
@@ -39,6 +42,7 @@ struct ChatCompletionRequest {
     std::vector<nlohmann::json> tools;
     bool tool_choice_auto = true;
     bool stream = false;
+    std::string thinking = "off";  // "off" | "low" | "medium" | "high"
 };
 
 struct ChatCompletionResponse {
@@ -52,11 +56,11 @@ class LLMProvider {
 public:
     virtual ~LLMProvider() = default;
     
-    virtual ChatCompletionResponse chat_completion(const ChatCompletionRequest& request) = 0;
-    virtual void chat_completion_stream(const ChatCompletionRequest& request,
+    virtual ChatCompletionResponse ChatCompletion(const ChatCompletionRequest& request) = 0;
+    virtual void ChatCompletionStream(const ChatCompletionRequest& request,
                                      std::function<void(const ChatCompletionResponse&)> callback) = 0;
-    virtual std::string get_provider_name() const = 0;
-    virtual std::vector<std::string> get_supported_models() const = 0;
+    virtual std::string GetProviderName() const = 0;
+    virtual std::vector<std::string> GetSupportedModels() const = 0;
 };
 
 } // namespace quantclaw

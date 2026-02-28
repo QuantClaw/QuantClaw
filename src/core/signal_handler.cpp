@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/core/signal_handler.hpp"
 #include <csignal>
 #include <thread>
@@ -9,7 +12,7 @@ std::atomic<bool> SignalHandler::shutdown_requested_{false};
 SignalHandler::ShutdownCallback SignalHandler::shutdown_callback_;
 SignalHandler::ReloadCallback SignalHandler::reload_callback_;
 
-void SignalHandler::install(ShutdownCallback on_shutdown, ReloadCallback on_reload) {
+void SignalHandler::Install(ShutdownCallback on_shutdown, ReloadCallback on_reload) {
     shutdown_callback_ = std::move(on_shutdown);
     reload_callback_ = std::move(on_reload);
     shutdown_requested_ = false;
@@ -22,13 +25,13 @@ void SignalHandler::install(ShutdownCallback on_shutdown, ReloadCallback on_relo
 #endif
 }
 
-void SignalHandler::wait_for_shutdown() {
+void SignalHandler::WaitForShutdown() {
     while (!shutdown_requested_) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
-bool SignalHandler::should_shutdown() {
+bool SignalHandler::ShouldShutdown() {
     return shutdown_requested_;
 }
 

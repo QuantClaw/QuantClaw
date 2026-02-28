@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <filesystem>
@@ -16,7 +19,7 @@ public:
 
 private:
     std::string execute(const nlohmann::json& arguments) override {
-        return registry_->execute_tool(get_name(), arguments);
+        return registry_->ExecuteTool(GetName(), arguments);
     }
     quantclaw::ToolRegistry* registry_;
 };
@@ -31,14 +34,14 @@ protected:
         logger_ = std::make_shared<spdlog::logger>("test", null_sink);
 
         tool_registry_ = std::make_unique<quantclaw::ToolRegistry>(logger_);
-        tool_registry_->register_builtin_tools();
+        tool_registry_->RegisterBuiltinTools();
 
         mcp_server_ = std::make_unique<quantclaw::mcp::MCPServer>(logger_);
 
         // Register tools from tool registry into MCP server
-        auto schemas = tool_registry_->get_tool_schemas();
+        auto schemas = tool_registry_->GetToolSchemas();
         for (const auto& schema : schemas) {
-            mcp_server_->register_tool(
+            mcp_server_->RegisterTool(
                 std::make_unique<RegistryBackedTool>(schema.name, schema.description, tool_registry_.get()));
         }
     }
@@ -62,7 +65,7 @@ TEST_F(MCPIntegrationTest, ListTools) {
         {"id", 1}
     };
 
-    auto response = mcp_server_->handle_request(request);
+    auto response = mcp_server_->HandleRequest(request);
 
     EXPECT_TRUE(response.contains("result"));
     EXPECT_TRUE(response["result"].contains("tools"));
@@ -85,7 +88,7 @@ TEST_F(MCPIntegrationTest, CallReadFileTool) {
         {"id", 2}
     };
 
-    auto response = mcp_server_->handle_request(request);
+    auto response = mcp_server_->HandleRequest(request);
 
     EXPECT_TRUE(response.contains("result"));
     EXPECT_TRUE(response["result"].contains("content"));
@@ -108,7 +111,7 @@ TEST_F(MCPIntegrationTest, CallWriteFileTool) {
         {"id", 3}
     };
 
-    auto response = mcp_server_->handle_request(request);
+    auto response = mcp_server_->HandleRequest(request);
 
     EXPECT_TRUE(response.contains("result"));
 
@@ -129,7 +132,7 @@ TEST_F(MCPIntegrationTest, ToolNotFound) {
         {"id", 4}
     };
 
-    auto response = mcp_server_->handle_request(request);
+    auto response = mcp_server_->HandleRequest(request);
 
     EXPECT_TRUE(response.contains("error"));
 }

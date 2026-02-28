@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <atomic>
@@ -23,8 +26,8 @@ struct CronJob {
   std::chrono::system_clock::time_point last_run;
   std::chrono::system_clock::time_point next_run;
 
-  nlohmann::json to_json() const;
-  static CronJob from_json(const nlohmann::json& j);
+  nlohmann::json ToJson() const;
+  static CronJob FromJson(const nlohmann::json& j);
 };
 
 // Simple cron expression evaluator supporting:
@@ -35,10 +38,10 @@ class CronExpression {
   explicit CronExpression(const std::string& expr);
 
   // Check if the given time matches the cron expression
-  bool matches(const std::tm& tm) const;
+  bool Matches(const std::tm& tm) const;
 
   // Calculate next run time after the given time
-  std::chrono::system_clock::time_point next_after(
+  std::chrono::system_clock::time_point NextAfter(
       std::chrono::system_clock::time_point after) const;
 
  private:
@@ -65,30 +68,30 @@ class CronScheduler {
   ~CronScheduler();
 
   // Load jobs from persistent storage
-  void load(const std::string& filepath);
+  void Load(const std::string& filepath);
 
   // Save jobs to persistent storage
-  void save(const std::string& filepath) const;
+  void Save(const std::string& filepath) const;
 
   // Add a new cron job
-  std::string add_job(const std::string& name,
+  std::string AddJob(const std::string& name,
                       const std::string& schedule,
                       const std::string& message,
                       const std::string& session_key = "agent:main:main");
 
   // Remove a job by ID
-  bool remove_job(const std::string& id);
+  bool RemoveJob(const std::string& id);
 
   // List all jobs
-  std::vector<CronJob> list_jobs() const;
+  std::vector<CronJob> ListJobs() const;
 
   // Start the scheduler loop
-  void start(JobHandler handler);
+  void Start(JobHandler handler);
 
   // Stop the scheduler
-  void stop();
+  void Stop();
 
-  bool is_running() const { return running_; }
+  bool IsRunning() const { return running_; }
 
  private:
   void scheduler_loop();

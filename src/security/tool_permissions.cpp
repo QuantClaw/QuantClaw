@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/security/tool_permissions.hpp"
 #include <algorithm>
 
@@ -61,7 +64,7 @@ ToolPermissionChecker::ToolPermissionChecker(const ToolPermissionConfig& config)
     }
 }
 
-bool ToolPermissionChecker::is_allowed(const std::string& tool_name) const {
+bool ToolPermissionChecker::IsAllowed(const std::string& tool_name) const {
     // Deny takes priority over allow
     if (denied_tools_.count(tool_name)) {
         return false;
@@ -75,8 +78,8 @@ bool ToolPermissionChecker::is_allowed(const std::string& tool_name) const {
     return false;
 }
 
-bool ToolPermissionChecker::is_mcp_tool_allowed(const std::string& server_name,
-                                                 const std::string& tool_name) const {
+bool ToolPermissionChecker::IsMcpToolAllowed(const std::string& server_name,
+                                              const std::string& tool_name) const {
     // Check deny first: exact match then wildcard
     std::string exact = server_name + ":" + tool_name;
     std::string wildcard = server_name + ":*";

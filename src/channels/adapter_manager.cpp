@@ -1,10 +1,10 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/channels/adapter_manager.hpp"
 #include <nlohmann/json.hpp>
 #include <filesystem>
-#include <csignal>
 #include <cstdlib>
-#include <unistd.h>
-#include <sys/wait.h>
 #include <chrono>
 #include <thread>
 
@@ -22,29 +22,23 @@ ChannelAdapterManager::ChannelAdapterManager(
 }
 
 ChannelAdapterManager::~ChannelAdapterManager() {
-    stop();
+    Stop();
 }
 
 std::string ChannelAdapterManager::find_adapter_script(const std::string& channel_name) const {
-    // Search order:
-    // 1. ~/.quantclaw/adapters/<name>.ts
-    // 2. Bundled adapters relative to executable
-    // 3. Source tree (development)
-
-    const char* home = std::getenv("HOME");
-    std::string home_str = home ? home : "/tmp";
+    std::string home = platform::home_directory();
 
     std::vector<std::string> search_paths = {
-        home_str + "/.quantclaw/adapters/" + channel_name + ".ts",
+        home + "/.quantclaw/adapters/" + channel_name + ".ts",
     };
 
     // Relative to the executable's directory
     try {
-        auto exe_path = std::filesystem::read_symlink("/proc/self/exe");
-        auto exe_dir = exe_path.parent_path();
+        auto exe = platform::executable_path();
+        auto exe_dir = std::filesystem::path(exe).parent_path();
         search_paths.push_back((exe_dir / "adapters" / (channel_name + ".ts")).string());
         search_paths.push_back((exe_dir.parent_path() / "adapters" / (channel_name + ".ts")).string());
-    } catch (...) {}
+    } catch (const std::exception&) {}
 
     for (const auto& path : search_paths) {
         if (std::filesystem::exists(path)) {
@@ -56,58 +50,47 @@ std::string ChannelAdapterManager::find_adapter_script(const std::string& channe
 }
 
 bool ChannelAdapterManager::launch_adapter(AdapterProcess& adapter, const ChannelConfig& config) {
-    // Pass the full raw channel config to the adapter
     std::string gateway_url = "ws://127.0.0.1:" + std::to_string(gateway_port_);
     nlohmann::json config_json = config.raw;
-    // Ensure token is present (may come from top-level or platform-specific field)
     if (!config.token.empty() && !config_json.contains("token")) {
         config_json["token"] = config.token;
     }
 
-    pid_t pid = fork();
-    if (pid < 0) {
-        logger_->error("Failed to fork adapter process for {}: {}", adapter.name, strerror(errno));
-        return false;
+    // Build environment variables
+    std::vector<std::string> env;
+    env.push_back("QUANTCLAW_GATEWAY_URL=" + gateway_url);
+    env.push_back("QUANTCLAW_AUTH_TOKEN=" + auth_token_);
+    env.push_back("QUANTCLAW_CHANNEL_NAME=" + adapter.name);
+    env.push_back("QUANTCLAW_CHANNEL_CONFIG=" + config_json.dump());
+    if (!config.token.empty()) {
+        std::string env_name = adapter.name;
+        for (auto& c : env_name) c = static_cast<char>(std::toupper(c));
+        env.push_back(env_name + "_BOT_TOKEN=" + config.token);
     }
 
-    if (pid == 0) {
-        // Child process — set env vars and exec
-        setenv("QUANTCLAW_GATEWAY_URL", gateway_url.c_str(), 1);
-        setenv("QUANTCLAW_AUTH_TOKEN", auth_token_.c_str(), 1);
-        setenv("QUANTCLAW_CHANNEL_NAME", adapter.name.c_str(), 1);
-        setenv("QUANTCLAW_CHANNEL_CONFIG", config_json.dump().c_str(), 1);
+    // Working directory = adapter script's parent directory
+    auto script_dir = std::filesystem::path(adapter.script_path).parent_path().string();
 
-        // Set platform-specific env var for convenience (e.g. DISCORD_BOT_TOKEN)
-        if (!config.token.empty()) {
-            std::string env_name = adapter.name;
-            for (auto& c : env_name) c = static_cast<char>(std::toupper(c));
-            setenv((env_name + "_BOT_TOKEN").c_str(), config.token.c_str(), 1);
-        }
+    // Try npx tsx first
+    std::vector<std::string> args = {"npx", "tsx", adapter.script_path};
+    auto pid = platform::spawn_process(args, env, script_dir);
 
-        // cd into the adapter script's directory so node_modules resolves
-        auto script_dir = std::filesystem::path(adapter.script_path).parent_path().string();
-        if (chdir(script_dir.c_str()) != 0) {
-            _exit(1);
-        }
-
-        // Run via npx tsx (TypeScript execution)
-        execlp("npx", "npx", "tsx", adapter.script_path.c_str(), nullptr);
-
-        // Fallback: try ts-node
-        execlp("npx", "npx", "ts-node", "--esm", adapter.script_path.c_str(), nullptr);
-
-        // Last resort: node (if pre-compiled to .js)
+    if (pid == platform::kInvalidPid) {
+        // Fallback: try node with .js extension
         std::string js_path = adapter.script_path;
         auto dot = js_path.rfind(".ts");
         if (dot != std::string::npos) {
             js_path.replace(dot, 3, ".js");
         }
-        execlp("node", "node", js_path.c_str(), nullptr);
-
-        _exit(1);
+        args = {"node", js_path};
+        pid = platform::spawn_process(args, env, script_dir);
     }
 
-    // Parent process
+    if (pid == platform::kInvalidPid) {
+        logger_->error("Failed to launch adapter '{}'", adapter.name);
+        return false;
+    }
+
     adapter.pid = pid;
     adapter.running = true;
     logger_->info("Launched adapter '{}' (PID: {}, script: {})",
@@ -116,35 +99,30 @@ bool ChannelAdapterManager::launch_adapter(AdapterProcess& adapter, const Channe
 }
 
 void ChannelAdapterManager::kill_adapter(AdapterProcess& adapter) {
-    if (!adapter.running || adapter.pid <= 0) return;
+    if (!adapter.running || adapter.pid == platform::kInvalidPid) return;
 
     logger_->info("Stopping adapter '{}' (PID: {})", adapter.name, adapter.pid);
 
-    // Send SIGTERM first
-    kill(adapter.pid, SIGTERM);
+    platform::terminate_process(adapter.pid);
 
     // Wait up to 5 seconds for graceful shutdown
-    for (int i = 0; i < 50; ++i) {
-        int status;
-        pid_t result = waitpid(adapter.pid, &status, WNOHANG);
-        if (result != 0) {
-            adapter.running = false;
-            adapter.pid = 0;
-            logger_->info("Adapter '{}' stopped", adapter.name);
-            return;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    int exit_code = platform::wait_process(adapter.pid, 5000);
+    if (exit_code >= 0) {
+        adapter.running = false;
+        adapter.pid = platform::kInvalidPid;
+        logger_->info("Adapter '{}' stopped", adapter.name);
+        return;
     }
 
     // Force kill
-    kill(adapter.pid, SIGKILL);
-    waitpid(adapter.pid, nullptr, 0);
+    platform::kill_process(adapter.pid);
+    platform::wait_process(adapter.pid, 2000);
     adapter.running = false;
-    adapter.pid = 0;
+    adapter.pid = platform::kInvalidPid;
     logger_->warn("Adapter '{}' force-killed", adapter.name);
 }
 
-void ChannelAdapterManager::start() {
+void ChannelAdapterManager::Start() {
     if (running_) return;
 
     for (const auto& [name, config] : channels_) {
@@ -177,7 +155,7 @@ void ChannelAdapterManager::start() {
     }
 }
 
-void ChannelAdapterManager::stop() {
+void ChannelAdapterManager::Stop() {
     running_ = false;
 
     for (auto& adapter : adapters_) {
@@ -191,7 +169,7 @@ void ChannelAdapterManager::stop() {
     monitor_thread_.reset();
 }
 
-std::vector<std::string> ChannelAdapterManager::running_adapters() const {
+std::vector<std::string> ChannelAdapterManager::RunningAdapters() const {
     std::vector<std::string> names;
     for (const auto& adapter : adapters_) {
         if (adapter.running) {
@@ -209,18 +187,10 @@ void ChannelAdapterManager::monitor_loop() {
         for (auto& adapter : adapters_) {
             if (!adapter.running) continue;
 
-            int status;
-            pid_t result = waitpid(adapter.pid, &status, WNOHANG);
-            if (result > 0) {
-                // Process exited
-                if (WIFEXITED(status)) {
-                    logger_->warn("Adapter '{}' exited with code {}", adapter.name, WEXITSTATUS(status));
-                } else if (WIFSIGNALED(status)) {
-                    logger_->warn("Adapter '{}' killed by signal {}", adapter.name, WTERMSIG(status));
-                }
-
+            if (!platform::is_process_alive(adapter.pid)) {
+                logger_->warn("Adapter '{}' exited unexpectedly", adapter.name);
                 adapter.running = false;
-                adapter.pid = 0;
+                adapter.pid = platform::kInvalidPid;
 
                 // Auto-restart if manager is still running
                 if (running_) {

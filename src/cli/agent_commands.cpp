@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/cli/agent_commands.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
 #include "quantclaw/gateway/protocol.hpp"
@@ -9,7 +12,7 @@ AgentCommands::AgentCommands(std::shared_ptr<spdlog::logger> logger)
     : logger_(logger) {
 }
 
-int AgentCommands::request_command(const std::vector<std::string>& args) {
+int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
     std::string message;
     std::string session_key = "agent:main:main";
     std::string model;
@@ -41,7 +44,7 @@ int AgentCommands::request_command(const std::vector<std::string>& args) {
 
     try {
         auto client = std::make_shared<gateway::GatewayClient>(gateway_url_, "", logger_);
-        if (!client->connect()) {
+        if (!client->Connect()) {
             std::cerr << "Error: Cannot connect to gateway at " << gateway_url_ << std::endl;
             std::cerr << "Is the gateway running? Start it with: quantclaw gateway" << std::endl;
             return 1;
@@ -49,14 +52,14 @@ int AgentCommands::request_command(const std::vector<std::string>& args) {
 
         // Subscribe to streaming events (print text deltas in real-time)
         if (!json_output) {
-            client->subscribe("agent.text_delta",
+            client->Subscribe("agent.text_delta",
                 [](const std::string&, const nlohmann::json& payload) {
                     if (payload.contains("text")) {
                         std::cout << payload["text"].get<std::string>() << std::flush;
                     }
                 }
             );
-            client->subscribe("agent.message_end",
+            client->Subscribe("agent.message_end",
                 [](const std::string&, const nlohmann::json&) {
                     std::cout << std::endl;
                 }
@@ -71,13 +74,13 @@ int AgentCommands::request_command(const std::vector<std::string>& args) {
             params["model"] = model;
         }
 
-        auto result = client->call("agent.request", params, timeout_ms);
+        auto result = client->Call("agent.request", params, timeout_ms);
 
         if (json_output) {
             std::cout << result.dump(2) << std::endl;
         }
 
-        client->disconnect();
+        client->Disconnect();
         return 0;
 
     } catch (const std::exception& e) {
@@ -86,18 +89,18 @@ int AgentCommands::request_command(const std::vector<std::string>& args) {
     }
 }
 
-int AgentCommands::stop_command(const std::vector<std::string>& /*args*/) {
+int AgentCommands::StopCommand(const std::vector<std::string>& /*args*/) {
     try {
         auto client = std::make_shared<gateway::GatewayClient>(gateway_url_, "", logger_);
-        if (!client->connect()) {
+        if (!client->Connect()) {
             std::cerr << "Error: Cannot connect to gateway" << std::endl;
             return 1;
         }
 
-        auto result = client->call("agent.stop", {});
+        auto result = client->Call("agent.stop", {});
         std::cout << "Agent stopped" << std::endl;
 
-        client->disconnect();
+        client->Disconnect();
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

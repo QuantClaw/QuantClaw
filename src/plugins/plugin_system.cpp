@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/plugins/plugin_system.hpp"
 #include <filesystem>
 
@@ -31,15 +34,15 @@ PluginSystem::PluginSystem(std::shared_ptr<spdlog::logger> logger)
       hooks_(logger) {}
 
 PluginSystem::~PluginSystem() {
-  shutdown();
+  Shutdown();
 }
 
-bool PluginSystem::initialize(const QuantClawConfig& config,
+bool PluginSystem::Initialize(const QuantClawConfig& config,
                               const std::filesystem::path& workspace_dir) {
   // Step 1: Discover and register plugins from manifests
-  registry_.discover(config, workspace_dir);
+  registry_.Discover(config, workspace_dir);
 
-  auto enabled = registry_.enabled_plugin_ids();
+  auto enabled = registry_.EnabledPluginIds();
   if (enabled.empty()) {
     logger_->info("No enabled plugins found, skipping sidecar");
     return true;
@@ -53,7 +56,7 @@ bool PluginSystem::initialize(const QuantClawConfig& config,
   }
 
   sidecar_ = std::make_shared<SidecarManager>(logger_);
-  hooks_.set_sidecar(sidecar_);
+  hooks_.SetSidecar(sidecar_);
 
   SidecarManager::Options opts;
   opts.sidecar_script = script;
@@ -63,44 +66,44 @@ bool PluginSystem::initialize(const QuantClawConfig& config,
       {"plugins", config.plugins_config},
   };
 
-  if (!sidecar_->start(opts)) {
+  if (!sidecar_->Start(opts)) {
     logger_->error("Failed to start sidecar, plugins will be unavailable");
     sidecar_.reset();
     return false;
   }
 
   // Fire gateway_start hook
-  hooks_.fire(hooks::kGatewayStart, {{"timestamp", std::time(nullptr)}});
+  hooks_.Fire(hooks::kGatewayStart, {{"timestamp", std::time(nullptr)}});
 
   logger_->info("Plugin system initialized ({} plugins, sidecar running)",
                 enabled.size());
   return true;
 }
 
-void PluginSystem::shutdown() {
-  if (sidecar_ && sidecar_->is_running()) {
-    hooks_.fire(hooks::kGatewayStop, {{"timestamp", std::time(nullptr)}});
-    sidecar_->stop();
+void PluginSystem::Shutdown() {
+  if (sidecar_ && sidecar_->IsRunning()) {
+    hooks_.Fire(hooks::kGatewayStop, {{"timestamp", std::time(nullptr)}});
+    sidecar_->Stop();
   }
   sidecar_.reset();
 }
 
-bool PluginSystem::reload(const QuantClawConfig& config,
-                          const std::filesystem::path& workspace_dir) {
-  registry_.discover(config, workspace_dir);
+bool PluginSystem::Reload(const QuantClawConfig& config,
+                         const std::filesystem::path& workspace_dir) {
+  registry_.Discover(config, workspace_dir);
 
-  if (sidecar_ && sidecar_->is_running()) {
-    return sidecar_->reload();
+  if (sidecar_ && sidecar_->IsRunning()) {
+    return sidecar_->Reload();
   }
   return true;
 }
 
-nlohmann::json PluginSystem::call_tool(const std::string& tool_name,
-                                       const nlohmann::json& args) {
-  if (!sidecar_ || !sidecar_->is_running()) {
+nlohmann::json PluginSystem::CallTool(const std::string& tool_name,
+                                      const nlohmann::json& args) {
+  if (!sidecar_ || !sidecar_->IsRunning()) {
     return {{"error", "Sidecar not available"}};
   }
-  auto resp = sidecar_->call("plugin.call_tool",
+  auto resp = sidecar_->Call("plugin.call_tool",
                              {{"toolName", tool_name}, {"args", args}});
   if (!resp.ok) {
     return {{"error", resp.error}};
@@ -108,28 +111,28 @@ nlohmann::json PluginSystem::call_tool(const std::string& tool_name,
   return resp.result;
 }
 
-nlohmann::json PluginSystem::get_tool_schemas() {
-  if (!sidecar_ || !sidecar_->is_running()) {
+nlohmann::json PluginSystem::GetToolSchemas() {
+  if (!sidecar_ || !sidecar_->IsRunning()) {
     return nlohmann::json::array();
   }
-  auto resp = sidecar_->call("plugin.tools", {});
+  auto resp = sidecar_->Call("plugin.tools", {});
   return resp.ok ? resp.result : nlohmann::json::array();
 }
 
-nlohmann::json PluginSystem::list_sidecar_plugins() {
-  if (!sidecar_ || !sidecar_->is_running()) {
+nlohmann::json PluginSystem::ListSidecarPlugins() {
+  if (!sidecar_ || !sidecar_->IsRunning()) {
     return nlohmann::json::array();
   }
-  auto resp = sidecar_->call("plugin.list", {});
+  auto resp = sidecar_->Call("plugin.list", {});
   return resp.ok ? resp.result : nlohmann::json::array();
 }
 
-nlohmann::json PluginSystem::handle_http(
+nlohmann::json PluginSystem::HandleHttp(
     const std::string& method,
     const std::string& path,
     const nlohmann::json& body,
     const std::map<std::string, std::string>& headers) {
-  if (!sidecar_ || !sidecar_->is_running()) {
+  if (!sidecar_ || !sidecar_->IsRunning()) {
     return {{"error", "Sidecar not available"}, {"status", 503}};
   }
 
@@ -138,7 +141,7 @@ nlohmann::json PluginSystem::handle_http(
     headers_json[k] = v;
   }
 
-  auto resp = sidecar_->call("plugin.http", {
+  auto resp = sidecar_->Call("plugin.http", {
       {"method", method},
       {"path", path},
       {"body", body},
@@ -151,21 +154,21 @@ nlohmann::json PluginSystem::handle_http(
   return resp.result;
 }
 
-nlohmann::json PluginSystem::handle_cli(
+nlohmann::json PluginSystem::HandleCli(
     const std::string& command,
     const std::vector<std::string>& args) {
-  if (!sidecar_ || !sidecar_->is_running()) {
+  if (!sidecar_ || !sidecar_->IsRunning()) {
     return {{"error", "Sidecar not available"}};
   }
-  auto resp = sidecar_->call("plugin.cli", {
+  auto resp = sidecar_->Call("plugin.cli", {
       {"command", command},
       {"args", args},
   });
   return resp.ok ? resp.result : nlohmann::json{{"error", resp.error}};
 }
 
-bool PluginSystem::is_sidecar_running() const {
-  return sidecar_ && sidecar_->is_running();
+bool PluginSystem::IsSidecarRunning() const {
+  return sidecar_ && sidecar_->IsRunning();
 }
 
 }  // namespace quantclaw

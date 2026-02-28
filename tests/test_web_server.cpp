@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <thread>
@@ -16,7 +19,7 @@ protected:
 
     void TearDown() override {
         if (server_) {
-            server_->stop();
+            server_->Stop();
             server_.reset();
         }
     }
@@ -33,7 +36,7 @@ protected:
 TEST_F(WebServerTest, HealthEndpoint) {
     int port = find_free_port();
     server_ = std::make_unique<quantclaw::web::WebServer>(port, logger_);
-    server_->start();
+    server_->Start();
 
     // Wait for server to be ready
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -52,12 +55,12 @@ TEST_F(WebServerTest, CustomGetRoute) {
     int port = find_free_port();
     server_ = std::make_unique<quantclaw::web::WebServer>(port, logger_);
 
-    server_->add_route("/api/test", "GET",
+    server_->AddRoute("/api/test", "GET",
         [](const std::string& /*method*/, const std::string& /*body*/) -> std::string {
             return R"({"result":"hello"})";
         });
 
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     httplib::Client cli("127.0.0.1", port);
@@ -74,13 +77,13 @@ TEST_F(WebServerTest, CustomPostRoute) {
     int port = find_free_port();
     server_ = std::make_unique<quantclaw::web::WebServer>(port, logger_);
 
-    server_->add_route("/api/echo", "POST",
+    server_->AddRoute("/api/echo", "POST",
         [](const std::string& /*method*/, const std::string& body) -> std::string {
             auto j = nlohmann::json::parse(body);
             return nlohmann::json({{"echo", j["msg"]}}).dump();
         });
 
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     httplib::Client cli("127.0.0.1", port);
@@ -97,7 +100,7 @@ TEST_F(WebServerTest, StartAndStop) {
     int port = find_free_port();
     server_ = std::make_unique<quantclaw::web::WebServer>(port, logger_);
 
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // Verify it's reachable
@@ -107,7 +110,7 @@ TEST_F(WebServerTest, StartAndStop) {
     EXPECT_EQ(res->status, 200);
 
     // Stop
-    server_->stop();
+    server_->Stop();
     server_.reset();
 
     // After stop, connection should fail
@@ -121,7 +124,7 @@ TEST_F(WebServerTest, StartAndStop) {
 TEST_F(WebServerTest, ResponseContentType) {
     int port = find_free_port();
     server_ = std::make_unique<quantclaw::web::WebServer>(port, logger_);
-    server_->start();
+    server_->Start();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     httplib::Client cli("127.0.0.1", port);

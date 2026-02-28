@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -11,8 +14,8 @@ class AgentCommands {
 public:
     explicit AgentCommands(std::shared_ptr<spdlog::logger> logger);
 
-    int request_command(const std::vector<std::string>& args);
-    int stop_command(const std::vector<std::string>& args);
+    int RequestCommand(const std::vector<std::string>& args);
+    int StopCommand(const std::vector<std::string>& args);
 
 private:
     std::shared_ptr<spdlog::logger> logger_;

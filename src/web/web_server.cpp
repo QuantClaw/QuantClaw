@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/web/web_server.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -10,34 +13,34 @@ WebServer::WebServer(int port, std::shared_ptr<spdlog::logger> logger)
 }
 
 WebServer::~WebServer() {
-    stop();
+    Stop();
 }
 
-void WebServer::add_route(const std::string& path, const std::string& method, RequestHandler handler) {
+void WebServer::AddRoute(const std::string& path, const std::string& method, RequestHandler handler) {
     routes_[path] = {method, handler};
     logger_->debug("Added route: {} {}", method, path);
 }
 
-void WebServer::add_raw_route(const std::string& path, const std::string& method, RawHandler handler) {
+void WebServer::AddRawRoute(const std::string& path, const std::string& method, RawHandler handler) {
     raw_routes_.emplace_back(path, method, std::move(handler));
     logger_->debug("Added raw route: {} {}", method, path);
 }
 
-void WebServer::enable_cors(const std::string& allowed_origin) {
+void WebServer::EnableCors(const std::string& allowed_origin) {
     cors_enabled_ = true;
     cors_origin_ = allowed_origin;
 }
 
-void WebServer::set_auth_token(const std::string& token) {
+void WebServer::SetAuthToken(const std::string& token) {
     auth_token_ = token;
 }
 
-void WebServer::set_mount_point(const std::string& mount, const std::string& dir) {
+void WebServer::SetMountPoint(const std::string& mount, const std::string& dir) {
     mount_points_.emplace_back(mount, dir);
     logger_->debug("Added mount point: {} -> {}", mount, dir);
 }
 
-void WebServer::start() {
+void WebServer::Start() {
     if (running_) {
         logger_->warn("WebServer already running");
         return;
@@ -48,7 +51,7 @@ void WebServer::start() {
     logger_->info("WebServer started on port {}", port_);
 }
 
-void WebServer::stop() {
+void WebServer::Stop() {
     if (!running_) {
         return;
     }
@@ -87,8 +90,9 @@ void WebServer::server_loop() {
                 if (req.path == "/health" || req.path == "/api/health" || req.method == "OPTIONS") {
                     return httplib::Server::HandlerResponse::Unhandled;
                 }
-                // Skip auth for static file paths (UI assets)
+                // Skip auth for static file paths (UI assets) and control UI
                 if (req.path == "/" ||
+                    req.path.rfind("/__quantclaw__/control/", 0) == 0 ||
                     req.path.find(".js") != std::string::npos ||
                     req.path.find(".css") != std::string::npos ||
                     req.path.find(".html") != std::string::npos ||

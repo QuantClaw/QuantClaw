@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include "quantclaw/plugins/hook_manager.hpp"
@@ -20,43 +23,43 @@ class PluginSystem {
   PluginSystem& operator=(const PluginSystem&) = delete;
 
   // Initialize: discover plugins and optionally start sidecar
-  bool initialize(const QuantClawConfig& config,
+  bool Initialize(const QuantClawConfig& config,
                   const std::filesystem::path& workspace_dir);
 
   // Shutdown sidecar and clean up
-  void shutdown();
+  void Shutdown();
 
   // Reload plugins (re-discover + SIGHUP sidecar)
-  bool reload(const QuantClawConfig& config,
+  bool Reload(const QuantClawConfig& config,
               const std::filesystem::path& workspace_dir);
 
   // Access components
-  PluginRegistry& registry() { return registry_; }
-  const PluginRegistry& registry() const { return registry_; }
-  HookManager& hooks() { return hooks_; }
-  SidecarManager* sidecar() { return sidecar_.get(); }
+  PluginRegistry& Registry() { return registry_; }
+  const PluginRegistry& Registry() const { return registry_; }
+  HookManager& Hooks() { return hooks_; }
+  SidecarManager* Sidecar() { return sidecar_.get(); }
 
   // Convenience: call a plugin tool via sidecar
-  nlohmann::json call_tool(const std::string& tool_name,
-                           const nlohmann::json& args);
+  nlohmann::json CallTool(const std::string& tool_name,
+                          const nlohmann::json& args);
 
   // Convenience: get tool schemas from sidecar
-  nlohmann::json get_tool_schemas();
+  nlohmann::json GetToolSchemas();
 
   // Convenience: list loaded plugins from sidecar
-  nlohmann::json list_sidecar_plugins();
+  nlohmann::json ListSidecarPlugins();
 
   // Handle an HTTP request through sidecar plugin routes
-  nlohmann::json handle_http(const std::string& method,
-                             const std::string& path,
-                             const nlohmann::json& body,
-                             const std::map<std::string, std::string>& headers);
+  nlohmann::json HandleHttp(const std::string& method,
+                            const std::string& path,
+                            const nlohmann::json& body,
+                            const std::map<std::string, std::string>& headers);
 
   // Route a CLI command through sidecar
-  nlohmann::json handle_cli(const std::string& command,
-                            const std::vector<std::string>& args);
+  nlohmann::json HandleCli(const std::string& command,
+                           const std::vector<std::string>& args);
 
-  bool is_sidecar_running() const;
+  bool IsSidecarRunning() const;
 
  private:
   std::shared_ptr<spdlog::logger> logger_;

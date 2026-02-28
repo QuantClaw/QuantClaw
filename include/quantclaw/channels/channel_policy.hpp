@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -16,8 +19,8 @@ enum class DmPolicy {
   kPairing,  // Require pairing code before accepting DMs
 };
 
-DmPolicy dm_policy_from_string(const std::string& s);
-std::string dm_policy_to_string(DmPolicy p);
+DmPolicy DmPolicyFromString(const std::string& s);
+std::string DmPolicyToString(DmPolicy p);
 
 // Session DM scope determines session isolation per sender
 enum class DmScope {
@@ -27,8 +30,8 @@ enum class DmScope {
   kPerAccountChannelPeer,  // Each account+channel+sender
 };
 
-DmScope dm_scope_from_string(const std::string& s);
-std::string dm_scope_to_string(DmScope s);
+DmScope DmScopeFromString(const std::string& s);
+std::string DmScopeToString(DmScope s);
 
 // Group activation mode
 enum class GroupActivation {
@@ -36,7 +39,7 @@ enum class GroupActivation {
   kAlways,   // Respond to all group messages
 };
 
-GroupActivation group_activation_from_string(const std::string& s);
+GroupActivation GroupActivationFromString(const std::string& s);
 
 // Channel-specific policy configuration, parsed from channel config
 struct ChannelPolicyConfig {
@@ -47,7 +50,7 @@ struct ChannelPolicyConfig {
   int group_chunk_size = 2000;          // max chars per group message chunk
   std::string bot_name;                 // for @mention detection
 
-  static ChannelPolicyConfig from_json(const nlohmann::json& j);
+  static ChannelPolicyConfig FromJson(const nlohmann::json& j);
 };
 
 // Manages pairing state for channels using DmPolicy::kPairing
@@ -56,22 +59,22 @@ class PairingManager {
   explicit PairingManager(std::shared_ptr<spdlog::logger> logger);
 
   // Generate a pairing code for a channel
-  std::string generate_code(const std::string& channel_id);
+  std::string GenerateCode(const std::string& channel_id);
 
   // Verify and consume a pairing code. Returns true if valid.
-  bool verify_code(const std::string& channel_id,
-                   const std::string& code,
-                   const std::string& sender_id);
+  bool VerifyCode(const std::string& channel_id,
+                  const std::string& code,
+                  const std::string& sender_id);
 
   // Check if a sender is already paired
-  bool is_paired(const std::string& channel_id,
-                 const std::string& sender_id) const;
+  bool IsPaired(const std::string& channel_id,
+                const std::string& sender_id) const;
 
   // Get all paired sender IDs for a channel
-  std::vector<std::string> paired_senders(const std::string& channel_id) const;
+  std::vector<std::string> PairedSenders(const std::string& channel_id) const;
 
   // Unpair a sender
-  void unpair(const std::string& channel_id, const std::string& sender_id);
+  void Unpair(const std::string& channel_id, const std::string& sender_id);
 
  private:
   std::shared_ptr<spdlog::logger> logger_;
@@ -87,7 +90,7 @@ class PairingManager {
 class SessionResolver {
  public:
   // Build a session key from message context
-  static std::string resolve_session_key(
+  static std::string ResolveSessionKey(
       DmScope scope,
       const std::string& agent_id,
       const std::string& channel_id,
@@ -95,7 +98,7 @@ class SessionResolver {
       const std::string& account_id = "");
 
   // Check if a group message should activate the agent
-  static bool should_activate_group(
+  static bool ShouldActivateGroup(
       GroupActivation mode,
       const std::string& message,
       const std::string& bot_name,

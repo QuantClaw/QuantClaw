@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -21,46 +24,46 @@ public:
     ~MemoryManager();
 
     // Load all workspace files into memory
-    void load_workspace_files();
+    void LoadWorkspaceFiles();
 
     // Read identity files (SOUL.md, USER.md)
-    std::string read_identity_file(const std::string& filename);
+    std::string ReadIdentityFile(const std::string& filename) const;
 
     // Read AGENTS.md (OpenClaw behavior instructions)
-    std::string read_agents_file();
+    std::string ReadAgentsFile() const;
 
     // Read TOOLS.md (OpenClaw tool usage guide)
-    std::string read_tools_file();
+    std::string ReadToolsFile() const;
 
     // Search memory files for content
-    std::vector<std::string> search_memory(const std::string& query);
+    std::vector<std::string> SearchMemory(const std::string& query) const;
 
     // Save daily memory entry
-    void save_daily_memory(const std::string& content);
+    void SaveDailyMemory(const std::string& content);
 
     // File change callback type
     using FileChangeCallback = std::function<void(const std::string& filename)>;
 
     // Start file system watcher (polling)
-    void start_file_watcher();
+    void StartFileWatcher();
 
     // Stop file system watcher
-    void stop_file_watcher();
+    void StopFileWatcher();
 
     // Set callback for file changes
-    void set_file_change_callback(FileChangeCallback cb);
+    void SetFileChangeCallback(FileChangeCallback cb);
 
     // Get workspace path
-    const std::filesystem::path& get_workspace_path() const;
+    const std::filesystem::path& GetWorkspacePath() const;
 
     // Set workspace for a specific agent ID
-    void set_agent_workspace(const std::string& agent_id);
+    void SetAgentWorkspace(const std::string& agent_id);
 
     // Get base QuantClaw directory (~/.quantclaw)
-    std::filesystem::path get_base_dir() const;
+    std::filesystem::path GetBaseDir() const;
 
     // Get sessions directory for an agent
-    std::filesystem::path get_sessions_dir(const std::string& agent_id = "main") const;
+    std::filesystem::path GetSessionsDir(const std::string& agent_id = "main") const;
 
 private:
     bool is_memory_file(const std::filesystem::path& filepath) const;
@@ -77,6 +80,7 @@ private:
     // File watcher
     std::unique_ptr<std::thread> watcher_thread_;
     std::atomic<bool> watching_{false};
+    mutable std::mutex watcher_mutex_;  // Protects change_callback_ and file_mtimes_
     FileChangeCallback change_callback_;
     std::unordered_map<std::string, std::filesystem::file_time_type> file_mtimes_;
 };

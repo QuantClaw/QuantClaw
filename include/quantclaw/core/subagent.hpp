@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -66,7 +69,7 @@ struct SubagentConfig {
   int max_children = 5;       // Max active children per parent
   std::vector<std::string> allowed_agents;  // Allowed agent IDs (empty = all)
 
-  static SubagentConfig from_json(const nlohmann::json& j);
+  static SubagentConfig FromJson(const nlohmann::json& j);
 };
 
 // Callback for launching agent runs on child sessions
@@ -82,41 +85,41 @@ class SubagentManager {
   explicit SubagentManager(std::shared_ptr<spdlog::logger> logger);
 
   // Configure limits
-  void configure(const SubagentConfig& config);
+  void Configure(const SubagentConfig& config);
 
   // Set the agent run function (called to launch subagent)
-  void set_agent_runner(AgentRunFn runner);
+  void SetAgentRunner(AgentRunFn runner);
 
   // Spawn a subagent. Returns spawn result.
-  SpawnResult spawn(const SpawnParams& params,
+  SpawnResult Spawn(const SpawnParams& params,
                     const std::string& parent_session_key,
                     int current_depth = 0);
 
   // Mark a run as completed with result
-  void complete_run(const std::string& run_id,
+  void CompleteRun(const std::string& run_id,
                     const std::string& result_summary = "");
 
   // Mark a run as failed
-  void fail_run(const std::string& run_id, const std::string& error = "");
+  void FailRun(const std::string& run_id, const std::string& error = "");
 
   // Cancel a running subagent
-  bool cancel_run(const std::string& run_id);
+  bool CancelRun(const std::string& run_id);
 
   // Get active children for a parent session
-  std::vector<SubagentRun> active_children(
+  std::vector<SubagentRun> ActiveChildren(
       const std::string& parent_session_key) const;
 
   // Get all tracked runs
-  std::vector<SubagentRun> all_runs() const;
+  std::vector<SubagentRun> AllRuns() const;
 
   // Get a specific run
-  const SubagentRun* get_run(const std::string& run_id) const;
+  const SubagentRun* GetRun(const std::string& run_id) const;
 
   // Cleanup completed ephemeral runs
-  int cleanup_completed();
+  int CleanupCompleted();
 
   // Get current config
-  const SubagentConfig& config() const { return config_; }
+  const SubagentConfig& GetConfig() const { return config_; }
 
  private:
   std::shared_ptr<spdlog::logger> logger_;

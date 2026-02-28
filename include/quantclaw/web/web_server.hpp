@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -23,22 +26,22 @@ public:
     ~WebServer();
 
     // Simplified route — handler receives (method, body) and returns response string
-    void add_route(const std::string& path, const std::string& method, RequestHandler handler);
+    void AddRoute(const std::string& path, const std::string& method, RequestHandler handler);
 
     // Raw route — handler receives full httplib Request/Response (query params, headers, etc.)
-    void add_raw_route(const std::string& path, const std::string& method, RawHandler handler);
+    void AddRawRoute(const std::string& path, const std::string& method, RawHandler handler);
 
     // Enable CORS headers on all responses
-    void enable_cors(const std::string& allowed_origin = "*");
+    void EnableCors(const std::string& allowed_origin = "*");
 
     // Set bearer token for auth (empty = no auth check)
-    void set_auth_token(const std::string& token);
+    void SetAuthToken(const std::string& token);
 
     // Mount a directory for static file serving
-    void set_mount_point(const std::string& mount, const std::string& dir);
+    void SetMountPoint(const std::string& mount, const std::string& dir);
 
-    void start();
-    void stop();
+    void Start();
+    void Stop();
 
 private:
     struct RouteInfo {

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/plugins/plugin_registry.hpp"
 #include <algorithm>
 #include <fstream>
@@ -33,7 +36,7 @@ std::string plugin_status_to_string(PluginStatus s) {
 PluginRegistry::PluginRegistry(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
-void PluginRegistry::discover(const QuantClawConfig& config,
+void PluginRegistry::Discover(const QuantClawConfig& config,
                               const std::filesystem::path& workspace_dir) {
   plugins_.clear();
   id_index_.clear();
@@ -87,16 +90,16 @@ void PluginRegistry::discover(const QuantClawConfig& config,
   }
 
   logger_->info("Plugin registry: {} plugins discovered, {} enabled",
-                plugins_.size(), enabled_plugin_ids().size());
+                plugins_.size(), EnabledPluginIds().size());
 }
 
-const PluginRecord* PluginRegistry::find(const std::string& id) const {
+const PluginRecord* PluginRegistry::Find(const std::string& id) const {
   auto it = id_index_.find(id);
   if (it == id_index_.end()) return nullptr;
   return &plugins_[it->second];
 }
 
-std::vector<std::string> PluginRegistry::enabled_plugin_ids() const {
+std::vector<std::string> PluginRegistry::EnabledPluginIds() const {
   std::vector<std::string> result;
   for (const auto& p : plugins_) {
     if (p.enabled) result.push_back(p.id);
@@ -104,12 +107,12 @@ std::vector<std::string> PluginRegistry::enabled_plugin_ids() const {
   return result;
 }
 
-bool PluginRegistry::is_enabled(const std::string& id) const {
-  auto rec = find(id);
+bool PluginRegistry::IsEnabled(const std::string& id) const {
+  auto rec = Find(id);
   return rec && rec->enabled;
 }
 
-nlohmann::json PluginRegistry::to_json() const {
+nlohmann::json PluginRegistry::ToJson() const {
   nlohmann::json arr = nlohmann::json::array();
   for (const auto& p : plugins_) {
     nlohmann::json j;
@@ -209,7 +212,7 @@ void PluginRegistry::scan_directory(const std::filesystem::path& dir,
     candidate.id_hint = entry.path().filename().string();
 
     try {
-      candidate.manifest = PluginManifest::load_from_file(manifest_path);
+      candidate.manifest = PluginManifest::LoadFromFile(manifest_path);
       candidate.id_hint = candidate.manifest->id;
     } catch (const std::exception& e) {
       logger_->warn("Failed to parse plugin manifest {}: {}",
@@ -227,7 +230,7 @@ void PluginRegistry::scan_directory(const std::filesystem::path& dir,
         candidate.package_name = pkg.value("name", "");
         candidate.package_version = pkg.value("version", "");
         candidate.package_description = pkg.value("description", "");
-      } catch (...) {
+      } catch (const std::exception&) {
         // package.json is optional metadata
       }
     }

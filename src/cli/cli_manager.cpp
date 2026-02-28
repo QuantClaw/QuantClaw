@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/cli/cli_manager.hpp"
 #include <iostream>
 #include <algorithm>
@@ -9,13 +12,13 @@ CLIManager::CLIManager() {
     // Commands are registered by main() after construction
 }
 
-void CLIManager::add_command(const Command& command) {
+void CLIManager::AddCommand(const Command& command) {
     commands_.push_back(command);
 }
 
-int CLIManager::run(int argc, char** argv) {
+int CLIManager::Run(int argc, char** argv) {
     if (argc < 2) {
-        show_help();
+        ShowHelp();
         return 1;
     }
 
@@ -27,7 +30,7 @@ int CLIManager::run(int argc, char** argv) {
         return 0;
     }
     if (command_name == "--help" || command_name == "-h") {
-        show_help();
+        ShowHelp();
         return 0;
     }
 
@@ -42,11 +45,11 @@ int CLIManager::run(int argc, char** argv) {
     }
 
     std::cerr << "Unknown command: " << command_name << std::endl;
-    show_help();
+    ShowHelp();
     return 1;
 }
 
-void CLIManager::show_help() const {
+void CLIManager::ShowHelp() const {
     std::cout << "QuantClaw - High-performance C++ AI assistant" << std::endl;
     std::cout << std::endl;
     std::cout << "Usage: quantclaw <command> [options]" << std::endl;

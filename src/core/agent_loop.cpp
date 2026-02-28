@@ -1,8 +1,12 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/core/agent_loop.hpp"
 #include "quantclaw/core/memory_manager.hpp"
 #include "quantclaw/tools/tool_registry.hpp"
 #include "quantclaw/gateway/protocol.hpp"
 #include "quantclaw/core/skill_loader.hpp"
+#include "quantclaw/providers/provider_registry.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <sstream>
@@ -30,11 +34,36 @@ AgentLoop::AgentLoop(std::shared_ptr<MemoryManager> memory_manager,
     logger_->info("AgentLoop initialized with model: {}", agent_config_.model);
 }
 
-std::vector<Message> AgentLoop::process_message(const std::string& message,
+std::shared_ptr<LLMProvider> AgentLoop::resolve_provider() {
+    if (!provider_registry_) {
+        return llm_provider_;
+    }
+
+    auto ref = provider_registry_->ResolveModel(agent_config_.model);
+    auto provider = provider_registry_->GetProviderForModel(ref);
+    if (provider) {
+        // Update model to stripped name (without provider prefix)
+        agent_config_.model = ref.model;
+        return provider;
+    }
+
+    logger_->warn("Failed to resolve provider for model '{}', falling back to injected provider",
+                  agent_config_.model);
+    return llm_provider_;
+}
+
+void AgentLoop::SetModel(const std::string& model_ref) {
+    agent_config_.model = model_ref;
+    logger_->info("Model set to: {}", model_ref);
+}
+
+std::vector<Message> AgentLoop::ProcessMessage(const std::string& message,
                                                  const std::vector<Message>& history,
                                                  const std::string& system_prompt) {
     logger_->info("Processing message (non-streaming)");
     stop_requested_ = false;
+
+    auto provider = resolve_provider();
 
     std::vector<Message> new_messages;
 
@@ -60,10 +89,11 @@ std::vector<Message> AgentLoop::process_message(const std::string& message,
     request.model = agent_config_.model;
     request.temperature = agent_config_.temperature;
     request.max_tokens = agent_config_.max_tokens;
+    request.thinking = agent_config_.thinking;
 
     // Add tool schemas
     nlohmann::json tools_json = nlohmann::json::array();
-    for (const auto& schema : tool_registry_->get_tool_schemas()) {
+    for (const auto& schema : tool_registry_->GetToolSchemas()) {
         nlohmann::json tool;
         tool["type"] = "function";
         tool["function"]["name"] = schema.name;
@@ -78,7 +108,7 @@ std::vector<Message> AgentLoop::process_message(const std::string& message,
 
     while (iterations < max_iterations_ && !stop_requested_) {
         try {
-            auto response = llm_provider_->chat_completion(request);
+            auto response = provider->ChatCompletion(request);
 
             if (!response.tool_calls.empty()) {
                 logger_->info("LLM requested {} tool calls", response.tool_calls.size());
@@ -97,9 +127,9 @@ std::vector<Message> AgentLoop::process_message(const std::string& message,
                 Message assistant_msg;
                 assistant_msg.role = "assistant";
                 if (!response.content.empty())
-                    assistant_msg.content.push_back(ContentBlock::make_text(response.content));
+                    assistant_msg.content.push_back(ContentBlock::MakeText(response.content));
                 for (const auto& tc : response.tool_calls)
-                    assistant_msg.content.push_back(ContentBlock::make_tool_use(tc.id, tc.name, tc.arguments));
+                    assistant_msg.content.push_back(ContentBlock::MakeToolUse(tc.id, tc.name, tc.arguments));
                 request.messages.push_back(assistant_msg);
                 new_messages.push_back(assistant_msg);
 
@@ -108,7 +138,7 @@ std::vector<Message> AgentLoop::process_message(const std::string& message,
                 results_msg.role = "user";
                 for (size_t i = 0; i < response.tool_calls.size(); i++)
                     results_msg.content.push_back(
-                        ContentBlock::make_tool_result(response.tool_calls[i].id, tool_results[i]));
+                        ContentBlock::MakeToolResult(response.tool_calls[i].id, tool_results[i]));
                 request.messages.push_back(results_msg);
                 new_messages.push_back(results_msg);
 
@@ -120,7 +150,7 @@ std::vector<Message> AgentLoop::process_message(const std::string& message,
                 logger_->info("LLM provided final response");
                 Message final_msg;
                 final_msg.role = "assistant";
-                final_msg.content.push_back(ContentBlock::make_text(response.content));
+                final_msg.content.push_back(ContentBlock::MakeText(response.content));
                 new_messages.push_back(final_msg);
                 return new_messages;
             }
@@ -142,7 +172,7 @@ std::vector<Message> AgentLoop::process_message(const std::string& message,
     if (stop_requested_) {
         Message stop_msg;
         stop_msg.role = "assistant";
-        stop_msg.content.push_back(ContentBlock::make_text("[Agent turn stopped by user]"));
+        stop_msg.content.push_back(ContentBlock::MakeText("[Agent turn stopped by user]"));
         new_messages.push_back(stop_msg);
         return new_messages;
     }
@@ -151,12 +181,14 @@ std::vector<Message> AgentLoop::process_message(const std::string& message,
                              std::to_string(max_iterations_) + " iterations");
 }
 
-std::vector<Message> AgentLoop::process_message_stream(const std::string& message,
+std::vector<Message> AgentLoop::ProcessMessageStream(const std::string& message,
                                                         const std::vector<Message>& history,
                                                         const std::string& system_prompt,
                                                         AgentEventCallback callback) {
     logger_->info("Processing message (streaming)");
     stop_requested_ = false;
+
+    auto provider = resolve_provider();
 
     std::vector<Message> new_messages;
 
@@ -176,9 +208,10 @@ std::vector<Message> AgentLoop::process_message_stream(const std::string& messag
     request.temperature = agent_config_.temperature;
     request.max_tokens = agent_config_.max_tokens;
     request.stream = true;
+    request.thinking = agent_config_.thinking;
 
     nlohmann::json tools_json = nlohmann::json::array();
-    for (const auto& schema : tool_registry_->get_tool_schemas()) {
+    for (const auto& schema : tool_registry_->GetToolSchemas()) {
         nlohmann::json tool;
         tool["type"] = "function";
         tool["function"]["name"] = schema.name;
@@ -195,18 +228,18 @@ std::vector<Message> AgentLoop::process_message_stream(const std::string& messag
         try {
             std::string full_response;
 
-            llm_provider_->chat_completion_stream(request, [&](const ChatCompletionResponse& chunk) {
+            provider->ChatCompletionStream(request, [&](const ChatCompletionResponse& chunk) {
                 if (!chunk.content.empty()) {
                     full_response += chunk.content;
                     if (callback) {
-                        callback({events::TEXT_DELTA, {{"text", chunk.content}}});
+                        callback({events::kTextDelta, {{"text", chunk.content}}});
                     }
                 }
 
                 if (!chunk.tool_calls.empty()) {
                     for (const auto& tc : chunk.tool_calls) {
                         if (callback) {
-                            callback({events::TOOL_USE, {
+                            callback({events::kToolUse, {
                                 {"id", tc.id},
                                 {"name", tc.name},
                                 {"input", tc.arguments}
@@ -217,17 +250,17 @@ std::vector<Message> AgentLoop::process_message_stream(const std::string& messag
                         Message assistant_msg;
                         assistant_msg.role = "assistant";
                         if (!full_response.empty())
-                            assistant_msg.content.push_back(ContentBlock::make_text(full_response));
-                        assistant_msg.content.push_back(ContentBlock::make_tool_use(tc.id, tc.name, tc.arguments));
+                            assistant_msg.content.push_back(ContentBlock::MakeText(full_response));
+                        assistant_msg.content.push_back(ContentBlock::MakeToolUse(tc.id, tc.name, tc.arguments));
                         request.messages.push_back(assistant_msg);
                         new_messages.push_back(assistant_msg);
                         full_response.clear();
 
                         // Execute tool
                         try {
-                            auto result = tool_registry_->execute_tool(tc.name, tc.arguments);
+                            auto result = tool_registry_->ExecuteTool(tc.name, tc.arguments);
                             if (callback) {
-                                callback({events::TOOL_RESULT, {
+                                callback({events::kToolResult, {
                                     {"tool_use_id", tc.id},
                                     {"content", result}
                                 }});
@@ -236,13 +269,13 @@ std::vector<Message> AgentLoop::process_message_stream(const std::string& messag
                             Message results_msg;
                             results_msg.role = "user";
                             results_msg.content.push_back(
-                                ContentBlock::make_tool_result(tc.id, result));
+                                ContentBlock::MakeToolResult(tc.id, result));
                             request.messages.push_back(results_msg);
                             new_messages.push_back(results_msg);
                         } catch (const std::exception& e) {
                             std::string error_content = "Error: " + std::string(e.what());
                             if (callback) {
-                                callback({events::TOOL_RESULT, {
+                                callback({events::kToolResult, {
                                     {"tool_use_id", tc.id},
                                     {"content", error_content},
                                     {"is_error", true}
@@ -252,7 +285,7 @@ std::vector<Message> AgentLoop::process_message_stream(const std::string& messag
                             Message results_msg;
                             results_msg.role = "user";
                             results_msg.content.push_back(
-                                ContentBlock::make_tool_result(tc.id, error_content));
+                                ContentBlock::MakeToolResult(tc.id, error_content));
                             request.messages.push_back(results_msg);
                             new_messages.push_back(results_msg);
                         }
@@ -263,7 +296,7 @@ std::vector<Message> AgentLoop::process_message_stream(const std::string& messag
 
                 if (chunk.is_stream_end) {
                     if (callback) {
-                        callback({events::MESSAGE_END, {
+                        callback({events::kMessageEnd, {
                             {"content", full_response}
                         }});
                     }
@@ -274,7 +307,7 @@ std::vector<Message> AgentLoop::process_message_stream(const std::string& messag
             if (!full_response.empty()) {
                 Message final_msg;
                 final_msg.role = "assistant";
-                final_msg.content.push_back(ContentBlock::make_text(full_response));
+                final_msg.content.push_back(ContentBlock::MakeText(full_response));
                 new_messages.push_back(final_msg);
                 return new_messages;
             }
@@ -284,7 +317,7 @@ std::vector<Message> AgentLoop::process_message_stream(const std::string& messag
         } catch (const std::exception& e) {
             logger_->error("Error in streaming: {}", e.what());
             if (callback) {
-                callback({events::MESSAGE_END, {{"error", e.what()}}});
+                callback({events::kMessageEnd, {{"error", e.what()}}});
             }
             return new_messages;
         }
@@ -292,25 +325,25 @@ std::vector<Message> AgentLoop::process_message_stream(const std::string& messag
 
     std::string stop_text = stop_requested_ ? "[Stopped]" : "[Max iterations reached]";
     if (callback) {
-        callback({events::MESSAGE_END, {{"content", stop_text}}});
+        callback({events::kMessageEnd, {{"content", stop_text}}});
     }
     Message stop_msg;
     stop_msg.role = "assistant";
-    stop_msg.content.push_back(ContentBlock::make_text(stop_text));
+    stop_msg.content.push_back(ContentBlock::MakeText(stop_text));
     new_messages.push_back(stop_msg);
     return new_messages;
 }
 
-void AgentLoop::stop() {
+void AgentLoop::Stop() {
     stop_requested_ = true;
     logger_->info("Agent stop requested");
 }
 
-void AgentLoop::set_config(const AgentConfig& config) {
+void AgentLoop::SetConfig(const AgentConfig& config) {
     agent_config_ = config;
     max_iterations_ = config.max_iterations;
-    logger_->info("AgentLoop config updated: model={}, temp={}, max_tokens={}",
-                  config.model, config.temperature, config.max_tokens);
+    logger_->info("AgentLoop config updated: model={}, temp={}, max_tokens={}, thinking={}",
+                  config.model, config.temperature, config.max_tokens, config.thinking);
 }
 
 std::vector<std::string> AgentLoop::handle_tool_calls(const std::vector<nlohmann::json>& tool_calls) {
@@ -328,7 +361,7 @@ std::vector<std::string> AgentLoop::handle_tool_calls(const std::vector<nlohmann
             }
 
             logger_->info("Executing tool: {} with arguments: {}", tool_name, arguments.dump());
-            std::string result = tool_registry_->execute_tool(tool_name, arguments);
+            std::string result = tool_registry_->ExecuteTool(tool_name, arguments);
             results.push_back(result);
             logger_->info("Tool execution successful");
 

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/cli/session_commands.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
 #include <iostream>
@@ -9,7 +12,7 @@ SessionCommands::SessionCommands(std::shared_ptr<spdlog::logger> logger)
     : logger_(logger) {
 }
 
-int SessionCommands::list_command(const std::vector<std::string>& args) {
+int SessionCommands::ListCommand(const std::vector<std::string>& args) {
     bool json_output = false;
     int limit = 20;
 
@@ -23,12 +26,12 @@ int SessionCommands::list_command(const std::vector<std::string>& args) {
 
     try {
         auto client = std::make_shared<gateway::GatewayClient>(gateway_url_, "", logger_);
-        if (!client->connect()) {
+        if (!client->Connect()) {
             std::cerr << "Error: Cannot connect to gateway" << std::endl;
             return 1;
         }
 
-        auto result = client->call("sessions.list", {{"limit", limit}});
+        auto result = client->Call("sessions.list", {{"limit", limit}});
 
         if (json_output) {
             std::cout << result.dump(2) << std::endl;
@@ -55,7 +58,7 @@ int SessionCommands::list_command(const std::vector<std::string>& args) {
             }
         }
 
-        client->disconnect();
+        client->Disconnect();
         return 0;
 
     } catch (const std::exception& e) {
@@ -64,7 +67,7 @@ int SessionCommands::list_command(const std::vector<std::string>& args) {
     }
 }
 
-int SessionCommands::history_command(const std::vector<std::string>& args) {
+int SessionCommands::HistoryCommand(const std::vector<std::string>& args) {
     std::string session_key;
     bool json_output = false;
     int limit = -1;
@@ -87,7 +90,7 @@ int SessionCommands::history_command(const std::vector<std::string>& args) {
 
     try {
         auto client = std::make_shared<gateway::GatewayClient>(gateway_url_, "", logger_);
-        if (!client->connect()) {
+        if (!client->Connect()) {
             std::cerr << "Error: Cannot connect to gateway" << std::endl;
             return 1;
         }
@@ -95,7 +98,7 @@ int SessionCommands::history_command(const std::vector<std::string>& args) {
         nlohmann::json params = {{"sessionKey", session_key}};
         if (limit > 0) params["limit"] = limit;
 
-        auto result = client->call("sessions.history", params);
+        auto result = client->Call("sessions.history", params);
 
         if (json_output) {
             std::cout << result.dump(2) << std::endl;
@@ -116,7 +119,7 @@ int SessionCommands::history_command(const std::vector<std::string>& args) {
             }
         }
 
-        client->disconnect();
+        client->Disconnect();
         return 0;
 
     } catch (const std::exception& e) {
@@ -125,7 +128,7 @@ int SessionCommands::history_command(const std::vector<std::string>& args) {
     }
 }
 
-int SessionCommands::delete_command(const std::vector<std::string>& args) {
+int SessionCommands::DeleteCommand(const std::vector<std::string>& args) {
     std::string session_key;
 
     for (size_t i = 0; i < args.size(); ++i) {
@@ -142,13 +145,13 @@ int SessionCommands::delete_command(const std::vector<std::string>& args) {
 
     try {
         auto client = std::make_shared<gateway::GatewayClient>(gateway_url_, "", logger_);
-        if (!client->connect()) {
+        if (!client->Connect()) {
             std::cerr << "Error: Cannot connect to gateway" << std::endl;
             return 1;
         }
 
-        auto result = client->call("sessions.delete", {{"sessionKey", session_key}});
-        client->disconnect();
+        auto result = client->Call("sessions.delete", {{"sessionKey", session_key}});
+        client->Disconnect();
 
         std::cout << "Session deleted: " << session_key << std::endl;
         return 0;
@@ -159,7 +162,7 @@ int SessionCommands::delete_command(const std::vector<std::string>& args) {
     }
 }
 
-int SessionCommands::reset_command(const std::vector<std::string>& args) {
+int SessionCommands::ResetCommand(const std::vector<std::string>& args) {
     std::string session_key;
 
     for (size_t i = 0; i < args.size(); ++i) {
@@ -176,13 +179,13 @@ int SessionCommands::reset_command(const std::vector<std::string>& args) {
 
     try {
         auto client = std::make_shared<gateway::GatewayClient>(gateway_url_, "", logger_);
-        if (!client->connect()) {
+        if (!client->Connect()) {
             std::cerr << "Error: Cannot connect to gateway" << std::endl;
             return 1;
         }
 
-        auto result = client->call("sessions.reset", {{"sessionKey", session_key}});
-        client->disconnect();
+        auto result = client->Call("sessions.reset", {{"sessionKey", session_key}});
+        client->Disconnect();
 
         std::cout << "Session reset: " << session_key << std::endl;
         return 0;

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -18,9 +21,9 @@ public:
     
     CLIManager();
     
-    void add_command(const Command& command);
-    int run(int argc, char** argv);
-    void show_help() const;
+    void AddCommand(const Command& command);
+    int Run(int argc, char** argv);
+    void ShowHelp() const;
     
 private:
     std::vector<Command> commands_;

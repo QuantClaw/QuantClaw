@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/web/api_routes.hpp"
 #include "quantclaw/web/web_server.hpp"
 #include "quantclaw/gateway/gateway_server.hpp"
@@ -6,6 +9,7 @@
 #include "quantclaw/core/prompt_builder.hpp"
 #include "quantclaw/tools/tool_registry.hpp"
 #include "quantclaw/config.hpp"
+#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <mutex>
@@ -43,25 +47,25 @@ void register_api_routes(
     std::function<void()> reload_fn)
 {
     // --- GET /api/health ---
-    server.add_raw_route("/api/health", "GET",
+    server.AddRawRoute("/api/health", "GET",
         [&gateway_server](const httplib::Request&, httplib::Response& res) {
             json_ok(res, {
                 {"status", "ok"},
-                {"uptime", gateway_server.get_uptime_seconds()},
+                {"uptime", gateway_server.GetUptimeSeconds()},
                 {"version", "0.2.0"}
             });
         }
     );
 
     // --- GET /api/status ---
-    server.add_raw_route("/api/status", "GET",
+    server.AddRawRoute("/api/status", "GET",
         [&gateway_server, session_manager](const httplib::Request&, httplib::Response& res) {
-            auto sessions = session_manager->list_sessions();
+            auto sessions = session_manager->ListSessions();
             json_ok(res, {
                 {"running", true},
-                {"port", gateway_server.get_port()},
-                {"connections", gateway_server.get_connection_count()},
-                {"uptime", gateway_server.get_uptime_seconds()},
+                {"port", gateway_server.GetPort()},
+                {"connections", gateway_server.GetConnectionCount()},
+                {"uptime", gateway_server.GetUptimeSeconds()},
                 {"sessions", sessions.size()},
                 {"version", "0.2.0"}
             });
@@ -69,7 +73,7 @@ void register_api_routes(
     );
 
     // --- GET /api/config ---
-    server.add_raw_route("/api/config", "GET",
+    server.AddRawRoute("/api/config", "GET",
         [&config](const httplib::Request& req, httplib::Response& res) {
             std::string path = req.get_param_value("path");
 
@@ -99,7 +103,7 @@ void register_api_routes(
     );
 
     // --- POST /api/agent/request ---
-    server.add_raw_route("/api/agent/request", "POST",
+    server.AddRawRoute("/api/agent/request", "POST",
         [session_manager, agent_loop, prompt_builder, logger]
         (const httplib::Request& req, httplib::Response& res) {
             try {
@@ -113,26 +117,26 @@ void register_api_routes(
                 }
 
                 // Get or create session
-                session_manager->get_or_create(session_key, "", "api");
+                session_manager->GetOrCreate(session_key, "", "api");
 
                 // Auto-generate display_name from first message
-                auto sessions = session_manager->list_sessions();
+                auto sessions = session_manager->ListSessions();
                 for (const auto& s : sessions) {
                     if (s.session_key == session_key && s.display_name == session_key) {
                         std::string truncated = message.substr(0, 50);
-                        session_manager->update_display_name(session_key, truncated);
+                        session_manager->UpdateDisplayName(session_key, truncated);
                         break;
                     }
                 }
 
                 // Append user message
-                session_manager->append_message(session_key, "user", message);
+                session_manager->AppendMessage(session_key, "user", message);
 
                 // Build system prompt
-                std::string system_prompt = prompt_builder->build_full();
+                std::string system_prompt = prompt_builder->BuildFull();
 
                 // Load history
-                auto history = session_manager->get_history(session_key, 50);
+                auto history = session_manager->GetHistory(session_key, 50);
 
                 // Convert to LLM Messages
                 std::vector<quantclaw::Message> llm_history;
@@ -147,7 +151,7 @@ void register_api_routes(
                 }
 
                 // Non-streaming call
-                auto new_messages = agent_loop->process_message(
+                auto new_messages = agent_loop->ProcessMessage(
                     message, llm_history, system_prompt);
 
                 // Extract final assistant text
@@ -167,7 +171,7 @@ void register_api_routes(
                     quantclaw::SessionMessage smsg;
                     smsg.role = msg.role;
                     smsg.content = msg.content;
-                    session_manager->append_message(session_key, smsg);
+                    session_manager->AppendMessage(session_key, smsg);
                 }
 
                 json_ok(res, {
@@ -191,7 +195,7 @@ void register_api_routes(
     //   event: agent.tool_result  data: {"tool_use_id": "...", "content": "..."}
     //   event: agent.message_end  data: {"content": "..."}
     //   event: done               data: {"sessionKey": "...", "response": "..."}
-    server.add_raw_route("/api/agent/stream", "POST",
+    server.AddRawRoute("/api/agent/stream", "POST",
         [session_manager, agent_loop, prompt_builder, logger]
         (const httplib::Request& req, httplib::Response& res) {
             nlohmann::json params;
@@ -220,21 +224,21 @@ void register_api_routes(
             auto state = std::make_shared<StreamState>();
 
             // Prepare session and history before spawning the worker thread
-            session_manager->get_or_create(session_key, "", "api");
+            session_manager->GetOrCreate(session_key, "", "api");
 
-            auto sessions = session_manager->list_sessions();
+            auto sessions = session_manager->ListSessions();
             for (const auto& s : sessions) {
                 if (s.session_key == session_key && s.display_name == session_key) {
-                    session_manager->update_display_name(
+                    session_manager->UpdateDisplayName(
                         session_key, message.substr(0, 50));
                     break;
                 }
             }
 
-            session_manager->append_message(session_key, "user", message);
-            std::string system_prompt = prompt_builder->build_full();
+            session_manager->AppendMessage(session_key, "user", message);
+            std::string system_prompt = prompt_builder->BuildFull();
 
-            auto history = session_manager->get_history(session_key, 50);
+            auto history = session_manager->GetHistory(session_key, 50);
             std::vector<quantclaw::Message> llm_history;
             llm_history.reserve(history.size());
             for (const auto& smsg : history) {
@@ -253,7 +257,7 @@ void register_api_routes(
                  message, llm_history = std::move(llm_history),
                  system_prompt, session_key, logger]() {
                     try {
-                        auto new_messages = agent_loop->process_message_stream(
+                        auto new_messages = agent_loop->ProcessMessageStream(
                             message, llm_history, system_prompt,
                             [&state](const quantclaw::AgentEvent& event) {
                                 std::string sse = "event: " + event.type +
@@ -269,7 +273,7 @@ void register_api_routes(
                             quantclaw::SessionMessage smsg;
                             smsg.role = msg.role;
                             smsg.content = msg.content;
-                            session_manager->append_message(session_key, smsg);
+                            session_manager->AppendMessage(session_key, smsg);
                         }
 
                         // Extract final response text
@@ -340,28 +344,28 @@ void register_api_routes(
     );
 
     // --- POST /api/agent/stop ---
-    server.add_raw_route("/api/agent/stop", "POST",
+    server.AddRawRoute("/api/agent/stop", "POST",
         [agent_loop](const httplib::Request&, httplib::Response& res) {
-            agent_loop->stop();
+            agent_loop->Stop();
             json_ok(res, {{"ok", true}});
         }
     );
 
     // --- GET /api/sessions ---
-    server.add_raw_route("/api/sessions", "GET",
+    server.AddRawRoute("/api/sessions", "GET",
         [session_manager](const httplib::Request& req, httplib::Response& res) {
             int limit = 50;
             int offset = 0;
             if (req.has_param("limit")) {
                 try { limit = std::stoi(req.get_param_value("limit")); }
-                catch (...) {}
+                catch (const std::exception&) {}
             }
             if (req.has_param("offset")) {
                 try { offset = std::stoi(req.get_param_value("offset")); }
-                catch (...) {}
+                catch (const std::exception&) {}
             }
 
-            auto sessions = session_manager->list_sessions();
+            auto sessions = session_manager->ListSessions();
             nlohmann::json result = nlohmann::json::array();
             int end = std::min(offset + limit, static_cast<int>(sessions.size()));
             for (int i = offset; i < end; ++i) {
@@ -379,7 +383,7 @@ void register_api_routes(
     );
 
     // --- GET /api/sessions/history ---
-    server.add_raw_route("/api/sessions/history", "GET",
+    server.AddRawRoute("/api/sessions/history", "GET",
         [session_manager](const httplib::Request& req, httplib::Response& res) {
             std::string session_key = req.get_param_value("sessionKey");
             if (session_key.empty()) {
@@ -389,10 +393,10 @@ void register_api_routes(
             int limit = -1;
             if (req.has_param("limit")) {
                 try { limit = std::stoi(req.get_param_value("limit")); }
-                catch (...) {}
+                catch (const std::exception&) {}
             }
 
-            auto history = session_manager->get_history(session_key, limit);
+            auto history = session_manager->GetHistory(session_key, limit);
             nlohmann::json result = nlohmann::json::array();
             for (const auto& msg : history) {
                 nlohmann::json entry;
@@ -401,12 +405,12 @@ void register_api_routes(
 
                 nlohmann::json content_arr = nlohmann::json::array();
                 for (const auto& block : msg.content) {
-                    content_arr.push_back(block.to_json());
+                    content_arr.push_back(block.ToJson());
                 }
                 entry["content"] = content_arr;
 
                 if (msg.usage) {
-                    entry["usage"] = msg.usage->to_json();
+                    entry["usage"] = msg.usage->ToJson();
                 }
                 result.push_back(entry);
             }
@@ -415,7 +419,7 @@ void register_api_routes(
     );
 
     // --- POST /api/sessions/delete ---
-    server.add_raw_route("/api/sessions/delete", "POST",
+    server.AddRawRoute("/api/sessions/delete", "POST",
         [session_manager](const httplib::Request& req, httplib::Response& res) {
             try {
                 auto params = nlohmann::json::parse(req.body);
@@ -424,7 +428,7 @@ void register_api_routes(
                     json_error(res, 400, "sessionKey is required");
                     return;
                 }
-                session_manager->delete_session(session_key);
+                session_manager->DeleteSession(session_key);
                 json_ok(res, {{"ok", true}});
             } catch (const nlohmann::json::exception& e) {
                 json_error(res, 400, std::string("Invalid JSON: ") + e.what());
@@ -435,7 +439,7 @@ void register_api_routes(
     );
 
     // --- POST /api/sessions/reset ---
-    server.add_raw_route("/api/sessions/reset", "POST",
+    server.AddRawRoute("/api/sessions/reset", "POST",
         [session_manager](const httplib::Request& req, httplib::Response& res) {
             try {
                 auto params = nlohmann::json::parse(req.body);
@@ -444,7 +448,7 @@ void register_api_routes(
                     json_error(res, 400, "sessionKey is required");
                     return;
                 }
-                session_manager->reset_session(session_key);
+                session_manager->ResetSession(session_key);
                 json_ok(res, {{"ok", true}});
             } catch (const nlohmann::json::exception& e) {
                 json_error(res, 400, std::string("Invalid JSON: ") + e.what());
@@ -456,7 +460,7 @@ void register_api_routes(
 
     // --- POST /api/config/reload ---
     if (reload_fn) {
-        server.add_raw_route("/api/config/reload", "POST",
+        server.AddRawRoute("/api/config/reload", "POST",
             [reload_fn, logger](const httplib::Request&, httplib::Response& res) {
                 try {
                     reload_fn();
@@ -468,8 +472,197 @@ void register_api_routes(
         );
     }
 
+    // --- POST /v1/chat/completions (OpenAI-compatible endpoint) ---
+    server.AddRawRoute("/v1/chat/completions", "POST",
+        [agent_loop, session_manager, logger]
+        (const httplib::Request& req, httplib::Response& res) {
+            try {
+                auto body = nlohmann::json::parse(req.body);
+
+                // Extract messages (OpenAI format)
+                if (!body.contains("messages") || !body["messages"].is_array()) {
+                    json_error(res, 400, "messages array is required");
+                    return;
+                }
+
+                // Extract the last user message
+                std::string user_message;
+                std::vector<quantclaw::Message> history;
+                for (const auto& msg : body["messages"]) {
+                    std::string role = msg.value("role", "");
+                    std::string content = msg.value("content", "");
+                    if (role == "system" || role == "user" || role == "assistant") {
+                        history.emplace_back(role, content);
+                    }
+                }
+
+                // The last user message is what we process
+                if (!history.empty() && history.back().role == "user") {
+                    user_message = history.back().text();
+                    history.pop_back();
+                } else {
+                    json_error(res, 400, "Last message must be from user");
+                    return;
+                }
+
+                // Extract system prompt from messages
+                std::string system_prompt;
+                std::vector<quantclaw::Message> llm_history;
+                for (const auto& msg : history) {
+                    if (msg.role == "system") {
+                        system_prompt += msg.text();
+                    } else {
+                        llm_history.push_back(msg);
+                    }
+                }
+
+                bool stream = body.value("stream", false);
+                std::string model = body.value("model", "default");
+
+                if (stream) {
+                    // Streaming response (SSE format matching OpenAI)
+                    struct StreamState {
+                        std::mutex mu;
+                        std::condition_variable cv;
+                        std::queue<std::string> chunks;
+                        bool finished = false;
+                    };
+                    auto state = std::make_shared<StreamState>();
+                    std::string resp_id = "chatcmpl-qc-" + std::to_string(
+                        std::chrono::system_clock::now().time_since_epoch().count());
+
+                    std::thread worker(
+                        [state, agent_loop, user_message,
+                         llm_history = std::move(llm_history),
+                         system_prompt, model, resp_id, logger]() {
+                            try {
+                                agent_loop->ProcessMessageStream(
+                                    user_message, llm_history, system_prompt,
+                                    [&state, &model, &resp_id](const quantclaw::AgentEvent& event) {
+                                        if (event.type == "agent.text_delta" &&
+                                            event.data.contains("text")) {
+                                            nlohmann::json chunk;
+                                            chunk["id"] = resp_id;
+                                            chunk["object"] = "chat.completion.chunk";
+                                            chunk["created"] = std::chrono::duration_cast<
+                                                std::chrono::seconds>(
+                                                std::chrono::system_clock::now()
+                                                    .time_since_epoch()).count();
+                                            chunk["model"] = model;
+                                            chunk["choices"] = nlohmann::json::array({
+                                                {{"index", 0},
+                                                 {"delta", {{"content", event.data["text"]}}},
+                                                 {"finish_reason", nullptr}}
+                                            });
+                                            std::string sse = "data: " + chunk.dump() + "\n\n";
+                                            std::lock_guard<std::mutex> lock(state->mu);
+                                            state->chunks.push(std::move(sse));
+                                            state->cv.notify_one();
+                                        }
+                                    }
+                                );
+
+                                // Send [DONE] marker
+                                {
+                                    std::lock_guard<std::mutex> lock(state->mu);
+                                    state->chunks.push("data: [DONE]\n\n");
+                                    state->finished = true;
+                                    state->cv.notify_one();
+                                }
+                            } catch (const std::exception& e) {
+                                logger->error("OpenAI stream error: {}", e.what());
+                                std::lock_guard<std::mutex> lock(state->mu);
+                                state->finished = true;
+                                state->cv.notify_one();
+                            }
+                        }
+                    );
+                    worker.detach();
+
+                    res.set_header("Cache-Control", "no-cache");
+                    res.set_header("Connection", "keep-alive");
+                    res.set_header("X-Accel-Buffering", "no");
+
+                    res.set_chunked_content_provider(
+                        "text/event-stream",
+                        [state](size_t /*offset*/, httplib::DataSink& sink) -> bool {
+                            std::unique_lock<std::mutex> lock(state->mu);
+                            state->cv.wait(lock, [&state] {
+                                return !state->chunks.empty() || state->finished;
+                            });
+                            while (!state->chunks.empty()) {
+                                auto& c = state->chunks.front();
+                                sink.write(c.data(), c.size());
+                                state->chunks.pop();
+                            }
+                            if (state->finished) {
+                                sink.done();
+                                return false;
+                            }
+                            return true;
+                        }
+                    );
+                } else {
+                    // Non-streaming response
+                    auto new_messages = agent_loop->ProcessMessage(
+                        user_message, llm_history, system_prompt);
+
+                    std::string final_response;
+                    for (const auto& msg : new_messages) {
+                        if (msg.role == "assistant") {
+                            final_response = msg.text();
+                        }
+                    }
+
+                    auto now = std::chrono::duration_cast<std::chrono::seconds>(
+                        std::chrono::system_clock::now().time_since_epoch()).count();
+
+                    nlohmann::json response;
+                    response["id"] = "chatcmpl-qc-" + std::to_string(now);
+                    response["object"] = "chat.completion";
+                    response["created"] = now;
+                    response["model"] = model;
+                    response["choices"] = nlohmann::json::array({
+                        {{"index", 0},
+                         {"message", {{"role", "assistant"}, {"content", final_response}}},
+                         {"finish_reason", "stop"}}
+                    });
+                    response["usage"] = {
+                        {"prompt_tokens", 0},
+                        {"completion_tokens", 0},
+                        {"total_tokens", 0}
+                    };
+
+                    json_ok(res, response);
+                }
+            } catch (const nlohmann::json::exception& e) {
+                json_error(res, 400, std::string("Invalid JSON: ") + e.what());
+            } catch (const std::exception& e) {
+                json_error(res, 500, e.what());
+            }
+        }
+    );
+
+    // --- GET /v1/models (OpenAI-compatible model list) ---
+    server.AddRawRoute("/v1/models", "GET",
+        [&config](const httplib::Request&, httplib::Response& res) {
+            auto now = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+
+            nlohmann::json models = nlohmann::json::array();
+            models.push_back({
+                {"id", config.agent.model},
+                {"object", "model"},
+                {"created", now},
+                {"owned_by", "quantclaw"}
+            });
+
+            json_ok(res, {{"object", "list"}, {"data", models}});
+        }
+    );
+
     // --- GET /api/channels ---
-    server.add_raw_route("/api/channels", "GET",
+    server.AddRawRoute("/api/channels", "GET",
         [](const httplib::Request&, httplib::Response& res) {
             json_ok(res, nlohmann::json::array({
                 {{"name", "cli"}, {"type", "cli"}, {"status", "active"}}
@@ -481,7 +674,7 @@ void register_api_routes(
     // Generic webhook endpoint for external integrations (e.g. Feishu, DingTalk, custom bots)
     // Accepts: {"channel": "discord", "senderId": "...", "channelId": "...", "message": "..."}
     // Returns: {"response": "...", "sessionKey": "..."}
-    server.add_raw_route("/api/channel/message", "POST",
+    server.AddRawRoute("/api/channel/message", "POST",
         [session_manager, agent_loop, prompt_builder, logger]
         (const httplib::Request& req, httplib::Response& res) {
             try {
@@ -500,26 +693,26 @@ void register_api_routes(
                 std::string session_key = "channel:" + channel + ":" + channel_id;
 
                 // Get or create session
-                session_manager->get_or_create(session_key, "", channel);
+                session_manager->GetOrCreate(session_key, "", channel);
 
                 // Auto-generate display_name
-                auto sessions = session_manager->list_sessions();
+                auto sessions = session_manager->ListSessions();
                 for (const auto& s : sessions) {
                     if (s.session_key == session_key && s.display_name == session_key) {
-                        session_manager->update_display_name(session_key,
+                        session_manager->UpdateDisplayName(session_key,
                             channel + ": " + message.substr(0, 40));
                         break;
                     }
                 }
 
                 // Append user message
-                session_manager->append_message(session_key, "user", message);
+                session_manager->AppendMessage(session_key, "user", message);
 
                 // Build system prompt
-                std::string system_prompt = prompt_builder->build_full();
+                std::string system_prompt = prompt_builder->BuildFull();
 
                 // Load history
-                auto history = session_manager->get_history(session_key, 50);
+                auto history = session_manager->GetHistory(session_key, 50);
                 std::vector<quantclaw::Message> llm_history;
                 for (const auto& smsg : history) {
                     quantclaw::Message m;
@@ -532,7 +725,7 @@ void register_api_routes(
                 }
 
                 // Non-streaming call
-                auto new_messages = agent_loop->process_message(
+                auto new_messages = agent_loop->ProcessMessage(
                     message, llm_history, system_prompt);
 
                 // Extract final assistant text
@@ -552,7 +745,7 @@ void register_api_routes(
                     quantclaw::SessionMessage smsg;
                     smsg.role = msg.role;
                     smsg.content = msg.content;
-                    session_manager->append_message(session_key, smsg);
+                    session_manager->AppendMessage(session_key, smsg);
                 }
 
                 json_ok(res, {
@@ -567,7 +760,7 @@ void register_api_routes(
         }
     );
 
-    logger->info("Registered {} HTTP API routes", reload_fn ? 13 : 12);
+    logger->info("Registered {} HTTP API routes", reload_fn ? 15 : 14);
 }
 
 } // namespace quantclaw::web

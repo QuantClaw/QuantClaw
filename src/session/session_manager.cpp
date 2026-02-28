@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/session/session_manager.hpp"
 #include <fstream>
 #include <sstream>
@@ -10,7 +13,7 @@ namespace quantclaw {
 
 // --- ContentBlock ---
 
-nlohmann::json ContentBlock::to_json() const {
+nlohmann::json ContentBlock::ToJson() const {
     nlohmann::json j;
     j["type"] = type;
     if (type == "text" || type == "thinking") {
@@ -26,7 +29,7 @@ nlohmann::json ContentBlock::to_json() const {
     return j;
 }
 
-ContentBlock ContentBlock::from_json(const nlohmann::json& j) {
+ContentBlock ContentBlock::FromJson(const nlohmann::json& j) {
     ContentBlock cb;
     cb.type = j.value("type", "text");
     if (cb.type == "text" || cb.type == "thinking") {
@@ -42,14 +45,14 @@ ContentBlock ContentBlock::from_json(const nlohmann::json& j) {
     return cb;
 }
 
-ContentBlock ContentBlock::make_text(const std::string& text) {
+ContentBlock ContentBlock::MakeText(const std::string& text) {
     ContentBlock cb;
     cb.type = "text";
     cb.text = text;
     return cb;
 }
 
-ContentBlock ContentBlock::make_tool_use(const std::string& id, const std::string& name, const nlohmann::json& input) {
+ContentBlock ContentBlock::MakeToolUse(const std::string& id, const std::string& name, const nlohmann::json& input) {
     ContentBlock cb;
     cb.type = "tool_use";
     cb.id = id;
@@ -58,7 +61,7 @@ ContentBlock ContentBlock::make_tool_use(const std::string& id, const std::strin
     return cb;
 }
 
-ContentBlock ContentBlock::make_tool_result(const std::string& tool_use_id, const std::string& content) {
+ContentBlock ContentBlock::MakeToolResult(const std::string& tool_use_id, const std::string& content) {
     ContentBlock cb;
     cb.type = "tool_result";
     cb.tool_use_id = tool_use_id;
@@ -68,7 +71,7 @@ ContentBlock ContentBlock::make_tool_result(const std::string& tool_use_id, cons
 
 // --- SessionMessage ---
 
-nlohmann::json SessionMessage::to_jsonl() const {
+nlohmann::json SessionMessage::ToJsonl() const {
     nlohmann::json j;
     j["type"] = "message";
     j["timestamp"] = timestamp;
@@ -78,19 +81,19 @@ nlohmann::json SessionMessage::to_jsonl() const {
 
     nlohmann::json content_arr = nlohmann::json::array();
     for (const auto& block : content) {
-        content_arr.push_back(block.to_json());
+        content_arr.push_back(block.ToJson());
     }
     msg["content"] = content_arr;
 
     if (usage) {
-        msg["usage"] = usage->to_json();
+        msg["usage"] = usage->ToJson();
     }
 
     j["message"] = msg;
     return j;
 }
 
-SessionMessage SessionMessage::from_jsonl(const nlohmann::json& j) {
+SessionMessage SessionMessage::FromJsonl(const nlohmann::json& j) {
     SessionMessage msg;
     msg.timestamp = j.value("timestamp", "");
 
@@ -101,16 +104,16 @@ SessionMessage SessionMessage::from_jsonl(const nlohmann::json& j) {
         if (m.contains("content")) {
             if (m["content"].is_array()) {
                 for (const auto& block : m["content"]) {
-                    msg.content.push_back(ContentBlock::from_json(block));
+                    msg.content.push_back(ContentBlock::FromJson(block));
                 }
             } else if (m["content"].is_string()) {
                 // Legacy: plain string content
-                msg.content.push_back(ContentBlock::make_text(m["content"].get<std::string>()));
+                msg.content.push_back(ContentBlock::MakeText(m["content"].get<std::string>()));
             }
         }
 
         if (m.contains("usage")) {
-            msg.usage = UsageInfo::from_json(m["usage"]);
+            msg.usage = UsageInfo::FromJson(m["usage"]);
         }
     }
 
@@ -123,11 +126,11 @@ SessionManager::SessionManager(const std::filesystem::path& sessions_dir,
                                std::shared_ptr<spdlog::logger> logger)
     : sessions_dir_(sessions_dir), logger_(logger) {
     std::filesystem::create_directories(sessions_dir_);
-    load_store();
+    LoadStore();
     logger_->info("SessionManager initialized at: {}", sessions_dir_.string());
 }
 
-SessionHandle SessionManager::get_or_create(const std::string& session_key,
+SessionHandle SessionManager::GetOrCreate(const std::string& session_key,
                                              const std::string& display_name,
                                              const std::string& channel) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -153,27 +156,27 @@ SessionHandle SessionManager::get_or_create(const std::string& session_key,
     info.channel = channel;
 
     store_[session_key] = info;
-    save_store();
+    SaveStore();
 
     logger_->info("Created new session: {} -> {}", session_key, sid);
 
     return {session_key, sid, transcript_path(sid)};
 }
 
-void SessionManager::append_message(const std::string& session_key,
+void SessionManager::AppendMessage(const std::string& session_key,
                                      const std::string& role,
                                      const std::string& text_content,
                                      const std::optional<UsageInfo>& usage) {
     SessionMessage msg;
     msg.role = role;
-    msg.content.push_back(ContentBlock::make_text(text_content));
+    msg.content.push_back(ContentBlock::MakeText(text_content));
     msg.timestamp = get_timestamp();
     msg.usage = usage;
 
-    append_message(session_key, msg);
+    AppendMessage(session_key, msg);
 }
 
-void SessionManager::append_message(const std::string& session_key, const SessionMessage& msg) {
+void SessionManager::AppendMessage(const std::string& session_key, const SessionMessage& msg) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto it = store_.find(session_key);
@@ -189,15 +192,15 @@ void SessionManager::append_message(const std::string& session_key, const Sessio
         return;
     }
 
-    file << msg.to_jsonl().dump() << "\n";
+    file << msg.ToJsonl().dump() << "\n";
     file.close();
 
     // Update timestamp
     it->second.updated_at = get_timestamp();
-    save_store();
+    SaveStore();
 }
 
-std::vector<SessionMessage> SessionManager::get_history(const std::string& session_key,
+std::vector<SessionMessage> SessionManager::GetHistory(const std::string& session_key,
                                                          int max_messages) const {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<SessionMessage> messages;
@@ -218,7 +221,7 @@ std::vector<SessionMessage> SessionManager::get_history(const std::string& sessi
         if (line.empty()) continue;
         try {
             auto j = nlohmann::json::parse(line);
-            messages.push_back(SessionMessage::from_jsonl(j));
+            messages.push_back(SessionMessage::FromJsonl(j));
         } catch (const std::exception& e) {
             logger_->warn("Failed to parse JSONL line: {}", e.what());
         }
@@ -232,7 +235,7 @@ std::vector<SessionMessage> SessionManager::get_history(const std::string& sessi
     return messages;
 }
 
-std::vector<SessionInfo> SessionManager::list_sessions() const {
+std::vector<SessionInfo> SessionManager::ListSessions() const {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<SessionInfo> result;
     result.reserve(store_.size());
@@ -246,7 +249,7 @@ std::vector<SessionInfo> SessionManager::list_sessions() const {
     return result;
 }
 
-void SessionManager::delete_session(const std::string& session_key) {
+void SessionManager::DeleteSession(const std::string& session_key) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto it = store_.find(session_key);
@@ -262,12 +265,12 @@ void SessionManager::delete_session(const std::string& session_key) {
     }
 
     store_.erase(it);
-    save_store();
+    SaveStore();
 
     logger_->info("Deleted session: {}", session_key);
 }
 
-void SessionManager::update_display_name(const std::string& session_key, const std::string& name) {
+void SessionManager::UpdateDisplayName(const std::string& session_key, const std::string& name) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto it = store_.find(session_key);
@@ -276,10 +279,10 @@ void SessionManager::update_display_name(const std::string& session_key, const s
     }
 
     it->second.display_name = name;
-    save_store();
+    SaveStore();
 }
 
-void SessionManager::reset_session(const std::string& session_key) {
+void SessionManager::ResetSession(const std::string& session_key) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto it = store_.find(session_key);
@@ -301,12 +304,12 @@ void SessionManager::reset_session(const std::string& session_key) {
     std::string new_sid = generate_session_id();
     it->second.session_id = new_sid;
     it->second.updated_at = get_timestamp();
-    save_store();
+    SaveStore();
 
     logger_->info("Reset session: {} -> {}", session_key, new_sid);
 }
 
-void SessionManager::save_store() {
+void SessionManager::SaveStore() {
     auto store_path = sessions_dir_ / "sessions.json";
     nlohmann::json j = nlohmann::json::object();
     for (const auto& [key, info] : store_) {
@@ -325,7 +328,7 @@ void SessionManager::save_store() {
     }
 }
 
-void SessionManager::load_store() {
+void SessionManager::LoadStore() {
     auto store_path = sessions_dir_ / "sessions.json";
     if (!std::filesystem::exists(store_path)) {
         return;

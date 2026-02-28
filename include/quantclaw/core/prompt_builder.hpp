@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -21,10 +24,10 @@ public:
                   const QuantClawConfig* config = nullptr);
 
     // Full system prompt: SOUL + AGENTS + TOOLS + skills + memory + runtime info
-    std::string build_full(const std::string& agent_id = "default") const;
+    std::string BuildFull(const std::string& agent_id = "default") const;
 
     // Minimal system prompt: identity + tools only
-    std::string build_minimal(const std::string& agent_id = "default") const;
+    std::string BuildMinimal(const std::string& agent_id = "default") const;
 
 private:
     std::shared_ptr<MemoryManager> memory_manager_;

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -23,17 +26,17 @@ public:
                   std::shared_ptr<spdlog::logger> logger);
     ~GatewayClient();
 
-    bool connect(int timeout_ms = 5000);
-    void disconnect();
-    bool is_connected() const;
+    bool Connect(int timeout_ms = 5000);
+    void Disconnect();
+    bool IsConnected() const;
 
     // Synchronous RPC call (sends req, waits for res)
-    nlohmann::json call(const std::string& method,
+    nlohmann::json Call(const std::string& method,
                         const nlohmann::json& params = {},
                         int timeout_ms = 30000);
 
     // Subscribe to events
-    void subscribe(const std::string& event, EventCallback callback);
+    void Subscribe(const std::string& event, EventCallback callback);
 
 private:
     void on_message(const ix::WebSocketMessagePtr& msg);

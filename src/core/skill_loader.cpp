@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/core/skill_loader.hpp"
 #include <fstream>
 #include <sstream>
@@ -15,7 +18,7 @@ SkillLoader::SkillLoader(std::shared_ptr<spdlog::logger> logger)
     logger_->info("SkillLoader initialized");
 }
 
-std::vector<SkillMetadata> SkillLoader::load_skills_from_directory(
+std::vector<SkillMetadata> SkillLoader::LoadSkillsFromDirectory(
     const std::filesystem::path& skills_dir) {
 
     std::vector<SkillMetadata> skills;
@@ -31,7 +34,7 @@ std::vector<SkillMetadata> SkillLoader::load_skills_from_directory(
         if (entry.is_regular_file() && entry.path().filename() == "SKILL.md") {
             try {
                 auto skill = parse_skill_file(entry.path());
-                if (check_skill_gating(skill)) {
+                if (CheckSkillGating(skill)) {
                     logger_->debug("Loaded skill: {}", skill.name);
                     skills.push_back(std::move(skill));
                 } else {
@@ -48,7 +51,7 @@ std::vector<SkillMetadata> SkillLoader::load_skills_from_directory(
     return skills;
 }
 
-bool SkillLoader::check_skill_gating(const SkillMetadata& skill) {
+bool SkillLoader::CheckSkillGating(const SkillMetadata& skill) {
     // If always=true, skip all gating
     if (skill.always) {
         return true;
@@ -111,7 +114,7 @@ bool SkillLoader::check_skill_gating(const SkillMetadata& skill) {
     return true;
 }
 
-std::string SkillLoader::get_skill_context(const std::vector<SkillMetadata>& skills) const {
+std::string SkillLoader::GetSkillContext(const std::vector<SkillMetadata>& skills) const {
     std::ostringstream context;
 
     for (const auto& skill : skills) {
@@ -160,7 +163,7 @@ std::string SkillLoader::get_skill_context(const std::vector<SkillMetadata>& ski
     return context.str();
 }
 
-bool SkillLoader::install_skill(const SkillMetadata& skill) {
+bool SkillLoader::InstallSkill(const SkillMetadata& skill) {
     if (skill.installs.empty()) {
         logger_->info("Skill '{}' has no install instructions", skill.name);
         return true;
@@ -209,7 +212,7 @@ bool SkillLoader::install_skill(const SkillMetadata& skill) {
     return all_ok;
 }
 
-std::vector<SkillCommand> SkillLoader::get_all_commands(
+std::vector<SkillCommand> SkillLoader::GetAllCommands(
     const std::vector<SkillMetadata>& skills) const {
     std::vector<SkillCommand> commands;
     for (const auto& skill : skills) {
@@ -575,7 +578,7 @@ nlohmann::json SkillLoader::parse_yaml_frontmatter(const std::string& yaml_str) 
     return root;
 }
 
-std::vector<SkillMetadata> SkillLoader::load_skills(
+std::vector<SkillMetadata> SkillLoader::LoadSkills(
     const SkillsConfig& skills_config,
     const std::filesystem::path& workspace_path) {
 
@@ -597,7 +600,7 @@ std::vector<SkillMetadata> SkillLoader::load_skills(
     std::vector<SkillMetadata> result;
 
     for (const auto& dir : dirs) {
-        auto skills = load_skills_from_directory(dir);
+        auto skills = LoadSkillsFromDirectory(dir);
         for (auto& skill : skills) {
             if (seen_names.count(skill.name)) continue;
 

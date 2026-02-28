@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -17,11 +20,11 @@ struct ContentBlock {
     std::string tool_use_id;
     std::string content;
 
-    nlohmann::json to_json() const;
-    static ContentBlock from_json(const nlohmann::json& j);
-    static ContentBlock make_text(const std::string& text);
-    static ContentBlock make_tool_use(const std::string& id, const std::string& name, const nlohmann::json& input);
-    static ContentBlock make_tool_result(const std::string& tool_use_id, const std::string& content);
+    nlohmann::json ToJson() const;
+    static ContentBlock FromJson(const nlohmann::json& j);
+    static ContentBlock MakeText(const std::string& text);
+    static ContentBlock MakeToolUse(const std::string& id, const std::string& name, const nlohmann::json& input);
+    static ContentBlock MakeToolResult(const std::string& tool_use_id, const std::string& content);
 };
 
 } // namespace quantclaw

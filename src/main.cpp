@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <iostream>
 #include <memory>
 #include <string>
@@ -34,7 +37,7 @@ int main(int argc, char* argv[]) {
     quantclaw::cli::CLIManager cli;
 
     // --- gateway command ---
-    cli.add_command({
+    cli.AddCommand({
         "gateway",
         "Manage the Gateway WebSocket server",
         {"g"},
@@ -44,24 +47,24 @@ int main(int argc, char* argv[]) {
 
             if (args.empty()) {
                 // No subcommand: run gateway in foreground
-                return gateway_cmds->foreground_command(args);
+                return gateway_cmds->ForegroundCommand(args);
             }
 
             std::string sub = args[0];
             std::vector<std::string> sub_args(args.begin() + 1, args.end());
 
-            if (sub == "run")       return gateway_cmds->foreground_command(sub_args);
-            if (sub == "install")   return gateway_cmds->install_command(sub_args);
-            if (sub == "uninstall") return gateway_cmds->uninstall_command(sub_args);
-            if (sub == "start")     return gateway_cmds->start_command(sub_args);
-            if (sub == "stop")      return gateway_cmds->stop_command(sub_args);
-            if (sub == "restart")   return gateway_cmds->restart_command(sub_args);
-            if (sub == "status")    return gateway_cmds->status_command(sub_args);
-            if (sub == "call")      return gateway_cmds->call_command(sub_args);
+            if (sub == "run")       return gateway_cmds->ForegroundCommand(sub_args);
+            if (sub == "install")   return gateway_cmds->InstallCommand(sub_args);
+            if (sub == "uninstall") return gateway_cmds->UninstallCommand(sub_args);
+            if (sub == "start")     return gateway_cmds->StartCommand(sub_args);
+            if (sub == "stop")      return gateway_cmds->StopCommand(sub_args);
+            if (sub == "restart")   return gateway_cmds->RestartCommand(sub_args);
+            if (sub == "status")    return gateway_cmds->StatusCommand(sub_args);
+            if (sub == "call")      return gateway_cmds->CallCommand(sub_args);
 
             // Flags on direct gateway command → foreground mode
             if (sub == "--port" || sub == "--foreground" || sub == "--bind") {
-                return gateway_cmds->foreground_command(args);
+                return gateway_cmds->ForegroundCommand(args);
             }
 
             std::cerr << "Unknown gateway subcommand: " << sub << std::endl;
@@ -72,7 +75,7 @@ int main(int argc, char* argv[]) {
     });
 
     // --- agent command ---
-    cli.add_command({
+    cli.AddCommand({
         "agent",
         "Send message to agent via Gateway",
         {"a"},
@@ -83,15 +86,15 @@ int main(int argc, char* argv[]) {
             // Check for "agent stop" subcommand
             if (!args.empty() && args[0] == "stop") {
                 std::vector<std::string> sub_args(args.begin() + 1, args.end());
-                return agent_cmds->stop_command(sub_args);
+                return agent_cmds->StopCommand(sub_args);
             }
 
-            return agent_cmds->request_command(args);
+            return agent_cmds->RequestCommand(args);
         }
     });
 
     // --- sessions command ---
-    cli.add_command({
+    cli.AddCommand({
         "sessions",
         "Manage sessions",
         {},
@@ -100,16 +103,16 @@ int main(int argc, char* argv[]) {
             for (int i = 1; i < argc; ++i) args.push_back(argv[i]);
 
             if (args.empty()) {
-                return session_cmds->list_command({});
+                return session_cmds->ListCommand({});
             }
 
             std::string sub = args[0];
             std::vector<std::string> sub_args(args.begin() + 1, args.end());
 
-            if (sub == "list")    return session_cmds->list_command(sub_args);
-            if (sub == "history") return session_cmds->history_command(sub_args);
-            if (sub == "delete")  return session_cmds->delete_command(sub_args);
-            if (sub == "reset")   return session_cmds->reset_command(sub_args);
+            if (sub == "list")    return session_cmds->ListCommand(sub_args);
+            if (sub == "history") return session_cmds->HistoryCommand(sub_args);
+            if (sub == "delete")  return session_cmds->DeleteCommand(sub_args);
+            if (sub == "reset")   return session_cmds->ResetCommand(sub_args);
 
             std::cerr << "Unknown sessions subcommand: " << sub << std::endl;
             return 1;
@@ -117,19 +120,19 @@ int main(int argc, char* argv[]) {
     });
 
     // --- status command (shortcut to gateway.status) ---
-    cli.add_command({
+    cli.AddCommand({
         "status",
         "Show gateway status",
         {},
         [gateway_cmds](int argc, char** argv) -> int {
             std::vector<std::string> args;
             for (int i = 1; i < argc; ++i) args.push_back(argv[i]);
-            return gateway_cmds->status_command(args);
+            return gateway_cmds->StatusCommand(args);
         }
     });
 
     // --- health command ---
-    cli.add_command({
+    cli.AddCommand({
         "health",
         "Gateway health check",
         {},
@@ -149,7 +152,7 @@ int main(int argc, char* argv[]) {
             try {
                 auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                     "ws://127.0.0.1:18789", "", logger);
-                if (!client->connect(timeout_ms)) {
+                if (!client->Connect(timeout_ms)) {
                     if (json_output) {
                         std::cout << R"({"status":"unreachable"})" << std::endl;
                     } else {
@@ -158,8 +161,8 @@ int main(int argc, char* argv[]) {
                     return 1;
                 }
 
-                auto result = client->call("gateway.health", {});
-                client->disconnect();
+                auto result = client->Call("gateway.health", {});
+                client->Disconnect();
 
                 if (json_output) {
                     std::cout << result.dump(2) << std::endl;
@@ -177,7 +180,7 @@ int main(int argc, char* argv[]) {
     });
 
     // --- config command ---
-    cli.add_command({
+    cli.AddCommand({
         "config",
         "Manage configuration",
         {"c"},
@@ -197,12 +200,12 @@ int main(int argc, char* argv[]) {
                 try {
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         "ws://127.0.0.1:18789", "", logger);
-                    if (!client->connect(3000)) {
+                    if (!client->Connect(3000)) {
                         std::cerr << "Error: Gateway not running" << std::endl;
                         return 1;
                     }
-                    client->call("config.reload", {});
-                    client->disconnect();
+                    client->Call("config.reload", {});
+                    client->Disconnect();
                     std::cout << "Configuration reloaded" << std::endl;
                     return 0;
                 } catch (const std::exception& e) {
@@ -221,10 +224,10 @@ int main(int argc, char* argv[]) {
                 try {
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         "ws://127.0.0.1:18789", "", logger);
-                    if (!client->connect(3000)) {
+                    if (!client->Connect(3000)) {
                         // Fallback: read config file directly
-                        auto config = quantclaw::QuantClawConfig::load_from_file(
-                            quantclaw::QuantClawConfig::default_config_path());
+                        auto config = quantclaw::QuantClawConfig::LoadFromFile(
+                            quantclaw::QuantClawConfig::DefaultConfigPath());
                         if (path == "gateway.port") {
                             std::cout << config.gateway.port << std::endl;
                         } else if (path == "agent.model") {
@@ -238,8 +241,8 @@ int main(int argc, char* argv[]) {
 
                     nlohmann::json params;
                     if (!path.empty()) params["path"] = path;
-                    auto result = client->call("config.get", params);
-                    client->disconnect();
+                    auto result = client->Call("config.get", params);
+                    client->Disconnect();
 
                     if (json_output) {
                         std::cout << result.dump(2) << std::endl;
@@ -275,16 +278,16 @@ int main(int argc, char* argv[]) {
                 }
 
                 try {
-                    auto config_file = quantclaw::QuantClawConfig::default_config_path();
-                    quantclaw::QuantClawConfig::set_value(config_file, path, value);
+                    auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
+                    quantclaw::QuantClawConfig::SetValue(config_file, path, value);
                     std::cout << path << " = " << value.dump() << std::endl;
 
                     // Notify running gateway to reload
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         "ws://127.0.0.1:18789", "", logger);
-                    if (client->connect(1000)) {
-                        client->call("config.reload", {});
-                        client->disconnect();
+                    if (client->Connect(1000)) {
+                        client->Call("config.reload", {});
+                        client->Disconnect();
                     }
                     return 0;
                 } catch (const std::exception& e) {
@@ -301,16 +304,16 @@ int main(int argc, char* argv[]) {
                 std::string path = args[1];
 
                 try {
-                    auto config_file = quantclaw::QuantClawConfig::default_config_path();
-                    quantclaw::QuantClawConfig::unset_value(config_file, path);
+                    auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
+                    quantclaw::QuantClawConfig::UnsetValue(config_file, path);
                     std::cout << "Removed: " << path << std::endl;
 
                     // Notify running gateway to reload
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         "ws://127.0.0.1:18789", "", logger);
-                    if (client->connect(1000)) {
-                        client->call("config.reload", {});
-                        client->disconnect();
+                    if (client->Connect(1000)) {
+                        client->Call("config.reload", {});
+                        client->Disconnect();
                     }
                     return 0;
                 } catch (const std::exception& e) {
@@ -326,7 +329,7 @@ int main(int argc, char* argv[]) {
     });
 
     // --- skills command ---
-    cli.add_command({
+    cli.AddCommand({
         "skills",
         "Manage agent skills",
         {"s"},
@@ -349,15 +352,15 @@ int main(int argc, char* argv[]) {
                 // Load config for skills settings
                 quantclaw::SkillsConfig skills_config;
                 try {
-                    auto config = quantclaw::QuantClawConfig::load_from_file(
-                        quantclaw::QuantClawConfig::default_config_path());
+                    auto config = quantclaw::QuantClawConfig::LoadFromFile(
+                        quantclaw::QuantClawConfig::DefaultConfigPath());
                     skills_config = config.skills;
                 } catch (const std::exception&) {
                     // Use defaults if no config
                 }
 
                 auto skill_loader = std::make_shared<quantclaw::SkillLoader>(logger);
-                auto skills = skill_loader->load_skills(skills_config, workspace_path);
+                auto skills = skill_loader->LoadSkills(skills_config, workspace_path);
 
                 if (skills.empty()) {
                     std::cout << "No skills found" << std::endl;
@@ -382,7 +385,7 @@ int main(int argc, char* argv[]) {
     });
 
     // --- doctor command ---
-    cli.add_command({
+    cli.AddCommand({
         "doctor",
         "Health check (config, deps, connectivity)",
         {},
@@ -391,7 +394,7 @@ int main(int argc, char* argv[]) {
             std::cout << std::string(40, '=') << std::endl;
 
             // Check config file
-            std::string config_path = quantclaw::QuantClawConfig::default_config_path();
+            std::string config_path = quantclaw::QuantClawConfig::DefaultConfigPath();
             bool config_ok = std::filesystem::exists(config_path);
             std::cout << "[" << (config_ok ? "OK" : "!!") << "] Config file: "
                       << config_path << std::endl;
@@ -415,9 +418,9 @@ int main(int argc, char* argv[]) {
             try {
                 auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                     "ws://127.0.0.1:18789", "", logger);
-                gw_ok = client->connect(2000);
-                if (gw_ok) client->disconnect();
-            } catch (...) {}
+                gw_ok = client->Connect(2000);
+                if (gw_ok) client->Disconnect();
+            } catch (const std::exception&) {}
             std::cout << "[" << (gw_ok ? "OK" : "!!") << "] Gateway: "
                       << (gw_ok ? "running" : "not running") << std::endl;
 
@@ -427,7 +430,7 @@ int main(int argc, char* argv[]) {
     });
 
     // --- cron command ---
-    cli.add_command({
+    cli.AddCommand({
         "cron",
         "Manage scheduled tasks",
         {},
@@ -443,9 +446,9 @@ int main(int argc, char* argv[]) {
                 try {
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         "ws://127.0.0.1:18789", "", logger);
-                    if (client->connect(3000)) {
-                        auto result = client->call("cron.list", {});
-                        client->disconnect();
+                    if (client->Connect(3000)) {
+                        auto result = client->Call("cron.list", {});
+                        client->Disconnect();
                         if (result.is_array()) {
                             if (result.empty()) {
                                 std::cout << "No cron jobs" << std::endl;
@@ -461,7 +464,7 @@ int main(int argc, char* argv[]) {
                         }
                         return 0;
                     }
-                } catch (...) {}
+                } catch (const std::exception&) {}
                 std::cerr << "Gateway not running" << std::endl;
                 return 1;
             }
@@ -476,17 +479,17 @@ int main(int argc, char* argv[]) {
                 try {
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         "ws://127.0.0.1:18789", "", logger);
-                    if (client->connect(3000)) {
-                        auto result = client->call("cron.add", {
+                    if (client->Connect(3000)) {
+                        auto result = client->Call("cron.add", {
                             {"schedule", schedule},
                             {"message", message},
                             {"name", message.substr(0, 30)},
                         });
-                        client->disconnect();
+                        client->Disconnect();
                         std::cout << "Added: " << result.value("id", "") << std::endl;
                         return 0;
                     }
-                } catch (...) {}
+                } catch (const std::exception&) {}
                 std::cerr << "Gateway not running" << std::endl;
                 return 1;
             }
@@ -495,13 +498,13 @@ int main(int argc, char* argv[]) {
                 try {
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         "ws://127.0.0.1:18789", "", logger);
-                    if (client->connect(3000)) {
-                        client->call("cron.remove", {{"id", args[1]}});
-                        client->disconnect();
+                    if (client->Connect(3000)) {
+                        client->Call("cron.remove", {{"id", args[1]}});
+                        client->Disconnect();
                         std::cout << "Removed" << std::endl;
                         return 0;
                     }
-                } catch (...) {}
+                } catch (const std::exception&) {}
                 std::cerr << "Gateway not running" << std::endl;
                 return 1;
             }
@@ -512,7 +515,7 @@ int main(int argc, char* argv[]) {
     });
 
     // --- memory command ---
-    cli.add_command({
+    cli.AddCommand({
         "memory",
         "Search and manage memory",
         {},
@@ -536,10 +539,10 @@ int main(int argc, char* argv[]) {
                 try {
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         "ws://127.0.0.1:18789", "", logger);
-                    if (client->connect(3000)) {
-                        auto result = client->call("memory.search",
+                    if (client->Connect(3000)) {
+                        auto result = client->Call("memory.search",
                                                    {{"query", query}});
-                        client->disconnect();
+                        client->Disconnect();
                         if (result.is_array()) {
                             for (const auto& r : result) {
                                 std::cout << "[" << r.value("source", "") << ":"
@@ -550,7 +553,7 @@ int main(int argc, char* argv[]) {
                         }
                         return 0;
                     }
-                } catch (...) {}
+                } catch (const std::exception&) {}
 
                 // Fallback: offline search
                 const char* home = std::getenv("HOME");
@@ -559,8 +562,8 @@ int main(int argc, char* argv[]) {
                                  ".quantclaw/agents/main/workspace";
 
                 quantclaw::MemorySearch search(logger);
-                search.index_directory(workspace);
-                auto results = search.search(query);
+                search.IndexDirectory(workspace);
+                auto results = search.Search(query);
                 for (const auto& r : results) {
                     std::cout << "[" << r.source << ":" << r.line_number
                               << "] " << r.content.substr(0, 120) << std::endl;
@@ -572,13 +575,13 @@ int main(int argc, char* argv[]) {
                 try {
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         "ws://127.0.0.1:18789", "", logger);
-                    if (client->connect(3000)) {
-                        auto result = client->call("memory.status", {});
-                        client->disconnect();
+                    if (client->Connect(3000)) {
+                        auto result = client->Call("memory.status", {});
+                        client->Disconnect();
                         std::cout << result.dump(2) << std::endl;
                         return 0;
                     }
-                } catch (...) {}
+                } catch (const std::exception&) {}
                 std::cout << "Gateway not running. Memory status unavailable."
                           << std::endl;
                 return 1;
@@ -590,7 +593,7 @@ int main(int argc, char* argv[]) {
     });
 
     // --- dashboard command ---
-    cli.add_command({
+    cli.AddCommand({
         "dashboard",
         "Open the Control UI",
         {},
@@ -602,26 +605,333 @@ int main(int argc, char* argv[]) {
 
             int port = 18790;
             try {
-                auto config = quantclaw::QuantClawConfig::load_from_file(
-                    quantclaw::QuantClawConfig::default_config_path());
+                auto config = quantclaw::QuantClawConfig::LoadFromFile(
+                    quantclaw::QuantClawConfig::DefaultConfigPath());
                 port = config.gateway.control_ui.port;
-            } catch (...) {}
+            } catch (const std::exception&) {}
 
             std::string url = "http://127.0.0.1:" + std::to_string(port) +
                               "/__quantclaw__/control/";
             std::cout << "Dashboard: " << url << std::endl;
 
             if (!no_open) {
-                std::string cmd = "xdg-open '" + url + "' 2>/dev/null || "
-                                  "open '" + url + "' 2>/dev/null";
+#ifdef _WIN32
+                std::string cmd = "start \"\" \"" + url + "\"";
+#elif defined(__APPLE__)
+                std::string cmd = "open '" + url + "' 2>/dev/null";
+#else
+                std::string cmd = "xdg-open '" + url + "' 2>/dev/null";
+#endif
                 [[maybe_unused]] int ret = std::system(cmd.c_str());
             }
             return 0;
         }
     });
 
+    // --- channels command ---
+    cli.AddCommand({
+        "channels",
+        "Manage communication channels",
+        {"ch"},
+        [logger](int argc, char** argv) -> int {
+            std::vector<std::string> args;
+            for (int i = 1; i < argc; ++i) args.push_back(argv[i]);
+
+            std::string sub = args.empty() ? "list" : args[0];
+            std::vector<std::string> sub_args;
+            if (args.size() > 1)
+                sub_args.assign(args.begin() + 1, args.end());
+
+            auto make_client = [&logger]() -> std::shared_ptr<quantclaw::gateway::GatewayClient> {
+                auto c = std::make_shared<quantclaw::gateway::GatewayClient>(
+                    "ws://127.0.0.1:18789", "", logger);
+                if (!c->Connect(3000)) {
+                    std::cerr << "Error: Gateway not running" << std::endl;
+                    return nullptr;
+                }
+                return c;
+            };
+
+            if (sub == "list") {
+                bool json_output = false;
+                for (const auto& a : sub_args) {
+                    if (a == "--json") json_output = true;
+                }
+                try {
+                    auto client = make_client();
+                    if (!client) return 1;
+                    auto result = client->Call("channels.list", {});
+                    client->Disconnect();
+                    if (json_output) {
+                        std::cout << result.dump(2) << std::endl;
+                    } else {
+                        if (result.is_array()) {
+                            if (result.empty()) {
+                                std::cout << "No channels configured" << std::endl;
+                            } else {
+                                for (const auto& ch : result) {
+                                    std::cout << "  " << ch.value("id", "")
+                                              << "  [" << ch.value("type", "") << "]"
+                                              << "  " << (ch.value("enabled", false) ? "ON" : "OFF")
+                                              << "  " << ch.value("status", "unknown")
+                                              << std::endl;
+                                }
+                            }
+                        }
+                    }
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            if (sub == "status") {
+                std::string channel_id = sub_args.empty() ? "" : sub_args[0];
+                try {
+                    auto client = make_client();
+                    if (!client) return 1;
+                    nlohmann::json params;
+                    if (!channel_id.empty()) params["id"] = channel_id;
+                    auto result = client->Call("channels.status", params);
+                    client->Disconnect();
+                    std::cout << result.dump(2) << std::endl;
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            if (sub == "add") {
+                if (sub_args.size() < 2) {
+                    std::cerr << "Usage: quantclaw channels add <type> <token> [--id <name>]" << std::endl;
+                    return 1;
+                }
+                std::string type = sub_args[0];
+                std::string token = sub_args[1];
+                std::string id = type;
+                for (size_t i = 2; i < sub_args.size(); ++i) {
+                    if (sub_args[i] == "--id" && i + 1 < sub_args.size()) {
+                        id = sub_args[++i];
+                    }
+                }
+                try {
+                    // Write to config file
+                    auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
+                    nlohmann::json channel_json;
+                    channel_json["enabled"] = true;
+                    channel_json["token"] = token;
+                    quantclaw::QuantClawConfig::SetValue(
+                        config_file, "channels." + id, channel_json);
+                    std::cout << "Added channel: " << id << " (" << type << ")" << std::endl;
+
+                    // Notify gateway to reload
+                    auto client = make_client();
+                    if (client) {
+                        client->Call("config.reload", {});
+                        client->Disconnect();
+                    }
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            if (sub == "remove") {
+                if (sub_args.empty()) {
+                    std::cerr << "Usage: quantclaw channels remove <id>" << std::endl;
+                    return 1;
+                }
+                try {
+                    auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
+                    quantclaw::QuantClawConfig::UnsetValue(
+                        config_file, "channels." + sub_args[0]);
+                    std::cout << "Removed channel: " << sub_args[0] << std::endl;
+
+                    auto client = make_client();
+                    if (client) {
+                        client->Call("config.reload", {});
+                        client->Disconnect();
+                    }
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            if (sub == "login") {
+                if (sub_args.empty()) {
+                    std::cerr << "Usage: quantclaw channels login <id>" << std::endl;
+                    return 1;
+                }
+                try {
+                    auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
+                    quantclaw::QuantClawConfig::SetValue(
+                        config_file, "channels." + sub_args[0] + ".enabled", true);
+                    std::cout << "Enabled channel: " << sub_args[0] << std::endl;
+
+                    auto client = make_client();
+                    if (client) {
+                        client->Call("config.reload", {});
+                        client->Disconnect();
+                    }
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            if (sub == "logout") {
+                if (sub_args.empty()) {
+                    std::cerr << "Usage: quantclaw channels logout <id>" << std::endl;
+                    return 1;
+                }
+                try {
+                    auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
+                    quantclaw::QuantClawConfig::SetValue(
+                        config_file, "channels." + sub_args[0] + ".enabled", false);
+                    std::cout << "Disabled channel: " << sub_args[0] << std::endl;
+
+                    auto client = make_client();
+                    if (client) {
+                        client->Call("config.reload", {});
+                        client->Disconnect();
+                    }
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            std::cerr << "Unknown channels subcommand: " << sub << std::endl;
+            std::cerr << "Available: list, status, add, remove, login, logout" << std::endl;
+            return 1;
+        }
+    });
+
+    // --- models command ---
+    cli.AddCommand({
+        "models",
+        "Manage AI models",
+        {"m"},
+        [logger](int argc, char** argv) -> int {
+            std::vector<std::string> args;
+            for (int i = 1; i < argc; ++i) args.push_back(argv[i]);
+
+            std::string sub = args.empty() ? "list" : args[0];
+            std::vector<std::string> sub_args;
+            if (args.size() > 1)
+                sub_args.assign(args.begin() + 1, args.end());
+
+            if (sub == "list") {
+                bool json_output = false;
+                for (const auto& a : sub_args) {
+                    if (a == "--json") json_output = true;
+                }
+                try {
+                    auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
+                        "ws://127.0.0.1:18789", "", logger);
+                    if (!client->Connect(3000)) {
+                        // Fallback: show configured model from config file
+                        auto config = quantclaw::QuantClawConfig::LoadFromFile(
+                            quantclaw::QuantClawConfig::DefaultConfigPath());
+                        std::cout << "Current model: " << config.agent.model << std::endl;
+                        std::cout << "(Gateway not running, showing config only)" << std::endl;
+                        return 0;
+                    }
+                    auto result = client->Call("models.list", {});
+                    client->Disconnect();
+                    if (json_output) {
+                        std::cout << result.dump(2) << std::endl;
+                    } else {
+                        if (result.contains("current")) {
+                            std::cout << "Current: " << result["current"].get<std::string>() << std::endl;
+                        }
+                        if (result.contains("providers") && result["providers"].is_array()) {
+                            std::cout << "\nProviders:" << std::endl;
+                            for (const auto& p : result["providers"]) {
+                                std::cout << "  " << p.value("id", "")
+                                          << " (" << p.value("type", "") << ")"
+                                          << std::endl;
+                                if (p.contains("models") && p["models"].is_array()) {
+                                    for (const auto& m : p["models"]) {
+                                        std::cout << "    - " << m.get<std::string>() << std::endl;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            if (sub == "set") {
+                if (sub_args.empty()) {
+                    std::cerr << "Usage: quantclaw models set <model>" << std::endl;
+                    return 1;
+                }
+                std::string model = sub_args[0];
+                try {
+                    // Write to config file
+                    auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
+                    quantclaw::QuantClawConfig::SetValue(
+                        config_file, "agent.model", model);
+
+                    // Also update running gateway via RPC
+                    auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
+                        "ws://127.0.0.1:18789", "", logger);
+                    if (client->Connect(3000)) {
+                        client->Call("models.set", {{"model", model}});
+                        client->Disconnect();
+                    }
+                    std::cout << "Model set to: " << model << std::endl;
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            if (sub == "aliases") {
+                try {
+                    auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
+                        "ws://127.0.0.1:18789", "", logger);
+                    if (!client->Connect(3000)) {
+                        std::cerr << "Gateway not running" << std::endl;
+                        return 1;
+                    }
+                    auto result = client->Call("models.list", {});
+                    client->Disconnect();
+                    if (result.contains("aliases") && result["aliases"].is_object()) {
+                        for (auto& [alias, target] : result["aliases"].items()) {
+                            std::cout << "  " << alias << " -> " << target.get<std::string>() << std::endl;
+                        }
+                    } else {
+                        std::cout << "No model aliases configured" << std::endl;
+                    }
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            std::cerr << "Unknown models subcommand: " << sub << std::endl;
+            std::cerr << "Available: list, set, aliases" << std::endl;
+            return 1;
+        }
+    });
+
     // --- logs command ---
-    cli.add_command({
+    cli.AddCommand({
         "logs",
         "View gateway logs",
         {},
@@ -655,5 +965,5 @@ int main(int argc, char* argv[]) {
         }
     });
 
-    return cli.run(argc, argv);
+    return cli.Run(argc, argv);
 }

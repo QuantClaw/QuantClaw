@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -8,6 +11,7 @@
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include "quantclaw/platform/process.hpp"
 
 namespace quantclaw {
 
@@ -56,7 +60,7 @@ struct BrowserToolConfig {
   int navigation_timeout_ms = 30000;
   SsrfPolicy ssrf_policy;
 
-  static BrowserToolConfig from_json(const nlohmann::json& j);
+  static BrowserToolConfig FromJson(const nlohmann::json& j);
 };
 
 // Browser session: manages a browser instance and page interactions
@@ -84,10 +88,6 @@ class BrowserSession {
   // Screenshots
   std::string screenshot_base64(bool full_page = false);
 
-  // Page content
-  std::string get_page_text() const;
-  std::string get_accessibility_tree() const;
-
   // State
   PageState get_state() const;
   bool is_connected() const;
@@ -101,7 +101,7 @@ class BrowserSession {
   BrowserConnection connection_;
   PageState state_;
   mutable std::mutex mu_;
-  pid_t browser_pid_ = 0;
+  platform::ProcessId browser_pid_ = platform::kInvalidPid;
 
   // Launch local browser
   bool launch_local();

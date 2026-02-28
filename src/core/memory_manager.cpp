@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/core/memory_manager.hpp"
 #include <fstream>
 #include <sstream>
@@ -31,15 +34,15 @@ MemoryManager::MemoryManager(const std::filesystem::path& workspace_path,
 }
 
 MemoryManager::~MemoryManager() {
-    stop_file_watcher();
+    StopFileWatcher();
 }
 
-void MemoryManager::load_workspace_files() {
+void MemoryManager::LoadWorkspaceFiles() {
     logger_->info("Loading workspace files from: {}", workspace_path_.string());
 
     for (const auto& name : {"SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"}) {
         try {
-            auto content = read_identity_file(name);
+            auto content = ReadIdentityFile(name);
             if (!content.empty()) {
                 logger_->debug("Loaded {} ({} bytes)", name, content.size());
             }
@@ -69,26 +72,26 @@ void MemoryManager::load_workspace_files() {
     logger_->info("Workspace files loaded successfully");
 }
 
-std::string MemoryManager::read_identity_file(const std::string& filename) {
+std::string MemoryManager::ReadIdentityFile(const std::string& filename) const {
     auto filepath = workspace_path_ / filename;
     return read_file_content(filepath);
 }
 
-std::string MemoryManager::read_agents_file() {
-    return read_identity_file("AGENTS.md");
+std::string MemoryManager::ReadAgentsFile() const {
+    return ReadIdentityFile("AGENTS.md");
 }
 
-std::string MemoryManager::read_tools_file() {
-    return read_identity_file("TOOLS.md");
+std::string MemoryManager::ReadToolsFile() const {
+    return ReadIdentityFile("TOOLS.md");
 }
 
-std::vector<std::string> MemoryManager::search_memory(const std::string& query) {
+std::vector<std::string> MemoryManager::SearchMemory(const std::string& query) const {
     std::vector<std::string> results;
 
     std::vector<std::string> identity_files = {"SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"};
     for (const auto& filename : identity_files) {
         try {
-            auto content = read_identity_file(filename);
+            auto content = ReadIdentityFile(filename);
             if (content.find(query) != std::string::npos) {
                 results.push_back("File: " + filename + "\nContent: " + content);
             }
@@ -115,7 +118,7 @@ std::vector<std::string> MemoryManager::search_memory(const std::string& query) 
     return results;
 }
 
-void MemoryManager::save_daily_memory(const std::string& content) {
+void MemoryManager::SaveDailyMemory(const std::string& content) {
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
     std::tm tm;
@@ -141,7 +144,6 @@ void MemoryManager::save_daily_memory(const std::string& content) {
     std::ofstream file(memory_file, std::ios::app);
     if (file.is_open()) {
         file << entry_content;
-        file.close();
         logger_->debug("Saved memory entry to {}", memory_file.string());
     } else {
         logger_->error("Failed to save memory entry to {}", memory_file.string());
@@ -149,34 +151,49 @@ void MemoryManager::save_daily_memory(const std::string& content) {
     }
 }
 
-void MemoryManager::start_file_watcher() {
-    if (watching_) return;
+void MemoryManager::StartFileWatcher() {
+    if (watching_) {
+        return;
+    }
     watching_ = true;
 
     // Record current mtimes
-    for (const auto& name : {"SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"}) {
-        auto path = workspace_path_ / name;
-        if (std::filesystem::exists(path)) {
-            file_mtimes_[name] = std::filesystem::last_write_time(path);
+    {
+        std::lock_guard<std::mutex> lock(watcher_mutex_);
+        for (const auto& name : {"SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"}) {
+            auto path = workspace_path_ / name;
+            if (std::filesystem::exists(path)) {
+                file_mtimes_[name] = std::filesystem::last_write_time(path);
+            }
         }
     }
 
     watcher_thread_ = std::make_unique<std::thread>([this]() {
         while (watching_) {
             std::this_thread::sleep_for(std::chrono::seconds(5));
-            if (!watching_) break;
+            if (!watching_) {
+                break;
+            }
 
             for (const auto& name : {"SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"}) {
                 auto path = workspace_path_ / name;
-                if (!std::filesystem::exists(path)) continue;
+                if (!std::filesystem::exists(path)) {
+                    continue;
+                }
                 auto mtime = std::filesystem::last_write_time(path);
-                auto it = file_mtimes_.find(name);
-                if (it == file_mtimes_.end() || it->second != mtime) {
-                    file_mtimes_[name] = mtime;
-                    logger_->info("File changed: {}", name);
-                    if (change_callback_) {
-                        change_callback_(name);
+
+                FileChangeCallback cb_copy;
+                {
+                    std::lock_guard<std::mutex> lock(watcher_mutex_);
+                    auto it = file_mtimes_.find(name);
+                    if (it == file_mtimes_.end() || it->second != mtime) {
+                        file_mtimes_[name] = mtime;
+                        logger_->info("File changed: {}", name);
+                        cb_copy = change_callback_;
                     }
+                }
+                if (cb_copy) {
+                    cb_copy(name);
                 }
             }
         }
@@ -185,7 +202,7 @@ void MemoryManager::start_file_watcher() {
     logger_->info("File watcher started for workspace: {}", workspace_path_.string());
 }
 
-void MemoryManager::stop_file_watcher() {
+void MemoryManager::StopFileWatcher() {
     if (!watching_) return;
     watching_ = false;
     if (watcher_thread_ && watcher_thread_->joinable()) {
@@ -195,26 +212,27 @@ void MemoryManager::stop_file_watcher() {
     logger_->info("File watcher stopped");
 }
 
-void MemoryManager::set_file_change_callback(FileChangeCallback cb) {
+void MemoryManager::SetFileChangeCallback(FileChangeCallback cb) {
+    std::lock_guard<std::mutex> lock(watcher_mutex_);
     change_callback_ = std::move(cb);
 }
 
-const std::filesystem::path& MemoryManager::get_workspace_path() const {
+const std::filesystem::path& MemoryManager::GetWorkspacePath() const {
     return workspace_path_;
 }
 
-void MemoryManager::set_agent_workspace(const std::string& agent_id) {
+void MemoryManager::SetAgentWorkspace(const std::string& agent_id) {
     agent_id_ = agent_id;
     workspace_path_ = base_dir_ / "agents" / agent_id / "workspace";
     std::filesystem::create_directories(workspace_path_);
     logger_->info("Set agent workspace: {}", workspace_path_.string());
 }
 
-std::filesystem::path MemoryManager::get_base_dir() const {
+std::filesystem::path MemoryManager::GetBaseDir() const {
     return base_dir_;
 }
 
-std::filesystem::path MemoryManager::get_sessions_dir(const std::string& agent_id) const {
+std::filesystem::path MemoryManager::GetSessionsDir(const std::string& agent_id) const {
     return base_dir_ / "agents" / agent_id / "sessions";
 }
 
@@ -246,7 +264,6 @@ std::string MemoryManager::read_file_content(const std::filesystem::path& filepa
 
     std::ostringstream content;
     content << file.rdbuf();
-    file.close();
 
     return content.str();
 }
@@ -259,7 +276,6 @@ void MemoryManager::write_file_content(const std::filesystem::path& filepath,
     }
 
     file << content;
-    file.close();
 }
 
 } // namespace quantclaw

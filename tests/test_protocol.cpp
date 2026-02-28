@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include "quantclaw/gateway/protocol.hpp"
 
@@ -6,16 +9,16 @@ using namespace quantclaw::gateway;
 // --- Frame type conversion ---
 
 TEST(ProtocolTest, FrameTypeToString) {
-    EXPECT_EQ(frame_type_to_string(FrameType::Request), "req");
-    EXPECT_EQ(frame_type_to_string(FrameType::Response), "res");
-    EXPECT_EQ(frame_type_to_string(FrameType::Event), "event");
+    EXPECT_EQ(FrameTypeToString(FrameType::kRequest), "req");
+    EXPECT_EQ(FrameTypeToString(FrameType::kResponse), "res");
+    EXPECT_EQ(FrameTypeToString(FrameType::kEvent), "event");
 }
 
 TEST(ProtocolTest, FrameTypeFromString) {
-    EXPECT_EQ(frame_type_from_string("req"), FrameType::Request);
-    EXPECT_EQ(frame_type_from_string("res"), FrameType::Response);
-    EXPECT_EQ(frame_type_from_string("event"), FrameType::Event);
-    EXPECT_THROW(frame_type_from_string("invalid"), std::runtime_error);
+    EXPECT_EQ(FrameTypeFromString("req"), FrameType::kRequest);
+    EXPECT_EQ(FrameTypeFromString("res"), FrameType::kResponse);
+    EXPECT_EQ(FrameTypeFromString("event"), FrameType::kEvent);
+    EXPECT_THROW(FrameTypeFromString("invalid"), std::runtime_error);
 }
 
 // --- RpcRequest ---
@@ -26,7 +29,7 @@ TEST(ProtocolTest, RpcRequestToJson) {
     req.method = "gateway.health";
     req.params = {{"key", "value"}};
 
-    auto j = req.to_json();
+    auto j = req.ToJson();
     EXPECT_EQ(j["type"], "req");
     EXPECT_EQ(j["id"], "42");
     EXPECT_EQ(j["method"], "gateway.health");
@@ -41,7 +44,7 @@ TEST(ProtocolTest, RpcRequestFromJson) {
         {"params", {{"limit", 10}}}
     };
 
-    auto req = RpcRequest::from_json(j);
+    auto req = RpcRequest::FromJson(j);
     EXPECT_EQ(req.id, "7");
     EXPECT_EQ(req.method, "sessions.list");
     EXPECT_EQ(req.params["limit"], 10);
@@ -54,7 +57,7 @@ TEST(ProtocolTest, RpcRequestFromJsonNoParams) {
         {"method", "gateway.health"}
     };
 
-    auto req = RpcRequest::from_json(j);
+    auto req = RpcRequest::FromJson(j);
     EXPECT_EQ(req.method, "gateway.health");
     EXPECT_TRUE(req.params.is_object());
     EXPECT_TRUE(req.params.empty());
@@ -69,7 +72,7 @@ TEST(ProtocolTest, RpcResponseSuccess) {
     EXPECT_TRUE(resp.ok);
     EXPECT_EQ(resp.payload["status"], "ok");
 
-    auto j = resp.to_json();
+    auto j = resp.ToJson();
     EXPECT_EQ(j["type"], "res");
     EXPECT_EQ(j["id"], "42");
     EXPECT_TRUE(j["ok"]);
@@ -84,7 +87,7 @@ TEST(ProtocolTest, RpcResponseFailure) {
     EXPECT_FALSE(resp.ok);
     EXPECT_EQ(resp.error, "Not found");
 
-    auto j = resp.to_json();
+    auto j = resp.ToJson();
     EXPECT_EQ(j["type"], "res");
     EXPECT_FALSE(j["ok"]);
     EXPECT_EQ(j["error"], "Not found");
@@ -99,7 +102,7 @@ TEST(ProtocolTest, RpcEventToJson) {
     evt.payload = {{"text", "hello"}};
     evt.seq = 5;
 
-    auto j = evt.to_json();
+    auto j = evt.ToJson();
     EXPECT_EQ(j["type"], "event");
     EXPECT_EQ(j["event"], "agent.text_delta");
     EXPECT_EQ(j["payload"]["text"], "hello");
@@ -113,7 +116,7 @@ TEST(ProtocolTest, RpcEventWithStateVersion) {
     evt.payload = {};
     evt.state_version = 12;
 
-    auto j = evt.to_json();
+    auto j = evt.ToJson();
     EXPECT_EQ(j["stateVersion"], 12);
 }
 
@@ -122,7 +125,7 @@ TEST(ProtocolTest, RpcEventNoOptionals) {
     evt.event = "test";
     evt.payload = {};
 
-    auto j = evt.to_json();
+    auto j = evt.ToJson();
     EXPECT_FALSE(j.contains("seq"));
     EXPECT_FALSE(j.contains("stateVersion"));
 }
@@ -134,7 +137,7 @@ TEST(ProtocolTest, ConnectChallengeToJson) {
     challenge.nonce = "abc123";
     challenge.timestamp = 1700000000;
 
-    auto j = challenge.to_json();
+    auto j = challenge.ToJson();
     EXPECT_EQ(j["type"], "event");
     EXPECT_EQ(j["event"], "connect.challenge");
     EXPECT_EQ(j["payload"]["nonce"], "abc123");
@@ -155,7 +158,7 @@ TEST(ProtocolTest, ConnectHelloParamsFromJson) {
         {"deviceId", "dev-001"}
     };
 
-    auto params = ConnectHelloParams::from_json(j);
+    auto params = ConnectHelloParams::FromJson(j);
     EXPECT_EQ(params.min_protocol, 1);
     EXPECT_EQ(params.max_protocol, 2);
     EXPECT_EQ(params.client_name, "test-client");
@@ -167,7 +170,7 @@ TEST(ProtocolTest, ConnectHelloParamsFromJson) {
 }
 
 TEST(ProtocolTest, ConnectHelloParamsDefaults) {
-    auto params = ConnectHelloParams::from_json(nlohmann::json::object());
+    auto params = ConnectHelloParams::FromJson(nlohmann::json::object());
     EXPECT_EQ(params.min_protocol, 1);
     EXPECT_EQ(params.max_protocol, 1);
     EXPECT_EQ(params.role, "operator");
@@ -183,7 +186,7 @@ TEST(ProtocolTest, HelloOkPayloadToJson) {
     payload.authenticated = true;
     payload.tick_interval_ms = 15000;
 
-    auto j = payload.to_json();
+    auto j = payload.ToJson();
     EXPECT_EQ(j["protocol"], 1);
     EXPECT_EQ(j["policy"], "permissive");
     EXPECT_TRUE(j["authenticated"]);
@@ -193,32 +196,32 @@ TEST(ProtocolTest, HelloOkPayloadToJson) {
 // --- parse_frame_type ---
 
 TEST(ProtocolTest, ParseFrameType) {
-    EXPECT_EQ(parse_frame_type({{"type", "req"}}), FrameType::Request);
-    EXPECT_EQ(parse_frame_type({{"type", "res"}}), FrameType::Response);
-    EXPECT_EQ(parse_frame_type({{"type", "event"}}), FrameType::Event);
+    EXPECT_EQ(ParseFrameType({{"type", "req"}}), FrameType::kRequest);
+    EXPECT_EQ(ParseFrameType({{"type", "res"}}), FrameType::kResponse);
+    EXPECT_EQ(ParseFrameType({{"type", "event"}}), FrameType::kEvent);
 }
 
 // --- Method / Event constants ---
 
 TEST(ProtocolTest, MethodConstants) {
-    EXPECT_STREQ(methods::CONNECT_HELLO, "connect.hello");
-    EXPECT_STREQ(methods::GATEWAY_HEALTH, "gateway.health");
-    EXPECT_STREQ(methods::GATEWAY_STATUS, "gateway.status");
-    EXPECT_STREQ(methods::CONFIG_GET, "config.get");
-    EXPECT_STREQ(methods::AGENT_REQUEST, "agent.request");
-    EXPECT_STREQ(methods::AGENT_STOP, "agent.stop");
-    EXPECT_STREQ(methods::SESSIONS_LIST, "sessions.list");
-    EXPECT_STREQ(methods::SESSIONS_HISTORY, "sessions.history");
-    EXPECT_STREQ(methods::CHANNELS_LIST, "channels.list");
+    EXPECT_STREQ(methods::kConnectHello, "connect.hello");
+    EXPECT_STREQ(methods::kGatewayHealth, "gateway.health");
+    EXPECT_STREQ(methods::kGatewayStatus, "gateway.status");
+    EXPECT_STREQ(methods::kConfigGet, "config.get");
+    EXPECT_STREQ(methods::kAgentRequest, "agent.request");
+    EXPECT_STREQ(methods::kAgentStop, "agent.stop");
+    EXPECT_STREQ(methods::kSessionsList, "sessions.list");
+    EXPECT_STREQ(methods::kSessionsHistory, "sessions.history");
+    EXPECT_STREQ(methods::kChannelsList, "channels.list");
 }
 
 TEST(ProtocolTest, EventConstants) {
-    EXPECT_STREQ(events::CONNECT_CHALLENGE, "connect.challenge");
-    EXPECT_STREQ(events::TEXT_DELTA, "agent.text_delta");
-    EXPECT_STREQ(events::TOOL_USE, "agent.tool_use");
-    EXPECT_STREQ(events::TOOL_RESULT, "agent.tool_result");
-    EXPECT_STREQ(events::MESSAGE_END, "agent.message_end");
-    EXPECT_STREQ(events::TICK, "gateway.tick");
+    EXPECT_STREQ(events::kConnectChallenge, "connect.challenge");
+    EXPECT_STREQ(events::kTextDelta, "agent.text_delta");
+    EXPECT_STREQ(events::kToolUse, "agent.tool_use");
+    EXPECT_STREQ(events::kToolResult, "agent.tool_result");
+    EXPECT_STREQ(events::kMessageEnd, "agent.message_end");
+    EXPECT_STREQ(events::kTick, "gateway.tick");
 }
 
 // --- Roundtrip serialization ---
@@ -229,8 +232,8 @@ TEST(ProtocolTest, RequestRoundtrip) {
     original.method = "test.method";
     original.params = {{"foo", "bar"}, {"num", 42}};
 
-    auto j = original.to_json();
-    auto parsed = RpcRequest::from_json(j);
+    auto j = original.ToJson();
+    auto parsed = RpcRequest::FromJson(j);
 
     EXPECT_EQ(parsed.id, original.id);
     EXPECT_EQ(parsed.method, original.method);

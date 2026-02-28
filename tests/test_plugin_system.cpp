@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <fstream>
 #include <filesystem>
@@ -44,7 +47,7 @@ class PluginManifestTest : public ::testing::Test {
 
 TEST_F(PluginManifestTest, ParseMinimalManifest) {
   nlohmann::json j = {{"id", "test-plugin"}};
-  auto m = quantclaw::PluginManifest::parse(j);
+  auto m = quantclaw::PluginManifest::Parse(j);
   EXPECT_EQ(m.id, "test-plugin");
   EXPECT_EQ(m.name, "test-plugin");  // defaults to id
   EXPECT_TRUE(m.description.empty());
@@ -67,7 +70,7 @@ TEST_F(PluginManifestTest, ParseFullManifest) {
       {"skills", {"discord-status", "discord-send"}},
       {"configSchema", {{"type", "object"}}},
   };
-  auto m = quantclaw::PluginManifest::parse(j);
+  auto m = quantclaw::PluginManifest::Parse(j);
   EXPECT_EQ(m.id, "discord");
   EXPECT_EQ(m.name, "Discord Channel");
   EXPECT_EQ(m.description, "Discord integration");
@@ -83,7 +86,7 @@ TEST_F(PluginManifestTest, ParseFullManifest) {
 
 TEST_F(PluginManifestTest, ParseMissingIdThrows) {
   nlohmann::json j = {{"name", "no-id"}};
-  EXPECT_THROW(quantclaw::PluginManifest::parse(j), std::runtime_error);
+  EXPECT_THROW(quantclaw::PluginManifest::Parse(j), std::runtime_error);
 }
 
 TEST_F(PluginManifestTest, LoadFromFile) {
@@ -93,14 +96,14 @@ TEST_F(PluginManifestTest, LoadFromFile) {
       {"version", "0.1.0"},
   };
   auto path = write_manifest("file-test", manifest);
-  auto m = quantclaw::PluginManifest::load_from_file(path);
+  auto m = quantclaw::PluginManifest::LoadFromFile(path);
   EXPECT_EQ(m.id, "file-test");
   EXPECT_EQ(m.name, "File Test Plugin");
 }
 
 TEST_F(PluginManifestTest, LoadFromNonexistentFileThrows) {
   EXPECT_THROW(
-      quantclaw::PluginManifest::load_from_file("/nonexistent/path.json"),
+      quantclaw::PluginManifest::LoadFromFile("/nonexistent/path.json"),
       std::runtime_error);
 }
 
@@ -113,8 +116,8 @@ TEST_F(PluginManifestTest, ToJsonRoundTrip) {
       {"channels", {"ch1", "ch2"}},
       {"configSchema", {{"type", "object"}}},
   };
-  auto m = quantclaw::PluginManifest::parse(j);
-  auto out = m.to_json();
+  auto m = quantclaw::PluginManifest::Parse(j);
+  auto out = m.ToJson();
   EXPECT_EQ(out["id"], "roundtrip");
   EXPECT_EQ(out["name"], "Roundtrip Test");
   EXPECT_EQ(out["channels"].size(), 2);
@@ -133,7 +136,7 @@ TEST_F(PluginManifestTest, ParseUiHints) {
           }},
       }},
   };
-  auto m = quantclaw::PluginManifest::parse(j);
+  auto m = quantclaw::PluginManifest::Parse(j);
   ASSERT_EQ(m.ui_hints.size(), 1);
   ASSERT_TRUE(m.ui_hints.count("apiKey"));
   EXPECT_EQ(m.ui_hints.at("apiKey").label, "API Key");
@@ -160,8 +163,8 @@ class PluginRegistryTest : public PluginManifestTest {
 TEST_F(PluginRegistryTest, DiscoverEmptyDirectory) {
   quantclaw::PluginRegistry reg(logger_);
   quantclaw::QuantClawConfig config;
-  reg.discover(config, test_dir_);
-  EXPECT_TRUE(reg.plugins().empty());
+  reg.Discover(config, test_dir_);
+  EXPECT_TRUE(reg.Plugins().empty());
 }
 
 TEST_F(PluginRegistryTest, DiscoverPluginsFromConfigPaths) {
@@ -185,14 +188,14 @@ TEST_F(PluginRegistryTest, DiscoverPluginsFromConfigPaths) {
   };
 
   quantclaw::PluginRegistry reg(logger_);
-  reg.discover(config, test_dir_);
+  reg.Discover(config, test_dir_);
 
-  EXPECT_EQ(reg.plugins().size(), 2);
-  EXPECT_TRUE(reg.find("plugin-a") != nullptr);
-  EXPECT_TRUE(reg.find("plugin-b") != nullptr);
-  EXPECT_EQ(reg.find("plugin-a")->name, "Plugin A");
-  ASSERT_EQ(reg.find("plugin-b")->channel_ids.size(), 1);
-  EXPECT_EQ(reg.find("plugin-b")->channel_ids[0], "telegram");
+  EXPECT_EQ(reg.Plugins().size(), 2);
+  EXPECT_TRUE(reg.Find("plugin-a") != nullptr);
+  EXPECT_TRUE(reg.Find("plugin-b") != nullptr);
+  EXPECT_EQ(reg.Find("plugin-a")->name, "Plugin A");
+  ASSERT_EQ(reg.Find("plugin-b")->channel_ids.size(), 1);
+  EXPECT_EQ(reg.Find("plugin-b")->channel_ids[0], "telegram");
 }
 
 TEST_F(PluginRegistryTest, EnableDisableLogic) {
@@ -216,10 +219,10 @@ TEST_F(PluginRegistryTest, EnableDisableLogic) {
   };
 
   quantclaw::PluginRegistry reg(logger_);
-  reg.discover(config, test_dir_);
+  reg.Discover(config, test_dir_);
 
-  EXPECT_TRUE(reg.is_enabled("enabled-one"));
-  EXPECT_FALSE(reg.is_enabled("disabled-one"));
+  EXPECT_TRUE(reg.IsEnabled("enabled-one"));
+  EXPECT_FALSE(reg.IsEnabled("disabled-one"));
 }
 
 TEST_F(PluginRegistryTest, AllowListRestrictsPlugins) {
@@ -243,10 +246,10 @@ TEST_F(PluginRegistryTest, AllowListRestrictsPlugins) {
   };
 
   quantclaw::PluginRegistry reg(logger_);
-  reg.discover(config, test_dir_);
+  reg.Discover(config, test_dir_);
 
-  EXPECT_TRUE(reg.is_enabled("allowed"));
-  EXPECT_FALSE(reg.is_enabled("not-allowed"));
+  EXPECT_TRUE(reg.IsEnabled("allowed"));
+  EXPECT_FALSE(reg.IsEnabled("not-allowed"));
 }
 
 TEST_F(PluginRegistryTest, ToJsonIncludesAllFields) {
@@ -261,9 +264,9 @@ TEST_F(PluginRegistryTest, ToJsonIncludesAllFields) {
   config.plugins_config = {{"load", {{"paths", {plugins_dir.string()}}}}};
 
   quantclaw::PluginRegistry reg(logger_);
-  reg.discover(config, test_dir_);
+  reg.Discover(config, test_dir_);
 
-  auto j = reg.to_json();
+  auto j = reg.ToJson();
   ASSERT_EQ(j.size(), 1);
   EXPECT_EQ(j[0]["id"], "json-test");
   EXPECT_EQ(j[0]["name"], "JSON Test");
@@ -283,9 +286,9 @@ TEST_F(PluginRegistryTest, QuantclawManifestAlsoDiscovered) {
   config.plugins_config = {{"load", {{"paths", {plugins_dir.string()}}}}};
 
   quantclaw::PluginRegistry reg(logger_);
-  reg.discover(config, test_dir_);
+  reg.Discover(config, test_dir_);
 
-  EXPECT_TRUE(reg.find("qc-plugin") != nullptr);
+  EXPECT_TRUE(reg.Find("qc-plugin") != nullptr);
 }
 
 TEST_F(PluginRegistryTest, GlobalDisable) {
@@ -303,9 +306,9 @@ TEST_F(PluginRegistryTest, GlobalDisable) {
   };
 
   quantclaw::PluginRegistry reg(logger_);
-  reg.discover(config, test_dir_);
+  reg.Discover(config, test_dir_);
 
-  EXPECT_FALSE(reg.is_enabled("some-plugin"));
+  EXPECT_FALSE(reg.IsEnabled("some-plugin"));
 }
 
 TEST_F(PluginRegistryTest, PluginConfigPassthrough) {
@@ -323,9 +326,9 @@ TEST_F(PluginRegistryTest, PluginConfigPassthrough) {
   };
 
   quantclaw::PluginRegistry reg(logger_);
-  reg.discover(config, test_dir_);
+  reg.Discover(config, test_dir_);
 
-  auto* rec = reg.find("cfg-plugin");
+  auto* rec = reg.Find("cfg-plugin");
   ASSERT_NE(rec, nullptr);
   EXPECT_EQ(rec->plugin_config["key"], "value");
 }
@@ -349,13 +352,13 @@ TEST_F(HookManagerTest, RegisterAndFire) {
   quantclaw::HookManager hooks(logger_);
 
   bool called = false;
-  hooks.register_hook("test_hook", "test-plugin",
+  hooks.RegisterHook("test_hook", "test-plugin",
                       [&called](const nlohmann::json&) -> nlohmann::json {
                         called = true;
                         return {{"handled", true}};
                       });
 
-  auto result = hooks.fire("test_hook", {{"data", 42}});
+  auto result = hooks.Fire("test_hook", {{"data", 42}});
   EXPECT_TRUE(called);
   EXPECT_TRUE(result.value("handled", false));
 }
@@ -364,25 +367,25 @@ TEST_F(HookManagerTest, PriorityOrdering) {
   quantclaw::HookManager hooks(logger_);
 
   std::vector<int> order;
-  hooks.register_hook("ordered_hook", "low",
+  hooks.RegisterHook("ordered_hook", "low",
                       [&order](const nlohmann::json&) -> nlohmann::json {
                         order.push_back(3);
                         return {};
                       }, 10);
 
-  hooks.register_hook("ordered_hook", "high",
+  hooks.RegisterHook("ordered_hook", "high",
                       [&order](const nlohmann::json&) -> nlohmann::json {
                         order.push_back(1);
                         return {};
                       }, 100);
 
-  hooks.register_hook("ordered_hook", "mid",
+  hooks.RegisterHook("ordered_hook", "mid",
                       [&order](const nlohmann::json&) -> nlohmann::json {
                         order.push_back(2);
                         return {};
                       }, 50);
 
-  hooks.fire("ordered_hook", {});
+  hooks.Fire("ordered_hook", {});
   ASSERT_EQ(order.size(), 3);
   EXPECT_EQ(order[0], 1);  // priority 100
   EXPECT_EQ(order[1], 2);  // priority 50
@@ -392,57 +395,57 @@ TEST_F(HookManagerTest, PriorityOrdering) {
 TEST_F(HookManagerTest, MergedResults) {
   quantclaw::HookManager hooks(logger_);
 
-  hooks.register_hook("merge_hook", "p1",
+  hooks.RegisterHook("merge_hook", "p1",
                       [](const nlohmann::json&) -> nlohmann::json {
                         return {{"key1", "val1"}};
                       });
-  hooks.register_hook("merge_hook", "p2",
+  hooks.RegisterHook("merge_hook", "p2",
                       [](const nlohmann::json&) -> nlohmann::json {
                         return {{"key2", "val2"}};
                       });
 
-  auto result = hooks.fire("merge_hook", {});
+  auto result = hooks.Fire("merge_hook", {});
   EXPECT_EQ(result["key1"], "val1");
   EXPECT_EQ(result["key2"], "val2");
 }
 
 TEST_F(HookManagerTest, UnregisteredHookReturnsEmpty) {
   quantclaw::HookManager hooks(logger_);
-  auto result = hooks.fire("nonexistent", {});
+  auto result = hooks.Fire("nonexistent", {});
   EXPECT_TRUE(result.empty());
 }
 
 TEST_F(HookManagerTest, HandlerExceptionDoesNotCrash) {
   quantclaw::HookManager hooks(logger_);
 
-  hooks.register_hook("throw_hook", "bad",
+  hooks.RegisterHook("throw_hook", "bad",
                       [](const nlohmann::json&) -> nlohmann::json {
                         throw std::runtime_error("boom");
                       });
-  hooks.register_hook("throw_hook", "good",
+  hooks.RegisterHook("throw_hook", "good",
                       [](const nlohmann::json&) -> nlohmann::json {
                         return {{"survived", true}};
                       });
 
-  auto result = hooks.fire("throw_hook", {});
+  auto result = hooks.Fire("throw_hook", {});
   EXPECT_TRUE(result.value("survived", false));
 }
 
 TEST_F(HookManagerTest, HandlerCount) {
   quantclaw::HookManager hooks(logger_);
-  EXPECT_EQ(hooks.handler_count("test"), 0);
+  EXPECT_EQ(hooks.HandlerCount("test"), 0);
 
-  hooks.register_hook("test", "a", [](const nlohmann::json&) { return nlohmann::json{}; });
-  hooks.register_hook("test", "b", [](const nlohmann::json&) { return nlohmann::json{}; });
-  EXPECT_EQ(hooks.handler_count("test"), 2);
+  hooks.RegisterHook("test", "a", [](const nlohmann::json&) { return nlohmann::json{}; });
+  hooks.RegisterHook("test", "b", [](const nlohmann::json&) { return nlohmann::json{}; });
+  EXPECT_EQ(hooks.HandlerCount("test"), 2);
 }
 
 TEST_F(HookManagerTest, RegisteredHooksList) {
   quantclaw::HookManager hooks(logger_);
-  hooks.register_hook("hook_a", "p", [](const nlohmann::json&) { return nlohmann::json{}; });
-  hooks.register_hook("hook_b", "p", [](const nlohmann::json&) { return nlohmann::json{}; });
+  hooks.RegisterHook("hook_a", "p", [](const nlohmann::json&) { return nlohmann::json{}; });
+  hooks.RegisterHook("hook_b", "p", [](const nlohmann::json&) { return nlohmann::json{}; });
 
-  auto names = hooks.registered_hooks();
+  auto names = hooks.RegisteredHooks();
   ASSERT_EQ(names.size(), 2);
   // map keys are sorted
   EXPECT_EQ(names[0], "hook_a");
@@ -483,9 +486,9 @@ class PluginSystemTest : public PluginManifestTest {
 TEST_F(PluginSystemTest, InitializeWithNoPlugins) {
   quantclaw::PluginSystem sys(logger_);
   quantclaw::QuantClawConfig config;
-  EXPECT_TRUE(sys.initialize(config, test_dir_));
-  EXPECT_TRUE(sys.registry().plugins().empty());
-  EXPECT_FALSE(sys.is_sidecar_running());
+  EXPECT_TRUE(sys.Initialize(config, test_dir_));
+  EXPECT_TRUE(sys.Registry().Plugins().empty());
+  EXPECT_FALSE(sys.IsSidecarRunning());
 }
 
 TEST_F(PluginSystemTest, InitializeDiscoversManifests) {
@@ -500,10 +503,10 @@ TEST_F(PluginSystemTest, InitializeDiscoversManifests) {
   config.plugins_config = {{"load", {{"paths", {plugins_dir.string()}}}}};
 
   quantclaw::PluginSystem sys(logger_);
-  EXPECT_TRUE(sys.initialize(config, test_dir_));
-  EXPECT_EQ(sys.registry().plugins().size(), 1);
+  EXPECT_TRUE(sys.Initialize(config, test_dir_));
+  EXPECT_EQ(sys.Registry().Plugins().size(), 1);
   // No sidecar script found → manifest-only mode
-  EXPECT_FALSE(sys.is_sidecar_running());
+  EXPECT_FALSE(sys.IsSidecarRunning());
 }
 
 TEST_F(PluginSystemTest, ReloadRediscoversPlugins) {
@@ -518,8 +521,8 @@ TEST_F(PluginSystemTest, ReloadRediscoversPlugins) {
   config.plugins_config = {{"load", {{"paths", {plugins_dir.string()}}}}};
 
   quantclaw::PluginSystem sys(logger_);
-  sys.initialize(config, test_dir_);
-  EXPECT_EQ(sys.registry().plugins().size(), 1);
+  sys.Initialize(config, test_dir_);
+  EXPECT_EQ(sys.Registry().Plugins().size(), 1);
 
   // Add another plugin
   fs::create_directories(plugins_dir / "second");
@@ -528,23 +531,23 @@ TEST_F(PluginSystemTest, ReloadRediscoversPlugins) {
     ofs << R"({"id":"second"})";
   }
 
-  sys.reload(config, test_dir_);
-  EXPECT_EQ(sys.registry().plugins().size(), 2);
+  sys.Reload(config, test_dir_);
+  EXPECT_EQ(sys.Registry().Plugins().size(), 2);
 }
 
 TEST_F(PluginSystemTest, HooksWorkWithoutSidecar) {
   quantclaw::PluginSystem sys(logger_);
   quantclaw::QuantClawConfig config;
-  sys.initialize(config, test_dir_);
+  sys.Initialize(config, test_dir_);
 
   bool fired = false;
-  sys.hooks().register_hook("test", "native",
+  sys.Hooks().RegisterHook("test", "native",
                             [&fired](const nlohmann::json&) -> nlohmann::json {
                               fired = true;
                               return {{"ok", true}};
                             });
 
-  auto result = sys.hooks().fire("test", {});
+  auto result = sys.Hooks().Fire("test", {});
   EXPECT_TRUE(fired);
   EXPECT_TRUE(result["ok"].get<bool>());
 }

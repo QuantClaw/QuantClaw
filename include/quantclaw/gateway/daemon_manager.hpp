@@ -1,37 +1,37 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <spdlog/spdlog.h>
+#include "quantclaw/platform/service.hpp"
 
 namespace quantclaw::gateway {
 
-// Manages the QuantClaw gateway as a systemd user service.
+// Manages the QuantClaw gateway as a platform service.
+// Linux: systemd user service. Windows: background process with PID file.
+// Thin wrapper around platform::ServiceManager.
 class DaemonManager {
  public:
   explicit DaemonManager(std::shared_ptr<spdlog::logger> logger);
 
-  int install(int port = 18789);
-  int uninstall();
-  int start();
-  int stop();
-  int restart();
-  int status();
+  int Install(int port = 18789);
+  int Uninstall();
+  int Start();
+  int Stop();
+  int Restart();
+  int Status();
 
-  bool is_running() const;
-  int get_pid() const;
+  bool IsRunning() const;
+  int GetPid() const;
+
+  void WritePid(int pid);
+  void RemovePid();
 
  private:
-  std::shared_ptr<spdlog::logger> logger_;
-  std::filesystem::path state_dir_;
-  std::filesystem::path pid_file_;
-  std::filesystem::path log_file_;
-
-  std::filesystem::path service_path() const;
-  std::string executable_path() const;
-  void write_pid(int pid);
-  void remove_pid();
+  platform::ServiceManager service_;
 };
 
 }  // namespace quantclaw::gateway

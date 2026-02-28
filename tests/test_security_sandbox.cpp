@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <filesystem>
@@ -33,7 +36,7 @@ TEST_F(SandboxTest, AllowedPathWithinWorkspace) {
     );
 
     auto file_in_workspace = test_dir_ / "SOUL.md";
-    EXPECT_TRUE(sandbox.is_path_allowed(file_in_workspace.string()));
+    EXPECT_TRUE(sandbox.IsPathAllowed(file_in_workspace.string()));
 }
 
 TEST_F(SandboxTest, DeniedPathOutsideWorkspace) {
@@ -44,7 +47,7 @@ TEST_F(SandboxTest, DeniedPathOutsideWorkspace) {
         {}
     );
 
-    EXPECT_FALSE(sandbox.is_path_allowed("/etc/passwd"));
+    EXPECT_FALSE(sandbox.IsPathAllowed("/etc/passwd"));
 }
 
 TEST_F(SandboxTest, ExplicitDenyOverridesAllow) {
@@ -55,8 +58,8 @@ TEST_F(SandboxTest, ExplicitDenyOverridesAllow) {
         {}
     );
 
-    EXPECT_FALSE(sandbox.is_path_allowed("/etc/passwd"));
-    EXPECT_TRUE(sandbox.is_path_allowed("/tmp/test.txt"));
+    EXPECT_FALSE(sandbox.IsPathAllowed("/etc/passwd"));
+    EXPECT_TRUE(sandbox.IsPathAllowed("/tmp/test.txt"));
 }
 
 TEST_F(SandboxTest, EmptyAllowedPathsPermitsAll) {
@@ -67,38 +70,38 @@ TEST_F(SandboxTest, EmptyAllowedPathsPermitsAll) {
         {}
     );
 
-    EXPECT_TRUE(sandbox.is_path_allowed("/tmp/anything"));
+    EXPECT_TRUE(sandbox.IsPathAllowed("/tmp/anything"));
 }
 
 TEST_F(SandboxTest, SanitizePathTraversal) {
     quantclaw::Sandbox sandbox(test_dir_, {}, {}, {}, {});
 
-    EXPECT_THROW(sandbox.sanitize_path("../../../etc/passwd"), std::runtime_error);
+    EXPECT_THROW(sandbox.SanitizePath("../../../etc/passwd"), std::runtime_error);
 }
 
 TEST_F(SandboxTest, SanitizeNormalPath) {
     quantclaw::Sandbox sandbox(test_dir_, {}, {}, {}, {});
 
-    auto result = sandbox.sanitize_path(test_dir_.string() + "/SOUL.md");
+    auto result = sandbox.SanitizePath(test_dir_.string() + "/SOUL.md");
     EXPECT_FALSE(result.empty());
 }
 
 // --- Static validators ---
 
 TEST_F(SandboxTest, ValidateFilePath) {
-    EXPECT_TRUE(quantclaw::Sandbox::validate_file_path("/tmp/test.txt", "/tmp"));
-    EXPECT_FALSE(quantclaw::Sandbox::validate_file_path("../../etc/passwd", "/tmp"));
+    EXPECT_TRUE(quantclaw::Sandbox::ValidateFilePath("/tmp/test.txt", "/tmp"));
+    EXPECT_FALSE(quantclaw::Sandbox::ValidateFilePath("../../etc/passwd", "/tmp"));
 }
 
 TEST_F(SandboxTest, ValidateShellCommandSafe) {
-    EXPECT_TRUE(quantclaw::Sandbox::validate_shell_command("ls -la"));
-    EXPECT_TRUE(quantclaw::Sandbox::validate_shell_command("echo hello"));
+    EXPECT_TRUE(quantclaw::Sandbox::ValidateShellCommand("ls -la"));
+    EXPECT_TRUE(quantclaw::Sandbox::ValidateShellCommand("echo hello"));
 }
 
 TEST_F(SandboxTest, ValidateShellCommandDangerous) {
-    EXPECT_FALSE(quantclaw::Sandbox::validate_shell_command("rm -rf /"));
-    EXPECT_FALSE(quantclaw::Sandbox::validate_shell_command("dd if=/dev/zero of=/dev/sda"));
-    EXPECT_FALSE(quantclaw::Sandbox::validate_shell_command("mkfs.ext4 /dev/sda"));
+    EXPECT_FALSE(quantclaw::Sandbox::ValidateShellCommand("rm -rf /"));
+    EXPECT_FALSE(quantclaw::Sandbox::ValidateShellCommand("dd if=/dev/zero of=/dev/sda"));
+    EXPECT_FALSE(quantclaw::Sandbox::ValidateShellCommand("mkfs.ext4 /dev/sda"));
 }
 
 // --- Command filtering ---
@@ -111,8 +114,8 @@ TEST_F(SandboxTest, DenyCommandByPattern) {
         {"rm\\s+-rf"}  // denied command pattern (regex)
     );
 
-    EXPECT_FALSE(sandbox.is_command_allowed("rm -rf /"));
-    EXPECT_TRUE(sandbox.is_command_allowed("ls -la"));
+    EXPECT_FALSE(sandbox.IsCommandAllowed("rm -rf /"));
+    EXPECT_TRUE(sandbox.IsCommandAllowed("ls -la"));
 }
 
 // --- Resource limits ---
@@ -123,7 +126,7 @@ TEST_F(SandboxTest, ApplyResourceLimitsDoesNotThrow) {
     pid_t pid = fork();
     ASSERT_NE(pid, -1) << "fork() failed";
     if (pid == 0) {
-        quantclaw::Sandbox::apply_resource_limits();
+        quantclaw::Sandbox::ApplyResourceLimits();
         _exit(0);  // No throw
     }
     int status;
@@ -131,7 +134,7 @@ TEST_F(SandboxTest, ApplyResourceLimitsDoesNotThrow) {
     ASSERT_TRUE(WIFEXITED(status));
     EXPECT_EQ(WEXITSTATUS(status), 0);
 #else
-    EXPECT_NO_THROW(quantclaw::Sandbox::apply_resource_limits());
+    EXPECT_NO_THROW(quantclaw::Sandbox::ApplyResourceLimits());
 #endif
 }
 
@@ -144,7 +147,7 @@ TEST_F(SandboxTest, ResourceLimitsAreSet) {
 
     if (pid == 0) {
         // Child process: apply limits and verify
-        quantclaw::Sandbox::apply_resource_limits();
+        quantclaw::Sandbox::ApplyResourceLimits();
 
         struct rlimit cpu_limit;
         getrlimit(RLIMIT_CPU, &cpu_limit);

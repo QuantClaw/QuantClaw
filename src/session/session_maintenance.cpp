@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/session/session_maintenance.hpp"
 
 #include <algorithm>
@@ -8,22 +11,22 @@ namespace quantclaw {
 
 // --- MaintenanceMode ---
 
-MaintenanceMode maintenance_mode_from_string(const std::string& s) {
+MaintenanceMode MaintenanceModeFromString(const std::string& s) {
   if (s == "warn") return MaintenanceMode::kWarn;
   return MaintenanceMode::kEnforce;
 }
 
 // --- SessionMaintenanceConfig ---
 
-SessionMaintenanceConfig SessionMaintenanceConfig::from_json(
+SessionMaintenanceConfig SessionMaintenanceConfig::FromJson(
     const nlohmann::json& j) {
   SessionMaintenanceConfig c;
   if (j.contains("mode") && j["mode"].is_string()) {
-    c.mode = maintenance_mode_from_string(j["mode"].get<std::string>());
+    c.mode = MaintenanceModeFromString(j["mode"].get<std::string>());
   }
   if (j.contains("pruneAfter")) {
     if (j["pruneAfter"].is_string()) {
-      c.prune_after_seconds = SessionMaintenance::parse_duration_seconds(
+      c.prune_after_seconds = SessionMaintenance::ParseDurationSeconds(
           j["pruneAfter"].get<std::string>());
     } else if (j["pruneAfter"].is_number()) {
       c.prune_after_seconds = j["pruneAfter"].get<int>();
@@ -32,7 +35,7 @@ SessionMaintenanceConfig SessionMaintenanceConfig::from_json(
   c.max_entries = j.value("maxEntries", 0);
   if (j.contains("rotateBytes")) {
     if (j["rotateBytes"].is_string()) {
-      c.rotate_bytes = SessionMaintenance::parse_size_bytes(
+      c.rotate_bytes = SessionMaintenance::ParseSizeBytes(
           j["rotateBytes"].get<std::string>());
     } else if (j["rotateBytes"].is_number()) {
       c.rotate_bytes = j["rotateBytes"].get<int64_t>();
@@ -40,7 +43,7 @@ SessionMaintenanceConfig SessionMaintenanceConfig::from_json(
   }
   if (j.contains("maxDiskBytes")) {
     if (j["maxDiskBytes"].is_string()) {
-      c.max_disk_bytes = SessionMaintenance::parse_size_bytes(
+      c.max_disk_bytes = SessionMaintenance::ParseSizeBytes(
           j["maxDiskBytes"].get<std::string>());
     } else if (j["maxDiskBytes"].is_number()) {
       c.max_disk_bytes = j["maxDiskBytes"].get<int64_t>();
@@ -59,11 +62,11 @@ SessionMaintenance::SessionMaintenance(
       logger_(std::move(logger)),
       last_sweep_(std::chrono::steady_clock::time_point{}) {}
 
-void SessionMaintenance::configure(const SessionMaintenanceConfig& config) {
+void SessionMaintenance::Configure(const SessionMaintenanceConfig& config) {
   config_ = config;
 }
 
-MaintenanceResult SessionMaintenance::sweep(bool force) {
+MaintenanceResult SessionMaintenance::Sweep(bool force) {
   MaintenanceResult result;
 
   // Check sweep interval
@@ -106,7 +109,7 @@ MaintenanceResult SessionMaintenance::sweep(bool force) {
   return result;
 }
 
-int SessionMaintenance::parse_duration_seconds(const std::string& s) {
+int SessionMaintenance::ParseDurationSeconds(const std::string& s) {
   if (s.empty()) return 0;
 
   std::regex re(R"((\d+)\s*(s|m|h|d|w))");
@@ -115,7 +118,7 @@ int SessionMaintenance::parse_duration_seconds(const std::string& s) {
     // Try plain number (seconds)
     try {
       return std::stoi(s);
-    } catch (...) {
+    } catch (const std::exception&) {
       return 0;
     }
   }
@@ -130,7 +133,7 @@ int SessionMaintenance::parse_duration_seconds(const std::string& s) {
   return value;
 }
 
-int64_t SessionMaintenance::parse_size_bytes(const std::string& s) {
+int64_t SessionMaintenance::ParseSizeBytes(const std::string& s) {
   if (s.empty()) return 0;
 
   std::regex re(R"((\d+)\s*(B|KB|MB|GB|TB)?)", std::regex::icase);
@@ -138,7 +141,7 @@ int64_t SessionMaintenance::parse_size_bytes(const std::string& s) {
   if (!std::regex_match(s, match, re)) {
     try {
       return std::stoll(s);
-    } catch (...) {
+    } catch (const std::exception&) {
       return 0;
     }
   }
@@ -274,7 +277,11 @@ void SessionMaintenance::archive_file(const std::filesystem::path& path) {
   auto now = std::chrono::system_clock::now();
   auto time_t = std::chrono::system_clock::to_time_t(now);
   struct tm tm {};
+#ifdef _WIN32
+  localtime_s(&tm, &time_t);
+#else
   localtime_r(&time_t, &tm);
+#endif
 
   char buf[32];
   std::strftime(buf, sizeof(buf), "%Y%m%d_%H%M%S", &tm);

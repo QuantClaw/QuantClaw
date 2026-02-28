@@ -1,8 +1,15 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/tools/tool_registry.hpp"
 #include "quantclaw/security/sandbox.hpp"
 #include "quantclaw/security/tool_permissions.hpp"
+#include "quantclaw/security/exec_approval.hpp"
+#include "quantclaw/core/subagent.hpp"
 #include "quantclaw/tools/tool_chain.hpp"
 #include "quantclaw/mcp/mcp_tool_manager.hpp"
+#include "quantclaw/platform/process.hpp"
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -18,7 +25,7 @@ ToolRegistry::ToolRegistry(std::shared_ptr<spdlog::logger> logger)
     logger_->info("ToolRegistry initialized");
 }
 
-void ToolRegistry::register_builtin_tools() {
+void ToolRegistry::RegisterBuiltinTools() {
     // Register file system tools with security sandbox
     tools_["read"] = [this](const nlohmann::json& params) {
         return read_file_tool(params);
@@ -70,7 +77,7 @@ void ToolRegistry::register_builtin_tools() {
     logger_->info("Registered {} built-in tools", tools_.size());
 }
 
-void ToolRegistry::register_external_tool(const std::string& name,
+void ToolRegistry::RegisterExternalTool(const std::string& name,
                                            const std::string& description,
                                            const nlohmann::json& parameters,
                                            std::function<std::string(const nlohmann::json&)> executor) {
@@ -80,15 +87,15 @@ void ToolRegistry::register_external_tool(const std::string& name,
     logger_->info("Registered external tool: {}", name);
 }
 
-void ToolRegistry::register_chain_tool() {
+void ToolRegistry::RegisterChainTool() {
     tools_["chain"] = [this](const nlohmann::json& params) -> std::string {
-        auto chain_def = ToolChainExecutor::parse_chain(params);
+        auto chain_def = ToolChainExecutor::ParseChain(params);
         ToolExecutorFn executor = [this](const std::string& name, const nlohmann::json& args) {
-            return execute_tool(name, args);
+            return ExecuteTool(name, args);
         };
         ToolChainExecutor chain_executor(executor, logger_);
-        auto result = chain_executor.execute(chain_def);
-        return ToolChainExecutor::result_to_json(result).dump();
+        auto result = chain_executor.Execute(chain_def);
+        return ToolChainExecutor::ResultToJson(result).dump();
     };
 
     nlohmann::json chain_params;
@@ -120,14 +127,89 @@ void ToolRegistry::register_chain_tool() {
     logger_->info("Registered chain tool");
 }
 
-void ToolRegistry::set_permission_checker(std::shared_ptr<ToolPermissionChecker> checker) {
+void ToolRegistry::SetPermissionChecker(std::shared_ptr<ToolPermissionChecker> checker) {
     permission_checker_ = std::move(checker);
     logger_->info("Permission checker set on ToolRegistry");
 }
 
-void ToolRegistry::set_mcp_tool_manager(std::shared_ptr<mcp::MCPToolManager> manager) {
+void ToolRegistry::SetMcpToolManager(std::shared_ptr<mcp::MCPToolManager> manager) {
     mcp_tool_manager_ = std::move(manager);
     logger_->info("MCP tool manager set on ToolRegistry");
+}
+
+void ToolRegistry::SetApprovalManager(std::shared_ptr<ExecApprovalManager> manager) {
+    approval_manager_ = std::move(manager);
+    logger_->info("Exec approval manager set on ToolRegistry");
+}
+
+void ToolRegistry::SetSubagentManager(SubagentManager* manager,
+                                         const std::string& session_key) {
+    subagent_manager_ = manager;
+    current_session_key_ = session_key;
+
+    if (!manager) return;
+
+    // Register spawn_subagent tool
+    tools_["spawn_subagent"] = [this](const nlohmann::json& params) -> std::string {
+        if (!subagent_manager_) {
+            throw std::runtime_error("Subagent manager not configured");
+        }
+
+        SpawnParams sp;
+        sp.task = params.value("task", "");
+        if (sp.task.empty()) {
+            throw std::runtime_error("Missing required parameter: task");
+        }
+        sp.label = params.value("label", "");
+        sp.agent_id = params.value("agent_id", "");
+        sp.model = params.value("model", "");
+        sp.thinking = params.value("thinking", "off");
+        sp.timeout_seconds = params.value("timeout", 300);
+        sp.mode = spawn_mode_from_string(params.value("mode", "run"));
+        sp.cleanup = params.value("cleanup", true);
+
+        auto result = subagent_manager_->Spawn(sp, current_session_key_);
+
+        nlohmann::json r;
+        r["status"] = (result.status == SpawnResult::kAccepted) ? "accepted" :
+                      (result.status == SpawnResult::kForbidden) ? "forbidden" : "error";
+        if (!result.child_session_key.empty())
+            r["child_session_key"] = result.child_session_key;
+        if (!result.run_id.empty())
+            r["run_id"] = result.run_id;
+        r["mode"] = spawn_mode_to_string(result.mode);
+        if (!result.note.empty()) r["note"] = result.note;
+        if (!result.error.empty()) r["error"] = result.error;
+        return r.dump();
+    };
+
+    nlohmann::json spawn_params;
+    spawn_params["type"] = "object";
+    spawn_params["properties"] = {
+        {"task", {{"type", "string"}, {"description", "Task description for the subagent"}}},
+        {"label", {{"type", "string"}, {"description", "Human-readable label"}}},
+        {"agent_id", {{"type", "string"}, {"description", "Target agent ID"}}},
+        {"model", {{"type", "string"}, {"description", "Model override (e.g. openai/gpt-4)"}}},
+        {"thinking", {{"type", "string"}, {"description", "Thinking level: off|low|medium|high"}}},
+        {"timeout", {{"type", "integer"}, {"description", "Timeout in seconds"}}},
+        {"mode", {{"type", "string"}, {"enum", {"run", "session"}}, {"description", "run=ephemeral, session=persistent"}}},
+        {"cleanup", {{"type", "boolean"}, {"description", "Auto-delete session on completion"}}}
+    };
+    spawn_params["required"] = {"task"};
+
+    // Remove existing schema if re-registering
+    tool_schemas_.erase(
+        std::remove_if(tool_schemas_.begin(), tool_schemas_.end(),
+            [](const ToolSchema& s) { return s.name == "spawn_subagent"; }),
+        tool_schemas_.end());
+
+    tool_schemas_.push_back({
+        "spawn_subagent",
+        "Spawn a subagent to handle a subtask autonomously. The subagent gets its own session and can use all tools.",
+        spawn_params
+    });
+
+    logger_->info("Subagent manager set, spawn_subagent tool registered");
 }
 
 bool ToolRegistry::check_permission(const std::string& tool_name) const {
@@ -137,17 +219,17 @@ bool ToolRegistry::check_permission(const std::string& tool_name) const {
 
     // Check if this is an external (MCP) tool
     if (external_tools_.count(tool_name) && mcp_tool_manager_) {
-        std::string server_name = mcp_tool_manager_->get_server_name(tool_name);
-        std::string original_name = mcp_tool_manager_->get_original_tool_name(tool_name);
-        return permission_checker_->is_mcp_tool_allowed(server_name, original_name);
+        std::string server_name = mcp_tool_manager_->GetServerName(tool_name);
+        std::string original_name = mcp_tool_manager_->GetOriginalToolName(tool_name);
+        return permission_checker_->IsMcpToolAllowed(server_name, original_name);
     }
 
-    return permission_checker_->is_allowed(tool_name);
+    return permission_checker_->IsAllowed(tool_name);
 }
 
-std::string ToolRegistry::execute_tool(const std::string& tool_name,
+std::string ToolRegistry::ExecuteTool(const std::string& tool_name,
                                      const nlohmann::json& parameters) {
-    if (!has_tool(tool_name)) {
+    if (!HasTool(tool_name)) {
         throw std::runtime_error("Tool not found: " + tool_name);
     }
 
@@ -168,7 +250,7 @@ std::string ToolRegistry::execute_tool(const std::string& tool_name,
     }
 }
 
-std::vector<ToolRegistry::ToolSchema> ToolRegistry::get_tool_schemas() const {
+std::vector<ToolRegistry::ToolSchema> ToolRegistry::GetToolSchemas() const {
     if (!permission_checker_) {
         return tool_schemas_;
     }
@@ -176,13 +258,13 @@ std::vector<ToolRegistry::ToolSchema> ToolRegistry::get_tool_schemas() const {
     std::vector<ToolSchema> filtered;
     for (const auto& schema : tool_schemas_) {
         if (external_tools_.count(schema.name) && mcp_tool_manager_) {
-            std::string server_name = mcp_tool_manager_->get_server_name(schema.name);
-            std::string original_name = mcp_tool_manager_->get_original_tool_name(schema.name);
-            if (permission_checker_->is_mcp_tool_allowed(server_name, original_name)) {
+            std::string server_name = mcp_tool_manager_->GetServerName(schema.name);
+            std::string original_name = mcp_tool_manager_->GetOriginalToolName(schema.name);
+            if (permission_checker_->IsMcpToolAllowed(server_name, original_name)) {
                 filtered.push_back(schema);
             }
         } else {
-            if (permission_checker_->is_allowed(schema.name)) {
+            if (permission_checker_->IsAllowed(schema.name)) {
                 filtered.push_back(schema);
             }
         }
@@ -190,7 +272,7 @@ std::vector<ToolRegistry::ToolSchema> ToolRegistry::get_tool_schemas() const {
     return filtered;
 }
 
-bool ToolRegistry::has_tool(const std::string& tool_name) const {
+bool ToolRegistry::HasTool(const std::string& tool_name) const {
     return tools_.find(tool_name) != tools_.end();
 }
 
@@ -202,7 +284,7 @@ std::string ToolRegistry::read_file_tool(const nlohmann::json& params) {
     std::string path = params["path"].get<std::string>();
 
     // Apply security sandbox - validate path
-    if (!quantclaw::SecuritySandbox::validate_file_path(path, "~/.quantclaw/workspace")) {
+    if (!quantclaw::SecuritySandbox::ValidateFilePath(path, "~/.quantclaw/workspace")) {
         throw std::runtime_error("Access denied: Path outside allowed workspace: " + path);
     }
 
@@ -231,7 +313,7 @@ std::string ToolRegistry::write_file_tool(const nlohmann::json& params) {
     std::string content = params["content"].get<std::string>();
 
     // Apply security sandbox - validate path
-    if (!quantclaw::SecuritySandbox::validate_file_path(path, "~/.quantclaw/workspace")) {
+    if (!quantclaw::SecuritySandbox::ValidateFilePath(path, "~/.quantclaw/workspace")) {
         throw std::runtime_error("Access denied: Path outside allowed workspace: " + path);
     }
 
@@ -259,7 +341,7 @@ std::string ToolRegistry::edit_file_tool(const nlohmann::json& params) {
     std::string new_text = params["newText"].get<std::string>();
 
     // Apply security sandbox - validate path
-    if (!quantclaw::SecuritySandbox::validate_file_path(path, "~/.quantclaw/workspace")) {
+    if (!quantclaw::SecuritySandbox::ValidateFilePath(path, "~/.quantclaw/workspace")) {
         throw std::runtime_error("Access denied: Path outside allowed workspace: " + path);
     }
 
@@ -303,42 +385,38 @@ std::string ToolRegistry::exec_tool(const nlohmann::json& params) {
     std::string command = params["command"].get<std::string>();
 
     // Apply security sandbox - validate command
-    if (!quantclaw::SecuritySandbox::validate_shell_command(command)) {
+    if (!quantclaw::SecuritySandbox::ValidateShellCommand(command)) {
         throw std::runtime_error("Command not allowed: " + command);
     }
 
-    // Apply resource limits
-    quantclaw::SecuritySandbox::apply_resource_limits();
-
-    logger_->info("Executing command: {}", command);
-
-    // Execute command and capture output with timeout
-    std::ostringstream output;
-    FILE* pipe = popen(command.c_str(), "r");
-    if (!pipe) {
-        throw std::runtime_error("Failed to execute command: " + command);
-    }
-
-    char buffer[1024];
-    auto start_time = std::chrono::steady_clock::now();
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-        output << buffer;
-
-        // Check timeout (30 seconds)
-        auto current_time = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time);
-        if (elapsed.count() > 30) {
-            pclose(pipe);
-            throw std::runtime_error("Command timeout exceeded: " + command);
+    // Exec approval check (if approval manager is configured)
+    if (approval_manager_) {
+        auto decision = approval_manager_->RequestApproval(command);
+        if (decision == ApprovalDecision::kDenied) {
+            throw std::runtime_error("Command execution denied by approval policy: " + command);
+        }
+        if (decision == ApprovalDecision::kTimeout) {
+            throw std::runtime_error("Command execution approval timed out: " + command);
         }
     }
 
-    int exit_code = pclose(pipe);
-    if (exit_code != 0) {
-        throw std::runtime_error("Command failed with exit code " + std::to_string(exit_code));
+    // Apply resource limits
+    quantclaw::SecuritySandbox::ApplyResourceLimits();
+
+    logger_->info("Executing command: {}", command);
+
+    auto result = platform::exec_capture(command, 30);
+    if (result.exit_code == -1) {
+        throw std::runtime_error("Failed to execute command: " + command);
+    }
+    if (result.exit_code == -2) {
+        throw std::runtime_error("Command timeout exceeded: " + command);
+    }
+    if (result.exit_code != 0) {
+        throw std::runtime_error("Command failed with exit code " + std::to_string(result.exit_code));
     }
 
-    return output.str();
+    return result.output;
 }
 
 std::string ToolRegistry::message_tool(const nlohmann::json& params) {
@@ -349,8 +427,6 @@ std::string ToolRegistry::message_tool(const nlohmann::json& params) {
     std::string channel = params["channel"].get<std::string>();
     std::string message = params["message"].get<std::string>();
 
-    // TODO: Implement actual message sending through channel manager
-    // For now, just log the message
     logger_->info("Sending message to channel {}: {}", channel, message);
 
     return "Message sent to channel: " + channel;

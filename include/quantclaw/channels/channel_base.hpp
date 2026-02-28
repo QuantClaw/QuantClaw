@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -21,13 +24,13 @@ public:
     
     virtual ~Channel() = default;
     
-    virtual void start() = 0;
-    virtual void stop() = 0;
-    virtual void send_message(const std::string& channel_id, const std::string& message) = 0;
-    virtual bool is_allowed(const std::string& sender_id) const = 0;
-    virtual std::string get_channel_name() const = 0;
-    
-    void set_message_handler(MessageHandler handler) {
+    virtual void Start() = 0;
+    virtual void Stop() = 0;
+    virtual void SendMessage(const std::string& channel_id, const std::string& message) = 0;
+    virtual bool IsAllowed(const std::string& sender_id) const = 0;
+    virtual std::string GetChannelName() const = 0;
+
+    void SetMessageHandler(MessageHandler handler) {
         message_handler_ = std::move(handler);
     }
     

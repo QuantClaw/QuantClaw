@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>
@@ -34,12 +37,12 @@ TEST_F(MemoryManagerTest, ReadIdentityFile) {
     f << "# My Soul\n\nI am a helpful assistant.";
     f.close();
 
-    auto content = memory_manager_->read_identity_file("SOUL.md");
+    auto content = memory_manager_->ReadIdentityFile("SOUL.md");
     EXPECT_EQ(content, "# My Soul\n\nI am a helpful assistant.");
 }
 
 TEST_F(MemoryManagerTest, ReadNonExistentFile) {
-    EXPECT_THROW(memory_manager_->read_identity_file("NONEXISTENT.md"), std::runtime_error);
+    EXPECT_THROW(memory_manager_->ReadIdentityFile("NONEXISTENT.md"), std::runtime_error);
 }
 
 TEST_F(MemoryManagerTest, ReadAgentsFile) {
@@ -47,7 +50,7 @@ TEST_F(MemoryManagerTest, ReadAgentsFile) {
     f << "# Agent Behavior\nBe concise.";
     f.close();
 
-    auto content = memory_manager_->read_agents_file();
+    auto content = memory_manager_->ReadAgentsFile();
     EXPECT_EQ(content, "# Agent Behavior\nBe concise.");
 }
 
@@ -56,12 +59,12 @@ TEST_F(MemoryManagerTest, ReadToolsFile) {
     f << "# Tool Guide\nUse read for files.";
     f.close();
 
-    auto content = memory_manager_->read_tools_file();
+    auto content = memory_manager_->ReadToolsFile();
     EXPECT_EQ(content, "# Tool Guide\nUse read for files.");
 }
 
 TEST_F(MemoryManagerTest, SaveDailyMemory) {
-    memory_manager_->save_daily_memory("This is a test memory entry.");
+    memory_manager_->SaveDailyMemory("This is a test memory entry.");
 
     auto memory_dir = test_dir_ / "memory";
     EXPECT_TRUE(std::filesystem::exists(memory_dir));
@@ -90,20 +93,20 @@ TEST_F(MemoryManagerTest, SearchMemory) {
     user << "The user is interested in AI and C++ programming.";
     user.close();
 
-    auto results = memory_manager_->search_memory("quantum");
+    auto results = memory_manager_->SearchMemory("quantum");
     EXPECT_FALSE(results.empty());
     EXPECT_TRUE(results[0].find("quantum") != std::string::npos);
 
-    auto no_results = memory_manager_->search_memory("zzz_nonexistent_zzz");
+    auto no_results = memory_manager_->SearchMemory("zzz_nonexistent_zzz");
     EXPECT_TRUE(no_results.empty());
 }
 
 TEST_F(MemoryManagerTest, GetWorkspacePath) {
-    EXPECT_EQ(memory_manager_->get_workspace_path(), test_dir_);
+    EXPECT_EQ(memory_manager_->GetWorkspacePath(), test_dir_);
 }
 
 TEST_F(MemoryManagerTest, GetSessionsDir) {
-    auto sessions_dir = memory_manager_->get_sessions_dir("main");
+    auto sessions_dir = memory_manager_->GetSessionsDir("main");
     EXPECT_TRUE(sessions_dir.string().find("agents/main/sessions") != std::string::npos);
 }
 
@@ -113,15 +116,15 @@ TEST_F(MemoryManagerTest, LoadWorkspaceFiles) {
     f.close();
 
     // Should not throw
-    EXPECT_NO_THROW(memory_manager_->load_workspace_files());
+    EXPECT_NO_THROW(memory_manager_->LoadWorkspaceFiles());
 }
 
 // --- File watcher tests ---
 
 TEST_F(MemoryManagerTest, FileWatcherStartStop) {
     // Should not throw
-    EXPECT_NO_THROW(memory_manager_->start_file_watcher());
-    EXPECT_NO_THROW(memory_manager_->stop_file_watcher());
+    EXPECT_NO_THROW(memory_manager_->StartFileWatcher());
+    EXPECT_NO_THROW(memory_manager_->StopFileWatcher());
 }
 
 TEST_F(MemoryManagerTest, FileWatcherDetectsChange) {
@@ -133,12 +136,12 @@ TEST_F(MemoryManagerTest, FileWatcherDetectsChange) {
 
     bool changed = false;
     std::string changed_file;
-    memory_manager_->set_file_change_callback([&](const std::string& filename) {
+    memory_manager_->SetFileChangeCallback([&](const std::string& filename) {
         changed = true;
         changed_file = filename;
     });
 
-    memory_manager_->start_file_watcher();
+    memory_manager_->StartFileWatcher();
 
     // Wait for initial scan
     std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -152,15 +155,15 @@ TEST_F(MemoryManagerTest, FileWatcherDetectsChange) {
     // Wait for watcher to detect (polls every 5 seconds)
     std::this_thread::sleep_for(std::chrono::seconds(7));
 
-    memory_manager_->stop_file_watcher();
+    memory_manager_->StopFileWatcher();
 
     EXPECT_TRUE(changed);
     EXPECT_EQ(changed_file, "SOUL.md");
 }
 
 TEST_F(MemoryManagerTest, FileWatcherDoubleStartIgnored) {
-    memory_manager_->start_file_watcher();
+    memory_manager_->StartFileWatcher();
     // Second start should be a no-op
-    EXPECT_NO_THROW(memory_manager_->start_file_watcher());
-    memory_manager_->stop_file_watcher();
+    EXPECT_NO_THROW(memory_manager_->StartFileWatcher());
+    memory_manager_->StopFileWatcher();
 }

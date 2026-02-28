@@ -1,57 +1,16 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/plugins/sidecar_manager.hpp"
 
 #include <algorithm>
-#include <cerrno>
-#include <csignal>
-#include <cstring>
 #include <fstream>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 namespace quantclaw {
 
 namespace {
-
 constexpr int kMaxBackoffMs = 60000;
 constexpr int kBaseBackoffMs = 1000;
-constexpr size_t kMaxResponseSize = 16 * 1024 * 1024;  // 16 MB
-
-std::string read_line(int fd, int timeout_ms) {
-  std::string line;
-  line.reserve(4096);
-  auto deadline = std::chrono::steady_clock::now() +
-                  std::chrono::milliseconds(timeout_ms);
-
-  while (std::chrono::steady_clock::now() < deadline) {
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(fd, &fds);
-
-    auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-        deadline - std::chrono::steady_clock::now());
-    if (remaining.count() <= 0) break;
-
-    struct timeval tv;
-    tv.tv_sec = remaining.count() / 1000;
-    tv.tv_usec = (remaining.count() % 1000) * 1000;
-
-    int ret = select(fd + 1, &fds, nullptr, nullptr, &tv);
-    if (ret <= 0) break;
-
-    char c;
-    ssize_t n = read(fd, &c, 1);
-    if (n <= 0) break;
-    if (c == '\n') return line;
-    line += c;
-
-    if (line.size() > kMaxResponseSize) break;
-  }
-  return line;
-}
-
 }  // namespace
 
 nlohmann::json SidecarRequest::to_json() const {
@@ -63,7 +22,7 @@ nlohmann::json SidecarRequest::to_json() const {
   };
 }
 
-SidecarResponse SidecarResponse::from_json(const nlohmann::json& j) {
+SidecarResponse SidecarResponse::FromJson(const nlohmann::json& j) {
   SidecarResponse r;
   r.id = j.value("id", 0);
   if (j.contains("error")) {
@@ -83,10 +42,10 @@ SidecarManager::SidecarManager(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
 SidecarManager::~SidecarManager() {
-  stop();
+  Stop();
 }
 
-bool SidecarManager::start(const Options& opts) {
+bool SidecarManager::Start(const Options& opts) {
   if (running_) {
     logger_->warn("Sidecar already running (pid={})", pid_.load());
     return true;
@@ -95,20 +54,17 @@ bool SidecarManager::start(const Options& opts) {
   opts_ = opts;
 
   if (opts_.socket_path.empty()) {
-    const char* home = std::getenv("HOME");
-    std::string home_str = home ? home : "/tmp";
-    opts_.socket_path = home_str + "/.quantclaw/sidecar.sock";
+    std::string home = platform::home_directory();
+    opts_.socket_path = home + "/.quantclaw/sidecar.sock";
   }
   if (opts_.pid_file.empty()) {
-    const char* home = std::getenv("HOME");
-    std::string home_str = home ? home : "/tmp";
-    opts_.pid_file = home_str + "/.quantclaw/sidecar.pid";
+    std::string home = platform::home_directory();
+    opts_.pid_file = home + "/.quantclaw/sidecar.pid";
   }
 
-  // Remove stale socket
-  unlink(opts_.socket_path.c_str());
+  platform::IpcServer::cleanup(opts_.socket_path);
 
-  if (!spawn_process()) {
+  if (!spawn_sidecar()) {
     return false;
   }
 
@@ -116,60 +72,63 @@ bool SidecarManager::start(const Options& opts) {
   stopping_ = false;
   restart_count_ = 0;
 
-  // Start monitor thread
   monitor_thread_ = std::thread([this] { monitor_loop(); });
 
   return true;
 }
 
-void SidecarManager::stop() {
+void SidecarManager::Stop() {
   if (!running_) return;
 
   stopping_ = true;
   running_ = false;
 
-  kill_process(false);
+  kill_sidecar(false);
 
   if (monitor_thread_.joinable()) {
     monitor_thread_.join();
   }
 
-  // Cleanup
-  if (socket_fd_ >= 0) {
-    close(socket_fd_);
-    socket_fd_ = -1;
+  // Cleanup IPC
+  {
+    std::lock_guard<std::mutex> lock(ipc_mu_);
+    if (ipc_handle_ != platform::kInvalidIpc) {
+      platform::ipc_close(ipc_handle_);
+      ipc_handle_ = platform::kInvalidIpc;
+    }
   }
-  unlink(opts_.socket_path.c_str());
+  platform::IpcServer::cleanup(opts_.socket_path);
   remove_pid_file();
 }
 
-bool SidecarManager::reload() {
-  if (!is_running()) return false;
+bool SidecarManager::Reload() {
+  if (!IsRunning()) return false;
 
-  pid_t p = pid_.load();
-  if (p > 0) {
-    logger_->info("Sending SIGHUP to sidecar (pid={})", p);
-    return kill(p, SIGHUP) == 0;
+  auto p = pid_.load();
+  if (p != platform::kInvalidPid) {
+    logger_->info("Sending reload signal to sidecar (pid={})", p);
+    platform::reload_process(p);
+    return true;
   }
   return false;
 }
 
-SidecarResponse SidecarManager::call(const std::string& method,
+SidecarResponse SidecarManager::Call(const std::string& method,
                                      const nlohmann::json& params,
                                      int timeout_ms) {
-  if (!is_running()) {
+  if (!IsRunning()) {
     SidecarResponse r;
     r.ok = false;
     r.error = "Sidecar not running";
     return r;
   }
 
-  std::lock_guard<std::mutex> lock(socket_mu_);
+  std::lock_guard<std::mutex> lock(ipc_mu_);
 
-  if (socket_fd_ < 0 && !connect_socket()) {
+  if (ipc_handle_ == platform::kInvalidIpc && !connect_ipc()) {
     SidecarResponse r;
     r.ok = false;
-    r.error = "Cannot connect to sidecar socket";
+    r.error = "Cannot connect to sidecar";
     return r;
   }
 
@@ -179,20 +138,21 @@ SidecarResponse SidecarManager::call(const std::string& method,
   req.id = rpc_id_.fetch_add(1);
 
   std::string payload = req.to_json().dump() + "\n";
-  ssize_t written = write(socket_fd_, payload.data(), payload.size());
+  int written = platform::ipc_write(ipc_handle_, payload.data(),
+                                    static_cast<int>(payload.size()));
   if (written < 0 || static_cast<size_t>(written) != payload.size()) {
-    close(socket_fd_);
-    socket_fd_ = -1;
+    platform::ipc_close(ipc_handle_);
+    ipc_handle_ = platform::kInvalidIpc;
     SidecarResponse r;
     r.ok = false;
-    r.error = "Write to sidecar failed: " + std::string(strerror(errno));
+    r.error = "Write to sidecar failed";
     return r;
   }
 
-  std::string response_line = read_line(socket_fd_, timeout_ms);
+  std::string response_line = platform::ipc_read_line(ipc_handle_, timeout_ms);
   if (response_line.empty()) {
-    close(socket_fd_);
-    socket_fd_ = -1;
+    platform::ipc_close(ipc_handle_);
+    ipc_handle_ = platform::kInvalidIpc;
     SidecarResponse r;
     r.ok = false;
     r.error = "Sidecar response timeout";
@@ -201,7 +161,7 @@ SidecarResponse SidecarManager::call(const std::string& method,
 
   try {
     auto j = nlohmann::json::parse(response_line);
-    return SidecarResponse::from_json(j);
+    return SidecarResponse::FromJson(j);
   } catch (const std::exception& e) {
     SidecarResponse r;
     r.ok = false;
@@ -210,10 +170,10 @@ SidecarResponse SidecarManager::call(const std::string& method,
   }
 }
 
-bool SidecarManager::is_running() const {
-  pid_t p = pid_.load();
-  if (p <= 0) return false;
-  return kill(p, 0) == 0;
+bool SidecarManager::IsRunning() const {
+  auto p = pid_.load();
+  if (p == platform::kInvalidPid) return false;
+  return platform::is_process_alive(p);
 }
 
 void SidecarManager::monitor_loop() {
@@ -223,12 +183,11 @@ void SidecarManager::monitor_loop() {
 
     if (stopping_) break;
 
-    if (!is_running()) {
+    if (!IsRunning()) {
       if (stopping_) break;
 
-      // Process died unexpectedly
       logger_->warn("Sidecar process died unexpectedly");
-      pid_ = 0;
+      pid_ = platform::kInvalidPid;
 
       if (restart_count_ >= opts_.max_restarts) {
         logger_->error("Sidecar max restarts ({}) exceeded, giving up",
@@ -244,13 +203,16 @@ void SidecarManager::monitor_loop() {
 
       if (stopping_) break;
 
-      if (socket_fd_ >= 0) {
-        close(socket_fd_);
-        socket_fd_ = -1;
+      {
+        std::lock_guard<std::mutex> lock(ipc_mu_);
+        if (ipc_handle_ != platform::kInvalidIpc) {
+          platform::ipc_close(ipc_handle_);
+          ipc_handle_ = platform::kInvalidIpc;
+        }
       }
-      unlink(opts_.socket_path.c_str());
+      platform::IpcServer::cleanup(opts_.socket_path);
 
-      if (spawn_process()) {
+      if (spawn_sidecar()) {
         restart_count_++;
         last_restart_ = std::chrono::steady_clock::now();
       } else {
@@ -260,163 +222,96 @@ void SidecarManager::monitor_loop() {
     }
 
     // Heartbeat check via RPC ping
-    auto resp = call("ping", {}, 5000);
+    auto resp = Call("ping", {}, 5000);
     if (!resp.ok) {
       logger_->warn("Sidecar heartbeat failed: {}", resp.error);
     }
   }
 }
 
-bool SidecarManager::spawn_process() {
+bool SidecarManager::spawn_sidecar() {
   if (opts_.sidecar_script.empty()) {
     logger_->error("No sidecar script configured");
     return false;
   }
 
-  // Create the socket before forking so sidecar can connect
-  int server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (server_fd < 0) {
-    logger_->error("Failed to create Unix socket: {}", strerror(errno));
+  // Create IPC server
+  platform::IpcServer server(opts_.socket_path);
+  if (!server.listen()) {
+    logger_->error("Failed to create IPC server at {}", opts_.socket_path);
+    return false;
+  }
+  platform::ipc_set_permissions(opts_.socket_path, 0600);
+
+  // Build env vars
+  std::vector<std::string> env;
+  env.push_back("QUANTCLAW_SOCKET=" + opts_.socket_path);
+  if (!opts_.plugin_config.is_null()) {
+    env.push_back("QUANTCLAW_PLUGIN_CONFIG=" + opts_.plugin_config.dump());
+  }
+
+  // Spawn child process
+  std::vector<std::string> args = {opts_.node_binary, opts_.sidecar_script};
+  auto child = platform::spawn_process(args, env);
+  if (child == platform::kInvalidPid) {
+    logger_->error("Failed to spawn sidecar process");
+    server.close();
     return false;
   }
 
-  struct sockaddr_un addr{};
-  addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, opts_.socket_path.c_str(),
-          sizeof(addr.sun_path) - 1);
-
-  unlink(opts_.socket_path.c_str());
-  if (bind(server_fd, reinterpret_cast<struct sockaddr*>(&addr),
-           sizeof(addr)) < 0) {
-    logger_->error("Failed to bind socket {}: {}",
-                   opts_.socket_path, strerror(errno));
-    close(server_fd);
-    return false;
-  }
-
-  // Set socket permissions to 0600
-  chmod(opts_.socket_path.c_str(), 0600);
-
-  if (listen(server_fd, 1) < 0) {
-    logger_->error("Failed to listen on socket: {}", strerror(errno));
-    close(server_fd);
-    return false;
-  }
-
-  pid_t child = fork();
-  if (child < 0) {
-    logger_->error("Fork failed: {}", strerror(errno));
-    close(server_fd);
-    return false;
-  }
-
-  if (child == 0) {
-    // Child process: exec Node.js sidecar
-    close(server_fd);
-
-    // Set environment
-    setenv("QUANTCLAW_SOCKET", opts_.socket_path.c_str(), 1);
-    if (!opts_.plugin_config.is_null()) {
-      setenv("QUANTCLAW_PLUGIN_CONFIG", opts_.plugin_config.dump().c_str(), 1);
-    }
-
-    execlp(opts_.node_binary.c_str(), opts_.node_binary.c_str(),
-           opts_.sidecar_script.c_str(), nullptr);
-
-    // exec failed
-    _exit(127);
-  }
-
-  // Parent: wait for sidecar to connect
   pid_ = child;
   write_pid_file();
   logger_->info("Sidecar started (pid={})", child);
 
   // Accept connection from sidecar with timeout
-  fd_set fds;
-  FD_ZERO(&fds);
-  FD_SET(server_fd, &fds);
-  struct timeval tv;
-  tv.tv_sec = 10;
-  tv.tv_usec = 0;
+  auto connected = server.accept(10000);
+  server.close();
 
-  int ret = select(server_fd + 1, &fds, nullptr, nullptr, &tv);
-  if (ret <= 0) {
+  if (connected == platform::kInvalidIpc) {
     logger_->error("Sidecar did not connect within 10 seconds");
-    kill(child, SIGKILL);
-    waitpid(child, nullptr, 0);
-    pid_ = 0;
-    close(server_fd);
+    platform::kill_process(child);
+    platform::wait_process(child, 5000);
+    pid_ = platform::kInvalidPid;
     return false;
   }
 
   {
-    std::lock_guard<std::mutex> lock(socket_mu_);
-    socket_fd_ = accept(server_fd, nullptr, nullptr);
-  }
-  close(server_fd);
-
-  if (socket_fd_ < 0) {
-    logger_->error("Failed to accept sidecar connection: {}",
-                   strerror(errno));
-    kill(child, SIGKILL);
-    waitpid(child, nullptr, 0);
-    pid_ = 0;
-    return false;
+    std::lock_guard<std::mutex> lock(ipc_mu_);
+    ipc_handle_ = connected;
   }
 
   return true;
 }
 
-void SidecarManager::kill_process(bool force) {
-  pid_t p = pid_.load();
-  if (p <= 0) return;
+void SidecarManager::kill_sidecar(bool force) {
+  auto p = pid_.load();
+  if (p == platform::kInvalidPid) return;
 
   if (force) {
     logger_->info("Force killing sidecar (pid={})", p);
-    kill(p, SIGKILL);
+    platform::kill_process(p);
+    platform::wait_process(p, 5000);
   } else {
     logger_->info("Gracefully stopping sidecar (pid={})", p);
-    kill(p, SIGTERM);
+    platform::terminate_process(p);
 
-    // Wait for graceful shutdown
-    auto deadline = std::chrono::steady_clock::now() +
-                    std::chrono::milliseconds(opts_.graceful_stop_timeout_ms);
-    while (std::chrono::steady_clock::now() < deadline) {
-      int status;
-      pid_t result = waitpid(p, &status, WNOHANG);
-      if (result > 0) {
-        logger_->info("Sidecar exited (status={})", WEXITSTATUS(status));
-        pid_ = 0;
-        return;
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    int exit_code = platform::wait_process(p, opts_.graceful_stop_timeout_ms);
+    if (exit_code >= 0) {
+      logger_->info("Sidecar exited (status={})", exit_code);
+    } else {
+      logger_->warn("Sidecar did not exit within {}ms, force killing",
+                    opts_.graceful_stop_timeout_ms);
+      platform::kill_process(p);
+      platform::wait_process(p, 5000);
     }
-
-    // Graceful timeout expired, force kill
-    logger_->warn("Sidecar did not exit within {}ms, sending SIGKILL",
-                  opts_.graceful_stop_timeout_ms);
-    kill(p, SIGKILL);
-    waitpid(p, nullptr, 0);
   }
-  pid_ = 0;
+  pid_ = platform::kInvalidPid;
 }
 
-bool SidecarManager::connect_socket() {
-  socket_fd_ = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (socket_fd_ < 0) return false;
-
-  struct sockaddr_un addr{};
-  addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, opts_.socket_path.c_str(),
-          sizeof(addr.sun_path) - 1);
-
-  if (connect(socket_fd_, reinterpret_cast<struct sockaddr*>(&addr),
-              sizeof(addr)) < 0) {
-    close(socket_fd_);
-    socket_fd_ = -1;
-    return false;
-  }
+bool SidecarManager::connect_ipc() {
+  platform::IpcClient client(opts_.socket_path);
+  if (!client.connect()) return false;
+  ipc_handle_ = client.handle();
   return true;
 }
 

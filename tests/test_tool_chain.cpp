@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include "quantclaw/tools/tool_chain.hpp"
 #include <spdlog/spdlog.h>
@@ -113,7 +116,7 @@ TEST_F(ToolChainTest, SimpleChainExecution) {
     };
 
     quantclaw::ToolChainExecutor executor(echo_executor(), logger_);
-    auto result = executor.execute(chain);
+    auto result = executor.Execute(chain);
 
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.step_results.size(), 2u);
@@ -132,7 +135,7 @@ TEST_F(ToolChainTest, ChainWithStepIndexReference) {
     };
 
     quantclaw::ToolChainExecutor executor(echo_executor(), logger_);
-    auto result = executor.execute(chain);
+    auto result = executor.Execute(chain);
 
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.final_result, "firstsecond");
@@ -141,7 +144,7 @@ TEST_F(ToolChainTest, ChainWithStepIndexReference) {
 TEST_F(ToolChainTest, ChainStopOnError) {
     quantclaw::ToolChainDef chain;
     chain.name = "stop-chain";
-    chain.error_policy = quantclaw::ChainErrorPolicy::StopOnError;
+    chain.error_policy = quantclaw::ChainErrorPolicy::kStopOnError;
     chain.steps = {
         {"echo", {{"text", "ok"}}},
         {"fail", {}},
@@ -149,7 +152,7 @@ TEST_F(ToolChainTest, ChainStopOnError) {
     };
 
     quantclaw::ToolChainExecutor executor(echo_executor(), logger_);
-    auto result = executor.execute(chain);
+    auto result = executor.Execute(chain);
 
     EXPECT_FALSE(result.success);
     EXPECT_EQ(result.step_results.size(), 2u);  // Stopped after step 1
@@ -160,7 +163,7 @@ TEST_F(ToolChainTest, ChainStopOnError) {
 TEST_F(ToolChainTest, ChainContinueOnError) {
     quantclaw::ToolChainDef chain;
     chain.name = "continue-chain";
-    chain.error_policy = quantclaw::ChainErrorPolicy::ContinueOnError;
+    chain.error_policy = quantclaw::ChainErrorPolicy::kContinueOnError;
     chain.steps = {
         {"echo", {{"text", "first"}}},
         {"fail", {}},
@@ -168,7 +171,7 @@ TEST_F(ToolChainTest, ChainContinueOnError) {
     };
 
     quantclaw::ToolChainExecutor executor(echo_executor(), logger_);
-    auto result = executor.execute(chain);
+    auto result = executor.Execute(chain);
 
     EXPECT_FALSE(result.success);  // Overall failure due to step 1
     EXPECT_EQ(result.step_results.size(), 3u);  // All steps ran
@@ -191,12 +194,12 @@ TEST_F(ToolChainTest, ChainRetryPolicy) {
 
     quantclaw::ToolChainDef chain;
     chain.name = "retry-chain";
-    chain.error_policy = quantclaw::ChainErrorPolicy::Retry;
+    chain.error_policy = quantclaw::ChainErrorPolicy::kRetry;
     chain.max_retries = 3;
     chain.steps = {{"flaky", {}}};
 
     quantclaw::ToolChainExecutor executor(flaky_executor, logger_);
-    auto result = executor.execute(chain);
+    auto result = executor.Execute(chain);
 
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.final_result, "success after retries");
@@ -208,7 +211,7 @@ TEST_F(ToolChainTest, EmptyChain) {
     chain.name = "empty";
 
     quantclaw::ToolChainExecutor executor(echo_executor(), logger_);
-    auto result = executor.execute(chain);
+    auto result = executor.Execute(chain);
 
     EXPECT_TRUE(result.success);
     EXPECT_TRUE(result.step_results.empty());
@@ -229,10 +232,10 @@ TEST_F(ToolChainTest, ParseChainFromJson) {
         }}
     };
 
-    auto chain = quantclaw::ToolChainExecutor::parse_chain(j);
+    auto chain = quantclaw::ToolChainExecutor::ParseChain(j);
     EXPECT_EQ(chain.name, "test-chain");
     EXPECT_EQ(chain.description, "A test chain");
-    EXPECT_EQ(chain.error_policy, quantclaw::ChainErrorPolicy::ContinueOnError);
+    EXPECT_EQ(chain.error_policy, quantclaw::ChainErrorPolicy::kContinueOnError);
     EXPECT_EQ(chain.max_retries, 2);
     EXPECT_EQ(chain.steps.size(), 2u);
     EXPECT_EQ(chain.steps[0].tool_name, "read");
@@ -249,7 +252,7 @@ TEST_F(ToolChainTest, ResultToJson) {
         {1, "upper", "HELLO", "", true}
     };
 
-    auto j = quantclaw::ToolChainExecutor::result_to_json(result);
+    auto j = quantclaw::ToolChainExecutor::ResultToJson(result);
     EXPECT_EQ(j["chain_name"], "test");
     EXPECT_TRUE(j["success"].get<bool>());
     EXPECT_EQ(j["final_result"], "done");
@@ -260,8 +263,8 @@ TEST_F(ToolChainTest, ResultToJson) {
 
 TEST_F(ToolChainTest, ParseDefaultValues) {
     nlohmann::json j = {{"steps", {{{"tool", "read"}}}}};
-    auto chain = quantclaw::ToolChainExecutor::parse_chain(j);
+    auto chain = quantclaw::ToolChainExecutor::ParseChain(j);
     EXPECT_EQ(chain.name, "unnamed-chain");
-    EXPECT_EQ(chain.error_policy, quantclaw::ChainErrorPolicy::StopOnError);
+    EXPECT_EQ(chain.error_policy, quantclaw::ChainErrorPolicy::kStopOnError);
     EXPECT_EQ(chain.max_retries, 1);
 }

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <filesystem>
@@ -23,6 +26,12 @@
 #include <spdlog/sinks/null_sink.h>
 
 // Forward declare register_rpc_handlers
+namespace quantclaw {
+    class ProviderRegistry;
+    class SkillLoader;
+    class CronScheduler;
+    class ExecApprovalManager;
+}
 namespace quantclaw::gateway {
     void register_rpc_handlers(
         GatewayServer& server,
@@ -32,7 +41,11 @@ namespace quantclaw::gateway {
         std::shared_ptr<quantclaw::ToolRegistry> tool_registry,
         const quantclaw::QuantClawConfig& config,
         std::shared_ptr<spdlog::logger> logger,
-        std::function<void()> reload_fn = nullptr);
+        std::function<void()> reload_fn = nullptr,
+        std::shared_ptr<quantclaw::ProviderRegistry> provider_registry = nullptr,
+        std::shared_ptr<quantclaw::SkillLoader> skill_loader = nullptr,
+        std::shared_ptr<quantclaw::CronScheduler> cron_scheduler = nullptr,
+        std::shared_ptr<quantclaw::ExecApprovalManager> exec_approval_mgr = nullptr);
 }
 
 // --- Mock LLM Provider ---
@@ -41,14 +54,14 @@ class E2EMockLLMProvider : public quantclaw::LLMProvider {
 public:
     std::string response_text = "Hello from QuantClaw E2E mock.";
 
-    quantclaw::ChatCompletionResponse chat_completion(const quantclaw::ChatCompletionRequest& /*request*/) override {
+    quantclaw::ChatCompletionResponse ChatCompletion(const quantclaw::ChatCompletionRequest& /*request*/) override {
         quantclaw::ChatCompletionResponse resp;
         resp.content = response_text;
         resp.finish_reason = "stop";
         return resp;
     }
 
-    void chat_completion_stream(const quantclaw::ChatCompletionRequest& /*request*/,
+    void ChatCompletionStream(const quantclaw::ChatCompletionRequest& /*request*/,
                                 std::function<void(const quantclaw::ChatCompletionResponse&)> callback) override {
         // Emit a text delta then stream end
         quantclaw::ChatCompletionResponse delta;
@@ -63,8 +76,8 @@ public:
         callback(end);
     }
 
-    std::string get_provider_name() const override { return "e2e-mock"; }
-    std::vector<std::string> get_supported_models() const override { return {"e2e-mock-model"}; }
+    std::string GetProviderName() const override { return "e2e-mock"; }
+    std::vector<std::string> GetSupportedModels() const override { return {"e2e-mock-model"}; }
 };
 
 // --- Test fixture: full in-process gateway ---
@@ -101,8 +114,8 @@ protected:
         memory_manager_ = std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
         skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
         tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
-        tool_registry_->register_builtin_tools();
-        tool_registry_->register_chain_tool();
+        tool_registry_->RegisterBuiltinTools();
+        tool_registry_->RegisterChainTool();
 
         mock_llm_ = std::make_shared<E2EMockLLMProvider>();
 
@@ -116,20 +129,20 @@ protected:
 
         // Create server
         server_ = std::make_unique<quantclaw::gateway::GatewayServer>(port_, logger_);
-        server_->set_auth(config_.gateway.auth.mode, config_.gateway.auth.token);
+        server_->SetAuth(config_.gateway.auth.mode, config_.gateway.auth.token);
 
         // Register RPC handlers
         quantclaw::gateway::register_rpc_handlers(
             *server_, session_manager_, agent_loop_, prompt_builder_, tool_registry_, config_, logger_);
 
         // Start server
-        server_->start();
+        server_->Start();
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 
     void TearDown() override {
         if (server_) {
-            server_->stop();
+            server_->Stop();
             server_.reset();
         }
         if (std::filesystem::exists(test_dir_)) {
@@ -171,69 +184,69 @@ protected:
 
 TEST_F(E2ETest, E2E_HealthRpc) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
-    auto result = client->call("gateway.health");
+    auto result = client->Call("gateway.health");
     EXPECT_EQ(result["status"], "ok");
     EXPECT_TRUE(result.contains("version"));
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 TEST_F(E2ETest, E2E_StatusRpc) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
-    auto result = client->call("gateway.status");
+    auto result = client->Call("gateway.status");
     EXPECT_TRUE(result["running"].get<bool>());
     EXPECT_TRUE(result.contains("connections"));
     EXPECT_TRUE(result.contains("sessions"));
     EXPECT_TRUE(result.contains("uptime"));
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 TEST_F(E2ETest, E2E_ConfigGet) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
-    auto result = client->call("config.get", nlohmann::json::object());
+    auto result = client->Call("config.get", nlohmann::json::object());
     // Full config: should have agent and gateway sections
     EXPECT_TRUE(result.contains("agent"));
     EXPECT_TRUE(result.contains("gateway"));
     EXPECT_TRUE(result["agent"].contains("model"));
     EXPECT_TRUE(result["gateway"].contains("port"));
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 TEST_F(E2ETest, E2E_ConfigGetPath) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
-    auto result = client->call("config.get", {{"path", "agent.model"}});
+    auto result = client->Call("config.get", {{"path", "agent.model"}});
     // Dot-path should return the model string directly
     EXPECT_EQ(result.get<std::string>(), "e2e-mock-model");
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 TEST_F(E2ETest, E2E_AgentRequest) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
     // Subscribe to streaming events
     std::atomic<bool> got_text_delta{false};
     std::atomic<bool> got_message_end{false};
 
-    client->subscribe("agent.text_delta", [&](const std::string&, const nlohmann::json&) {
+    client->Subscribe("agent.text_delta", [&](const std::string&, const nlohmann::json&) {
         got_text_delta = true;
     });
-    client->subscribe("agent.message_end", [&](const std::string&, const nlohmann::json&) {
+    client->Subscribe("agent.message_end", [&](const std::string&, const nlohmann::json&) {
         got_message_end = true;
     });
 
-    auto result = client->call("agent.request", {{"message", "Hello"}}, 10000);
+    auto result = client->Call("agent.request", {{"message", "Hello"}}, 10000);
     EXPECT_TRUE(result.contains("sessionKey"));
     EXPECT_TRUE(result.contains("response"));
     EXPECT_FALSE(result["response"].get<std::string>().empty());
@@ -242,28 +255,28 @@ TEST_F(E2ETest, E2E_AgentRequest) {
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     EXPECT_TRUE(got_message_end);
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 TEST_F(E2ETest, E2E_AgentStop) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
-    auto result = client->call("agent.stop");
+    auto result = client->Call("agent.stop");
     EXPECT_TRUE(result.contains("ok"));
     EXPECT_TRUE(result["ok"].get<bool>());
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 TEST_F(E2ETest, E2E_SessionsAfterRequest) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
     // Send a request to create a session
-    client->call("agent.request", {{"message", "Hi"}}, 10000);
+    client->Call("agent.request", {{"message", "Hi"}}, 10000);
 
-    auto sessions = client->call("sessions.list", nlohmann::json::object());
+    auto sessions = client->Call("sessions.list", nlohmann::json::object());
     ASSERT_TRUE(sessions.is_array());
     EXPECT_GE(sessions.size(), 1u);
 
@@ -272,20 +285,20 @@ TEST_F(E2ETest, E2E_SessionsAfterRequest) {
     EXPECT_TRUE(s.contains("key"));
     EXPECT_TRUE(s.contains("id"));
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 TEST_F(E2ETest, E2E_SessionHistory) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
     std::string session_key = "agent:default:main";
-    client->call("agent.request", {
+    client->Call("agent.request", {
         {"message", "Tell me something"},
         {"sessionKey", session_key}
     }, 10000);
 
-    auto history = client->call("sessions.history", {{"sessionKey", session_key}});
+    auto history = client->Call("sessions.history", {{"sessionKey", session_key}});
     ASSERT_TRUE(history.is_array());
 
     // Should have at least user + assistant messages
@@ -302,37 +315,38 @@ TEST_F(E2ETest, E2E_SessionHistory) {
     EXPECT_TRUE(found_user);
     EXPECT_TRUE(found_assistant);
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 TEST_F(E2ETest, E2E_ChannelsList) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
-    auto result = client->call("channels.list");
+    auto result = client->Call("channels.list");
     ASSERT_TRUE(result.is_array());
     EXPECT_GE(result.size(), 1u);
 
-    // Should include CLI channel
+    // Should include CLI channel (field may be "name" or "id")
     bool has_cli = false;
     for (const auto& ch : result) {
-        if (ch.value("name", "") == "cli") {
+        std::string id = ch.value("id", ch.value("name", ""));
+        if (id == "cli") {
             has_cli = true;
             break;
         }
     }
     EXPECT_TRUE(has_cli);
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 TEST_F(E2ETest, E2E_ChainExecute) {
     auto client = make_client();
-    ASSERT_TRUE(client->connect(5000));
+    ASSERT_TRUE(client->Connect(5000));
 
     std::string test_file = (workspace_dir_ / "hello.txt").string();
 
-    auto result = client->call("chain.execute", {
+    auto result = client->Call("chain.execute", {
         {"name", "test-chain"},
         {"steps", {{
             {"tool", "read"},
@@ -347,7 +361,7 @@ TEST_F(E2ETest, E2E_ChainExecute) {
     std::string final_result = result.value("final_result", "");
     EXPECT_NE(final_result.find("hello world"), std::string::npos);
 
-    client->disconnect();
+    client->Disconnect();
 }
 
 // --- Auth tests: use a separate fixture with token auth ---
@@ -372,7 +386,7 @@ protected:
         memory_manager_ = std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
         skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
         tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
-        tool_registry_->register_builtin_tools();
+        tool_registry_->RegisterBuiltinTools();
 
         mock_llm_ = std::make_shared<E2EMockLLMProvider>();
         agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
@@ -382,18 +396,18 @@ protected:
             memory_manager_, skill_loader_, tool_registry_);
 
         server_ = std::make_unique<quantclaw::gateway::GatewayServer>(port_, logger_);
-        server_->set_auth("token", "e2e-secret-token");
+        server_->SetAuth("token", "e2e-secret-token");
 
         quantclaw::gateway::register_rpc_handlers(
             *server_, session_manager_, agent_loop_, prompt_builder_, tool_registry_, config_, logger_);
 
-        server_->start();
+        server_->Start();
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 
     void TearDown() override {
         if (server_) {
-            server_->stop();
+            server_->Stop();
             server_.reset();
         }
         if (std::filesystem::exists(test_dir_)) {
@@ -428,36 +442,36 @@ TEST_F(E2EAuthTest, E2E_AuthRejectNoHello) {
     std::string url = "ws://127.0.0.1:" + std::to_string(port_);
     quantclaw::gateway::GatewayClient client(url, "", logger_);
 
-    bool connected = client.connect(3000);
+    bool connected = client.Connect(3000);
     if (connected) {
         // Connection may succeed at WebSocket level, but RPC should fail
-        EXPECT_THROW(client.call("gateway.health", {}, 3000), std::runtime_error);
+        EXPECT_THROW(client.Call("gateway.health", {}, 3000), std::runtime_error);
     }
     // If connect() returned false, that's also acceptable (hello was rejected)
 
-    client.disconnect();
+    client.Disconnect();
 }
 
 TEST_F(E2EAuthTest, E2E_AuthRejectBadToken) {
     std::string url = "ws://127.0.0.1:" + std::to_string(port_);
     quantclaw::gateway::GatewayClient client(url, "wrong-token", logger_);
 
-    bool connected = client.connect(3000);
+    bool connected = client.Connect(3000);
     if (connected) {
-        EXPECT_THROW(client.call("gateway.health", {}, 3000), std::runtime_error);
+        EXPECT_THROW(client.Call("gateway.health", {}, 3000), std::runtime_error);
     }
 
-    client.disconnect();
+    client.Disconnect();
 }
 
 TEST_F(E2EAuthTest, E2E_AuthSuccessCorrectToken) {
     std::string url = "ws://127.0.0.1:" + std::to_string(port_);
     quantclaw::gateway::GatewayClient client(url, "e2e-secret-token", logger_);
 
-    ASSERT_TRUE(client.connect(5000));
+    ASSERT_TRUE(client.Connect(5000));
 
-    auto result = client.call("gateway.health");
+    auto result = client.Call("gateway.health");
     EXPECT_EQ(result["status"], "ok");
 
-    client.disconnect();
+    client.Disconnect();
 }

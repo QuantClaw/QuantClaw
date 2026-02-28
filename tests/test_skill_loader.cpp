@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>
@@ -49,7 +52,7 @@ description: A simple test skill
 This is a test skill for QuantClaw.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
 
     ASSERT_EQ(skills.size(), 1u);
     EXPECT_EQ(skills[0].name, "test-skill");
@@ -66,7 +69,7 @@ description: No requirements
 Content here.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
 
     ASSERT_EQ(skills.size(), 1u);
     EXPECT_EQ(skills[0].required_bins.size(), 0u);
@@ -89,7 +92,7 @@ requires:
 Weather content.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
     EXPECT_EQ(skills.size(), 0u);
 }
 
@@ -106,7 +109,7 @@ requires:
 Always content.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
     ASSERT_EQ(skills.size(), 1u);
     EXPECT_EQ(skills[0].name, "always-on");
     EXPECT_TRUE(skills[0].always);
@@ -122,7 +125,7 @@ emoji: rocket
 Content.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
     ASSERT_EQ(skills.size(), 1u);
     EXPECT_EQ(skills[0].emoji, "rocket");
 }
@@ -137,7 +140,7 @@ primaryEnv: MY_KEY
 Content.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
     ASSERT_EQ(skills.size(), 1u);
     EXPECT_EQ(skills[0].primary_env, "MY_KEY");
 }
@@ -152,7 +155,7 @@ os: ["linux"]
 Content.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
 #ifdef __linux__
     EXPECT_EQ(skills.size(), 1u);
 #elif defined(__APPLE__)
@@ -170,8 +173,8 @@ emoji: star
 Skill body text.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
-    auto context = skill_loader_->get_skill_context(skills);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    auto context = skill_loader_->GetSkillContext(skills);
 
     EXPECT_TRUE(context.find("ctx-skill") != std::string::npos);
     EXPECT_TRUE(context.find("Context test") != std::string::npos);
@@ -180,7 +183,7 @@ Skill body text.
 }
 
 TEST_F(SkillLoaderTest, NonExistentDirectory) {
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_ / "nonexistent");
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_ / "nonexistent");
     EXPECT_EQ(skills.size(), 0u);
 }
 
@@ -188,7 +191,7 @@ TEST_F(SkillLoaderTest, MultipleSkills) {
     write_skill("skill-a", "---\nname: skill-a\ndescription: A\n---\nA content.");
     write_skill("skill-b", "---\nname: skill-b\ndescription: B\n---\nB content.");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
     EXPECT_EQ(skills.size(), 2u);
 }
 
@@ -200,7 +203,7 @@ description: No name field
 Content.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
     ASSERT_EQ(skills.size(), 1u);
     EXPECT_EQ(skills[0].name, "dir-name");
 }
@@ -221,7 +224,7 @@ metadata:
 Nested content.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
     // Should be gated out because NONEXISTENT_OPENCLAW_KEY_XYZ doesn't exist
     EXPECT_EQ(skills.size(), 0u);
 }
@@ -241,7 +244,7 @@ metadata:
 Always loaded nested content.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
     ASSERT_EQ(skills.size(), 1u);
     EXPECT_EQ(skills[0].name, "nested-always");
     EXPECT_TRUE(skills[0].always);
@@ -257,7 +260,7 @@ os: ["macos"]
 macOS content.
 )");
 
-    auto skills = skill_loader_->load_skills_from_directory(test_dir_);
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
 #ifdef __linux__
     // "macos" normalizes to "darwin", which != "linux"
     EXPECT_EQ(skills.size(), 0u);
@@ -299,7 +302,7 @@ TEST_F(SkillLoaderTest, LoadSkillsMultiDir) {
     quantclaw::SkillsConfig config;
     config.load.extra_dirs.push_back(dir_b.string());
 
-    auto skills = skill_loader_->load_skills(config, workspace);
+    auto skills = skill_loader_->LoadSkills(config, workspace);
 
     // Should find skill-a from workspace/skills and skill-b from extra dir
     EXPECT_GE(skills.size(), 2u);
@@ -336,7 +339,7 @@ TEST_F(SkillLoaderTest, DeduplicationWorkspaceWins) {
     quantclaw::SkillsConfig config;
     config.load.extra_dirs.push_back(extra_dir.string());
 
-    auto skills = skill_loader_->load_skills(config, workspace);
+    auto skills = skill_loader_->LoadSkills(config, workspace);
 
     // Should only have one instance, from workspace (first wins)
     int count = 0;
@@ -374,7 +377,7 @@ TEST_F(SkillLoaderTest, PerSkillDisableViaConfig) {
     quantclaw::SkillsConfig config;
     config.entries["disabled-skill"] = quantclaw::SkillEntryConfig{false};
 
-    auto skills = skill_loader_->load_skills(config, workspace);
+    auto skills = skill_loader_->LoadSkills(config, workspace);
 
     bool found_enabled = false, found_disabled = false;
     for (const auto& s : skills) {

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/mcp/mcp_client.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -17,7 +20,7 @@ MCPClient::MCPClient(const std::string& server_url, std::shared_ptr<spdlog::logg
     logger_->info("MCPClient initialized with server: {}", server_url_);
 }
 
-std::vector<Tool> MCPClient::list_tools() {
+std::vector<Tool> MCPClient::ListTools() {
     nlohmann::json request;
     request["jsonrpc"] = "2.0";
     request["method"] = "list_tools";
@@ -39,7 +42,7 @@ std::vector<Tool> MCPClient::list_tools() {
     return tools;
 }
 
-MCPResponse MCPClient::call_tool(const std::string& tool_name, const nlohmann::json& arguments) {
+MCPResponse MCPClient::CallTool(const std::string& tool_name, const nlohmann::json& arguments) {
     nlohmann::json request;
     request["jsonrpc"] = "2.0";
     request["method"] = "call_tool";

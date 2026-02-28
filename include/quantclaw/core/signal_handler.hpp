@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <functional>
@@ -10,9 +13,9 @@ public:
     using ShutdownCallback = std::function<void()>;
     using ReloadCallback = std::function<void()>;
 
-    static void install(ShutdownCallback on_shutdown, ReloadCallback on_reload = nullptr);
-    static void wait_for_shutdown();
-    static bool should_shutdown();
+    static void Install(ShutdownCallback on_shutdown, ReloadCallback on_reload = nullptr);
+    static void WaitForShutdown();
+    static bool ShouldShutdown();
 
 private:
     static std::atomic<bool> shutdown_requested_;

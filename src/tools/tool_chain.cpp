@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/tools/tool_chain.hpp"
 #include <regex>
 #include <sstream>
@@ -76,7 +79,7 @@ ToolChainExecutor::ToolChainExecutor(ToolExecutorFn executor,
 {
 }
 
-ChainResult ToolChainExecutor::execute(const ToolChainDef& chain) {
+ChainResult ToolChainExecutor::Execute(const ToolChainDef& chain) {
     ChainResult result;
     result.chain_name = chain.name;
     result.success = true;
@@ -96,7 +99,7 @@ ChainResult ToolChainExecutor::execute(const ToolChainDef& chain) {
                        chain.name, i, step.tool_name, resolved_args.dump());
 
         int attempts = 0;
-        int max_attempts = (chain.error_policy == ChainErrorPolicy::Retry)
+        int max_attempts = (chain.error_policy == ChainErrorPolicy::kRetry)
                              ? chain.max_retries : 1;
 
         while (attempts < max_attempts) {
@@ -116,8 +119,8 @@ ChainResult ToolChainExecutor::execute(const ToolChainDef& chain) {
         result.step_results.push_back(step_result);
 
         if (!step_result.success) {
-            if (chain.error_policy == ChainErrorPolicy::StopOnError ||
-                chain.error_policy == ChainErrorPolicy::Retry) {
+            if (chain.error_policy == ChainErrorPolicy::kStopOnError ||
+                chain.error_policy == ChainErrorPolicy::kRetry) {
                 result.success = false;
                 result.final_result = "Chain stopped at step " + std::to_string(i) +
                                       ": " + step_result.error;
@@ -141,7 +144,7 @@ ChainResult ToolChainExecutor::execute(const ToolChainDef& chain) {
     return result;
 }
 
-ToolChainDef ToolChainExecutor::parse_chain(const nlohmann::json& j) {
+ToolChainDef ToolChainExecutor::ParseChain(const nlohmann::json& j) {
     ToolChainDef chain;
     chain.name = j.value("name", "unnamed-chain");
     chain.description = j.value("description", "");
@@ -149,11 +152,11 @@ ToolChainDef ToolChainExecutor::parse_chain(const nlohmann::json& j) {
     // Parse error policy
     std::string policy_str = j.value("error_policy", "stop_on_error");
     if (policy_str == "continue_on_error") {
-        chain.error_policy = ChainErrorPolicy::ContinueOnError;
+        chain.error_policy = ChainErrorPolicy::kContinueOnError;
     } else if (policy_str == "retry") {
-        chain.error_policy = ChainErrorPolicy::Retry;
+        chain.error_policy = ChainErrorPolicy::kRetry;
     } else {
-        chain.error_policy = ChainErrorPolicy::StopOnError;
+        chain.error_policy = ChainErrorPolicy::kStopOnError;
     }
 
     chain.max_retries = j.value("max_retries", 1);
@@ -171,7 +174,7 @@ ToolChainDef ToolChainExecutor::parse_chain(const nlohmann::json& j) {
     return chain;
 }
 
-nlohmann::json ToolChainExecutor::result_to_json(const ChainResult& result) {
+nlohmann::json ToolChainExecutor::ResultToJson(const ChainResult& result) {
     nlohmann::json j;
     j["chain_name"] = result.chain_name;
     j["success"] = result.success;

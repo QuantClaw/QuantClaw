@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -12,18 +15,18 @@ public:
     GatewayCommands(std::shared_ptr<spdlog::logger> logger);
 
     // Run gateway in foreground
-    int foreground_command(const std::vector<std::string>& args);
+    int ForegroundCommand(const std::vector<std::string>& args);
 
     // Daemon management
-    int install_command(const std::vector<std::string>& args);
-    int uninstall_command(const std::vector<std::string>& args);
-    int start_command(const std::vector<std::string>& args);
-    int stop_command(const std::vector<std::string>& args);
-    int restart_command(const std::vector<std::string>& args);
-    int status_command(const std::vector<std::string>& args);
+    int InstallCommand(const std::vector<std::string>& args);
+    int UninstallCommand(const std::vector<std::string>& args);
+    int StartCommand(const std::vector<std::string>& args);
+    int StopCommand(const std::vector<std::string>& args);
+    int RestartCommand(const std::vector<std::string>& args);
+    int StatusCommand(const std::vector<std::string>& args);
 
     // RPC utility
-    int call_command(const std::vector<std::string>& args);
+    int CallCommand(const std::vector<std::string>& args);
 
 private:
     std::shared_ptr<spdlog::logger> logger_;

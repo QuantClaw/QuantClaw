@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "quantclaw/security/exec_approval.hpp"
 
 #include <algorithm>
@@ -8,13 +11,13 @@ namespace quantclaw {
 
 // --- AskMode ---
 
-AskMode ask_mode_from_string(const std::string& s) {
+AskMode AskModeFromString(const std::string& s) {
   if (s == "off") return AskMode::kOff;
   if (s == "always") return AskMode::kAlways;
   return AskMode::kOnMiss;  // default
 }
 
-std::string ask_mode_to_string(AskMode m) {
+std::string AskModeToString(AskMode m) {
   switch (m) {
     case AskMode::kOff: return "off";
     case AskMode::kAlways: return "always";
@@ -25,7 +28,7 @@ std::string ask_mode_to_string(AskMode m) {
 
 // --- ApprovalDecision ---
 
-std::string approval_decision_to_string(ApprovalDecision d) {
+std::string ApprovalDecisionToString(ApprovalDecision d) {
   switch (d) {
     case ApprovalDecision::kApproved: return "approved";
     case ApprovalDecision::kDenied: return "denied";
@@ -37,18 +40,18 @@ std::string approval_decision_to_string(ApprovalDecision d) {
 
 // --- ExecAllowlist ---
 
-void ExecAllowlist::add_pattern(const std::string& pattern) {
+void ExecAllowlist::AddPattern(const std::string& pattern) {
   patterns_.push_back(pattern);
 }
 
-bool ExecAllowlist::matches(const std::string& command) const {
+bool ExecAllowlist::Matches(const std::string& command) const {
   for (const auto& pattern : patterns_) {
     if (glob_match(pattern, command)) return true;
   }
   return false;
 }
 
-void ExecAllowlist::load_from_json(const nlohmann::json& j) {
+void ExecAllowlist::LoadFromJson(const nlohmann::json& j) {
   patterns_.clear();
   if (j.is_array()) {
     for (const auto& item : j) {
@@ -88,10 +91,10 @@ bool ExecAllowlist::glob_match(const std::string& pattern,
 
 // --- ExecApprovalConfig ---
 
-ExecApprovalConfig ExecApprovalConfig::from_json(const nlohmann::json& j) {
+ExecApprovalConfig ExecApprovalConfig::FromJson(const nlohmann::json& j) {
   ExecApprovalConfig c;
   if (j.contains("ask") && j["ask"].is_string()) {
-    c.ask = ask_mode_from_string(j["ask"].get<std::string>());
+    c.ask = AskModeFromString(j["ask"].get<std::string>());
   }
   c.timeout_seconds = j.value("approvalTimeout", 120);
   if (j.contains("askFallback") && j["askFallback"].is_string()) {
@@ -116,21 +119,21 @@ ExecApprovalConfig ExecApprovalConfig::from_json(const nlohmann::json& j) {
 ExecApprovalManager::ExecApprovalManager(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
-void ExecApprovalManager::configure(const ExecApprovalConfig& config) {
+void ExecApprovalManager::Configure(const ExecApprovalConfig& config) {
   std::lock_guard<std::mutex> lock(mu_);
   config_ = config;
   allowlist_ = ExecAllowlist{};
   for (const auto& p : config_.allowlist) {
-    allowlist_.add_pattern(p);
+    allowlist_.AddPattern(p);
   }
 }
 
-void ExecApprovalManager::set_approval_handler(ApprovalCallback handler) {
+void ExecApprovalManager::SetApprovalHandler(ApprovalCallback handler) {
   std::lock_guard<std::mutex> lock(mu_);
   approval_handler_ = std::move(handler);
 }
 
-ApprovalDecision ExecApprovalManager::request_approval(
+ApprovalDecision ExecApprovalManager::RequestApproval(
     const std::string& command,
     const std::string& cwd,
     const std::string& agent_id,
@@ -141,7 +144,7 @@ ApprovalDecision ExecApprovalManager::request_approval(
   }
 
   // Check allowlist for on-miss mode
-  if (config_.ask == AskMode::kOnMiss && allowlist_.matches(command)) {
+  if (config_.ask == AskMode::kOnMiss && allowlist_.Matches(command)) {
     logger_->debug("Command '{}' matches allowlist, auto-approved", command);
     return ApprovalDecision::kApproved;
   }
@@ -177,15 +180,15 @@ ApprovalDecision ExecApprovalManager::request_approval(
   if (decision == ApprovalDecision::kPending) {
     decision = config_.timeout_fallback;
     logger_->info("No approval handler or pending, falling back to: {}",
-                  approval_decision_to_string(decision));
+                  ApprovalDecisionToString(decision));
   }
 
   // Resolve
-  resolve(req.id, decision, "auto");
+  Resolve(req.id, decision, "auto");
   return decision;
 }
 
-bool ExecApprovalManager::resolve(const std::string& request_id,
+bool ExecApprovalManager::Resolve(const std::string& request_id,
                                    ApprovalDecision decision,
                                    const std::string& resolved_by) {
   std::lock_guard<std::mutex> lock(mu_);
@@ -202,12 +205,12 @@ bool ExecApprovalManager::resolve(const std::string& request_id,
 
   logger_->info("Approval {} resolved: {} by {}",
                 request_id,
-                approval_decision_to_string(decision),
+                ApprovalDecisionToString(decision),
                 resolved_by);
   return true;
 }
 
-std::vector<ApprovalRequest> ExecApprovalManager::pending_requests() const {
+std::vector<ApprovalRequest> ExecApprovalManager::PendingRequests() const {
   std::lock_guard<std::mutex> lock(mu_);
   std::vector<ApprovalRequest> result;
   for (const auto& [id, req] : pending_) {
@@ -216,12 +219,12 @@ std::vector<ApprovalRequest> ExecApprovalManager::pending_requests() const {
   return result;
 }
 
-std::vector<ApprovalResolved> ExecApprovalManager::resolved_history() const {
+std::vector<ApprovalResolved> ExecApprovalManager::ResolvedHistory() const {
   std::lock_guard<std::mutex> lock(mu_);
   return resolved_;
 }
 
-void ExecApprovalManager::prune_expired() {
+void ExecApprovalManager::PruneExpired() {
   std::lock_guard<std::mutex> lock(mu_);
   auto now = std::chrono::steady_clock::now();
   std::vector<std::string> expired;

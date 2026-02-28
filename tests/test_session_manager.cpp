@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>
@@ -33,7 +36,7 @@ protected:
 // --- get_or_create ---
 
 TEST_F(SessionManagerTest, CreateNewSession) {
-    auto handle = session_mgr_->get_or_create("agent:default:main", "Main", "cli");
+    auto handle = session_mgr_->GetOrCreate("agent:default:main", "Main", "cli");
 
     EXPECT_EQ(handle.session_key, "agent:default:main");
     EXPECT_FALSE(handle.session_id.empty());
@@ -41,15 +44,15 @@ TEST_F(SessionManagerTest, CreateNewSession) {
 }
 
 TEST_F(SessionManagerTest, GetExistingSession) {
-    auto h1 = session_mgr_->get_or_create("agent:default:main");
-    auto h2 = session_mgr_->get_or_create("agent:default:main");
+    auto h1 = session_mgr_->GetOrCreate("agent:default:main");
+    auto h2 = session_mgr_->GetOrCreate("agent:default:main");
 
     EXPECT_EQ(h1.session_id, h2.session_id);
 }
 
 TEST_F(SessionManagerTest, DifferentKeysCreateDifferentSessions) {
-    auto h1 = session_mgr_->get_or_create("agent:default:main");
-    auto h2 = session_mgr_->get_or_create("agent:default:dm:user1");
+    auto h1 = session_mgr_->GetOrCreate("agent:default:main");
+    auto h2 = session_mgr_->GetOrCreate("agent:default:dm:user1");
 
     EXPECT_NE(h1.session_id, h2.session_id);
 }
@@ -57,12 +60,12 @@ TEST_F(SessionManagerTest, DifferentKeysCreateDifferentSessions) {
 // --- append_message / get_history ---
 
 TEST_F(SessionManagerTest, AppendAndRetrieveMessages) {
-    session_mgr_->get_or_create("test:session");
+    session_mgr_->GetOrCreate("test:session");
 
-    session_mgr_->append_message("test:session", "user", "Hello");
-    session_mgr_->append_message("test:session", "assistant", "Hi there!");
+    session_mgr_->AppendMessage("test:session", "user", "Hello");
+    session_mgr_->AppendMessage("test:session", "assistant", "Hi there!");
 
-    auto history = session_mgr_->get_history("test:session");
+    auto history = session_mgr_->GetHistory("test:session");
 
     ASSERT_EQ(history.size(), 2u);
     EXPECT_EQ(history[0].role, "user");
@@ -72,10 +75,10 @@ TEST_F(SessionManagerTest, AppendAndRetrieveMessages) {
 }
 
 TEST_F(SessionManagerTest, MessageTimestampsAreSet) {
-    session_mgr_->get_or_create("test:ts");
-    session_mgr_->append_message("test:ts", "user", "test");
+    session_mgr_->GetOrCreate("test:ts");
+    session_mgr_->AppendMessage("test:ts", "user", "test");
 
-    auto history = session_mgr_->get_history("test:ts");
+    auto history = session_mgr_->GetHistory("test:ts");
     ASSERT_EQ(history.size(), 1u);
     EXPECT_FALSE(history[0].timestamp.empty());
     // ISO 8601 format check
@@ -83,37 +86,37 @@ TEST_F(SessionManagerTest, MessageTimestampsAreSet) {
 }
 
 TEST_F(SessionManagerTest, HistoryWithLimit) {
-    session_mgr_->get_or_create("test:limit");
+    session_mgr_->GetOrCreate("test:limit");
 
     for (int i = 0; i < 10; ++i) {
-        session_mgr_->append_message("test:limit", "user", "msg " + std::to_string(i));
+        session_mgr_->AppendMessage("test:limit", "user", "msg " + std::to_string(i));
     }
 
-    auto all = session_mgr_->get_history("test:limit");
+    auto all = session_mgr_->GetHistory("test:limit");
     EXPECT_EQ(all.size(), 10u);
 
-    auto last3 = session_mgr_->get_history("test:limit", 3);
+    auto last3 = session_mgr_->GetHistory("test:limit", 3);
     ASSERT_EQ(last3.size(), 3u);
     EXPECT_EQ(last3[0].content[0].text, "msg 7");
     EXPECT_EQ(last3[2].content[0].text, "msg 9");
 }
 
 TEST_F(SessionManagerTest, HistoryOfNonexistentSession) {
-    auto history = session_mgr_->get_history("nonexistent");
+    auto history = session_mgr_->GetHistory("nonexistent");
     EXPECT_TRUE(history.empty());
 }
 
 // --- Usage info ---
 
 TEST_F(SessionManagerTest, AppendMessageWithUsage) {
-    session_mgr_->get_or_create("test:usage");
+    session_mgr_->GetOrCreate("test:usage");
 
     quantclaw::UsageInfo usage;
     usage.input_tokens = 100;
     usage.output_tokens = 50;
-    session_mgr_->append_message("test:usage", "assistant", "Response", usage);
+    session_mgr_->AppendMessage("test:usage", "assistant", "Response", usage);
 
-    auto history = session_mgr_->get_history("test:usage");
+    auto history = session_mgr_->GetHistory("test:usage");
     ASSERT_EQ(history.size(), 1u);
     ASSERT_TRUE(history[0].usage.has_value());
     EXPECT_EQ(history[0].usage->input_tokens, 100);
@@ -123,8 +126,8 @@ TEST_F(SessionManagerTest, AppendMessageWithUsage) {
 // --- JSONL format verification ---
 
 TEST_F(SessionManagerTest, JsonlFormatIsCorrect) {
-    auto handle = session_mgr_->get_or_create("test:jsonl");
-    session_mgr_->append_message("test:jsonl", "user", "hello world");
+    auto handle = session_mgr_->GetOrCreate("test:jsonl");
+    session_mgr_->AppendMessage("test:jsonl", "user", "hello world");
 
     // Read raw JSONL file
     std::ifstream f(handle.transcript_path);
@@ -144,49 +147,49 @@ TEST_F(SessionManagerTest, JsonlFormatIsCorrect) {
 // --- list_sessions ---
 
 TEST_F(SessionManagerTest, ListSessions) {
-    session_mgr_->get_or_create("agent:a:main", "Session A");
-    session_mgr_->get_or_create("agent:b:main", "Session B");
+    session_mgr_->GetOrCreate("agent:a:main", "Session A");
+    session_mgr_->GetOrCreate("agent:b:main", "Session B");
 
-    auto sessions = session_mgr_->list_sessions();
+    auto sessions = session_mgr_->ListSessions();
     EXPECT_EQ(sessions.size(), 2u);
 }
 
 TEST_F(SessionManagerTest, ListSessionsEmpty) {
-    auto sessions = session_mgr_->list_sessions();
+    auto sessions = session_mgr_->ListSessions();
     EXPECT_TRUE(sessions.empty());
 }
 
 // --- reset_session ---
 
 TEST_F(SessionManagerTest, ResetSession) {
-    session_mgr_->get_or_create("test:reset");
-    session_mgr_->append_message("test:reset", "user", "old message");
+    session_mgr_->GetOrCreate("test:reset");
+    session_mgr_->AppendMessage("test:reset", "user", "old message");
 
-    auto before = session_mgr_->get_history("test:reset");
+    auto before = session_mgr_->GetHistory("test:reset");
     EXPECT_EQ(before.size(), 1u);
 
-    session_mgr_->reset_session("test:reset");
+    session_mgr_->ResetSession("test:reset");
 
-    auto after = session_mgr_->get_history("test:reset");
+    auto after = session_mgr_->GetHistory("test:reset");
     EXPECT_TRUE(after.empty());
 }
 
 // --- sessions.json persistence ---
 
 TEST_F(SessionManagerTest, PersistenceAcrossReloads) {
-    session_mgr_->get_or_create("test:persist", "Persistent");
-    session_mgr_->append_message("test:persist", "user", "saved");
+    session_mgr_->GetOrCreate("test:persist", "Persistent");
+    session_mgr_->AppendMessage("test:persist", "user", "saved");
 
     // Destroy and recreate
     session_mgr_.reset();
     session_mgr_ = std::make_unique<quantclaw::SessionManager>(test_dir_, logger_);
 
-    auto sessions = session_mgr_->list_sessions();
+    auto sessions = session_mgr_->ListSessions();
     ASSERT_EQ(sessions.size(), 1u);
     EXPECT_EQ(sessions[0].session_key, "test:persist");
     EXPECT_EQ(sessions[0].display_name, "Persistent");
 
-    auto history = session_mgr_->get_history("test:persist");
+    auto history = session_mgr_->GetHistory("test:persist");
     ASSERT_EQ(history.size(), 1u);
     EXPECT_EQ(history[0].content[0].text, "saved");
 }
@@ -194,40 +197,40 @@ TEST_F(SessionManagerTest, PersistenceAcrossReloads) {
 // --- ContentBlock ---
 
 TEST(ContentBlockTest, MakeText) {
-    auto block = quantclaw::ContentBlock::make_text("hello");
+    auto block = quantclaw::ContentBlock::MakeText("hello");
     EXPECT_EQ(block.type, "text");
     EXPECT_EQ(block.text, "hello");
 
-    auto j = block.to_json();
+    auto j = block.ToJson();
     EXPECT_EQ(j["type"], "text");
     EXPECT_EQ(j["text"], "hello");
 }
 
 TEST(ContentBlockTest, MakeToolUse) {
-    auto block = quantclaw::ContentBlock::make_tool_use("t1", "read", {{"path", "/tmp"}});
+    auto block = quantclaw::ContentBlock::MakeToolUse("t1", "read", {{"path", "/tmp"}});
     EXPECT_EQ(block.type, "tool_use");
     EXPECT_EQ(block.id, "t1");
     EXPECT_EQ(block.name, "read");
 
-    auto j = block.to_json();
+    auto j = block.ToJson();
     EXPECT_EQ(j["name"], "read");
     EXPECT_EQ(j["input"]["path"], "/tmp");
 }
 
 TEST(ContentBlockTest, MakeToolResult) {
-    auto block = quantclaw::ContentBlock::make_tool_result("t1", "file contents");
+    auto block = quantclaw::ContentBlock::MakeToolResult("t1", "file contents");
     EXPECT_EQ(block.type, "tool_result");
     EXPECT_EQ(block.tool_use_id, "t1");
 
-    auto j = block.to_json();
+    auto j = block.ToJson();
     EXPECT_EQ(j["tool_use_id"], "t1");
     EXPECT_EQ(j["content"], "file contents");
 }
 
 TEST(ContentBlockTest, Roundtrip) {
-    auto original = quantclaw::ContentBlock::make_text("roundtrip test");
-    auto j = original.to_json();
-    auto parsed = quantclaw::ContentBlock::from_json(j);
+    auto original = quantclaw::ContentBlock::MakeText("roundtrip test");
+    auto j = original.ToJson();
+    auto parsed = quantclaw::ContentBlock::FromJson(j);
 
     EXPECT_EQ(parsed.type, original.type);
     EXPECT_EQ(parsed.text, original.text);
@@ -238,12 +241,12 @@ TEST(ContentBlockTest, Roundtrip) {
 // --- delete_session ---
 
 TEST_F(SessionManagerTest, DeleteSession) {
-    auto handle = session_mgr_->get_or_create("test:delete");
-    session_mgr_->append_message("test:delete", "user", "hello");
+    auto handle = session_mgr_->GetOrCreate("test:delete");
+    session_mgr_->AppendMessage("test:delete", "user", "hello");
 
-    session_mgr_->delete_session("test:delete");
+    session_mgr_->DeleteSession("test:delete");
 
-    auto sessions = session_mgr_->list_sessions();
+    auto sessions = session_mgr_->ListSessions();
     EXPECT_TRUE(sessions.empty());
 
     // JSONL file should be gone
@@ -252,16 +255,16 @@ TEST_F(SessionManagerTest, DeleteSession) {
 
 TEST_F(SessionManagerTest, DeleteNonexistentSession) {
     // Should not crash
-    session_mgr_->delete_session("nonexistent:session");
-    auto sessions = session_mgr_->list_sessions();
+    session_mgr_->DeleteSession("nonexistent:session");
+    auto sessions = session_mgr_->ListSessions();
     EXPECT_TRUE(sessions.empty());
 }
 
 // --- created_at ---
 
 TEST_F(SessionManagerTest, CreatedAtTimestamp) {
-    session_mgr_->get_or_create("test:created");
-    auto sessions = session_mgr_->list_sessions();
+    session_mgr_->GetOrCreate("test:created");
+    auto sessions = session_mgr_->ListSessions();
 
     ASSERT_EQ(sessions.size(), 1u);
     EXPECT_FALSE(sessions[0].created_at.empty());
@@ -271,11 +274,11 @@ TEST_F(SessionManagerTest, CreatedAtTimestamp) {
 // --- update_display_name ---
 
 TEST_F(SessionManagerTest, UpdateDisplayName) {
-    session_mgr_->get_or_create("test:name", "Original");
+    session_mgr_->GetOrCreate("test:name", "Original");
 
-    session_mgr_->update_display_name("test:name", "Updated Name");
+    session_mgr_->UpdateDisplayName("test:name", "Updated Name");
 
-    auto sessions = session_mgr_->list_sessions();
+    auto sessions = session_mgr_->ListSessions();
     ASSERT_EQ(sessions.size(), 1u);
     EXPECT_EQ(sessions[0].display_name, "Updated Name");
 }
@@ -283,22 +286,22 @@ TEST_F(SessionManagerTest, UpdateDisplayName) {
 // --- Tool call message JSONL roundtrip ---
 
 TEST_F(SessionManagerTest, ToolCallMessageRoundtrip) {
-    session_mgr_->get_or_create("test:toolcall");
+    session_mgr_->GetOrCreate("test:toolcall");
 
     // Append assistant message with tool_use
     quantclaw::SessionMessage assistant_msg;
     assistant_msg.role = "assistant";
-    assistant_msg.content.push_back(quantclaw::ContentBlock::make_text("Let me check."));
-    assistant_msg.content.push_back(quantclaw::ContentBlock::make_tool_use("t1", "read_file", {{"path", "/tmp/test"}}));
-    session_mgr_->append_message("test:toolcall", assistant_msg);
+    assistant_msg.content.push_back(quantclaw::ContentBlock::MakeText("Let me check."));
+    assistant_msg.content.push_back(quantclaw::ContentBlock::MakeToolUse("t1", "read_file", {{"path", "/tmp/test"}}));
+    session_mgr_->AppendMessage("test:toolcall", assistant_msg);
 
     // Append user message with tool_result
     quantclaw::SessionMessage result_msg;
     result_msg.role = "user";
-    result_msg.content.push_back(quantclaw::ContentBlock::make_tool_result("t1", "file contents here"));
-    session_mgr_->append_message("test:toolcall", result_msg);
+    result_msg.content.push_back(quantclaw::ContentBlock::MakeToolResult("t1", "file contents here"));
+    session_mgr_->AppendMessage("test:toolcall", result_msg);
 
-    auto history = session_mgr_->get_history("test:toolcall");
+    auto history = session_mgr_->GetHistory("test:toolcall");
     ASSERT_EQ(history.size(), 2u);
 
     // Verify assistant message
@@ -322,12 +325,12 @@ TEST_F(SessionManagerTest, ToolCallMessageRoundtrip) {
 TEST(SessionMessageTest, JsonlRoundtrip) {
     quantclaw::SessionMessage msg;
     msg.role = "assistant";
-    msg.content.push_back(quantclaw::ContentBlock::make_text("Hello!"));
+    msg.content.push_back(quantclaw::ContentBlock::MakeText("Hello!"));
     msg.timestamp = "2026-02-23T10:00:00Z";
     msg.usage = quantclaw::UsageInfo{10, 5};
 
-    auto j = msg.to_jsonl();
-    auto parsed = quantclaw::SessionMessage::from_jsonl(j);
+    auto j = msg.ToJsonl();
+    auto parsed = quantclaw::SessionMessage::FromJsonl(j);
 
     EXPECT_EQ(parsed.role, "assistant");
     ASSERT_EQ(parsed.content.size(), 1u);

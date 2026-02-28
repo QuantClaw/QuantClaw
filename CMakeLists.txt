@@ -49,6 +49,7 @@ set(QUANTCLAW_CORE_SOURCES
     src/core/memory_search.cpp
     src/core/subagent.cpp
     # Providers
+    src/providers/curl_raii.cpp
     src/providers/openai_provider.cpp
     src/providers/anthropic_provider.cpp
     src/providers/provider_registry.cpp
@@ -87,10 +88,27 @@ set(QUANTCLAW_CORE_SOURCES
     src/security/sandbox.cpp
     src/security/tool_permissions.cpp
     src/security/exec_approval.cpp
+    src/security/rbac.cpp
+    src/security/rate_limiter.cpp
     # Web
     src/web/web_server.cpp
     src/web/api_routes.cpp
 )
+
+# Platform-specific sources
+if(WIN32)
+    list(APPEND QUANTCLAW_CORE_SOURCES
+        src/platform/process_win32.cpp
+        src/platform/ipc_win32.cpp
+        src/platform/service_win32.cpp
+    )
+else()
+    list(APPEND QUANTCLAW_CORE_SOURCES
+        src/platform/process_unix.cpp
+        src/platform/ipc_unix.cpp
+        src/platform/service_unix.cpp
+    )
+endif()
 
 add_library(quantclaw_core STATIC ${QUANTCLAW_CORE_SOURCES})
 
@@ -176,6 +194,10 @@ if(BUILD_TESTS)
         tests/test_session_maintenance.cpp
         tests/test_subagent.cpp
         tests/test_browser_tool.cpp
+        tests/test_platform.cpp
+        tests/test_platform.cpp
+        tests/test_rbac.cpp
+        tests/test_rate_limiter.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})

@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -23,14 +26,14 @@ public:
            const std::vector<std::string>& allowed_commands,
            const std::vector<std::string>& denied_commands);
 
-    bool is_path_allowed(const std::string& path) const;
-    bool is_command_allowed(const std::string& command) const;
-    std::string sanitize_path(const std::string& path) const;
+    bool IsPathAllowed(const std::string& path) const;
+    bool IsCommandAllowed(const std::string& command) const;
+    std::string SanitizePath(const std::string& path) const;
 
     // Static convenience methods used by ToolRegistry and MCPServer
-    static bool validate_file_path(const std::string& path, const std::string& workspace);
-    static bool validate_shell_command(const std::string& command);
-    static void apply_resource_limits();
+    static bool ValidateFilePath(const std::string& path, const std::string& workspace);
+    static bool ValidateShellCommand(const std::string& command);
+    static void ApplyResourceLimits();
 };
 
 using SecuritySandbox = Sandbox;

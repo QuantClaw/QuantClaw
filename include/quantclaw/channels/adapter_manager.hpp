@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -8,6 +11,7 @@
 #include <atomic>
 #include <spdlog/spdlog.h>
 #include "quantclaw/config.hpp"
+#include "quantclaw/platform/process.hpp"
 
 namespace quantclaw {
 
@@ -39,19 +43,19 @@ public:
     ~ChannelAdapterManager();
 
     // Start all enabled channel adapters
-    void start();
+    void Start();
 
     // Stop all running adapters
-    void stop();
+    void Stop();
 
     // Get list of running adapter names
-    std::vector<std::string> running_adapters() const;
+    std::vector<std::string> RunningAdapters() const;
 
 private:
     struct AdapterProcess {
         std::string name;
         std::string script_path;
-        pid_t pid = 0;
+        platform::ProcessId pid = platform::kInvalidPid;
         bool running = false;
     };
 

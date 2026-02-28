@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>
@@ -16,7 +19,7 @@ protected:
         logger_ = std::make_shared<spdlog::logger>("test", null_sink);
 
         tool_registry_ = std::make_unique<quantclaw::ToolRegistry>(logger_);
-        tool_registry_->register_builtin_tools();
+        tool_registry_->RegisterBuiltinTools();
     }
 
     void TearDown() override {
@@ -31,13 +34,13 @@ protected:
 };
 
 TEST_F(ToolRegistryTest, AllBuiltinToolsRegistered) {
-    auto schemas = tool_registry_->get_tool_schemas();
+    auto schemas = tool_registry_->GetToolSchemas();
 
     EXPECT_FALSE(schemas.empty());
 
     std::vector<std::string> expected_tools = {"read", "write", "edit", "exec", "message"};
     for (const auto& tool_name : expected_tools) {
-        EXPECT_TRUE(tool_registry_->has_tool(tool_name)) << "Tool " << tool_name << " not found";
+        EXPECT_TRUE(tool_registry_->HasTool(tool_name)) << "Tool " << tool_name << " not found";
     }
 }
 
@@ -48,7 +51,7 @@ TEST_F(ToolRegistryTest, ReadFileTool) {
     file.close();
 
     nlohmann::json params = {{"path", test_file.string()}};
-    std::string result = tool_registry_->execute_tool("read", params);
+    std::string result = tool_registry_->ExecuteTool("read", params);
 
     EXPECT_EQ(result, "Hello, QuantClaw!");
 }
@@ -56,7 +59,7 @@ TEST_F(ToolRegistryTest, ReadFileTool) {
 TEST_F(ToolRegistryTest, ReadNonExistentFile) {
     nlohmann::json params = {{"path", (test_dir_ / "nonexistent.txt").string()}};
 
-    EXPECT_THROW(tool_registry_->execute_tool("read", params), std::runtime_error);
+    EXPECT_THROW(tool_registry_->ExecuteTool("read", params), std::runtime_error);
 }
 
 TEST_F(ToolRegistryTest, WriteFileTool) {
@@ -66,7 +69,7 @@ TEST_F(ToolRegistryTest, WriteFileTool) {
         {"content", "This is written by QuantClaw!"}
     };
 
-    std::string result = tool_registry_->execute_tool("write", params);
+    std::string result = tool_registry_->ExecuteTool("write", params);
 
     EXPECT_TRUE(result.find("Successfully wrote") != std::string::npos);
 
@@ -88,7 +91,7 @@ TEST_F(ToolRegistryTest, EditFileTool) {
         {"newText", "Modified content"}
     };
 
-    std::string result = tool_registry_->execute_tool("edit", params);
+    std::string result = tool_registry_->ExecuteTool("edit", params);
 
     EXPECT_TRUE(result.find("Successfully edited") != std::string::npos);
 
@@ -110,19 +113,19 @@ TEST_F(ToolRegistryTest, EditNonExistentText) {
         {"newText", "New text"}
     };
 
-    EXPECT_THROW(tool_registry_->execute_tool("edit", params), std::runtime_error);
+    EXPECT_THROW(tool_registry_->ExecuteTool("edit", params), std::runtime_error);
 }
 
 TEST_F(ToolRegistryTest, ToolNotFound) {
     nlohmann::json params = {};
 
-    EXPECT_THROW(tool_registry_->execute_tool("nonexistent-tool", params), std::runtime_error);
+    EXPECT_THROW(tool_registry_->ExecuteTool("nonexistent-tool", params), std::runtime_error);
 }
 
 TEST_F(ToolRegistryTest, MissingParameters) {
     nlohmann::json params = {};
 
-    EXPECT_THROW(tool_registry_->execute_tool("read", params), std::runtime_error);
+    EXPECT_THROW(tool_registry_->ExecuteTool("read", params), std::runtime_error);
 }
 
 // --- exec tool ---
@@ -135,27 +138,27 @@ TEST_F(ToolRegistryTest, MissingParameters) {
 
 TEST_F(ToolRegistryTest, ExecToolMissingParam) {
     nlohmann::json params = nlohmann::json::object();
-    EXPECT_THROW(tool_registry_->execute_tool("exec", params), std::runtime_error);
+    EXPECT_THROW(tool_registry_->ExecuteTool("exec", params), std::runtime_error);
 }
 
 // --- message tool ---
 
 TEST_F(ToolRegistryTest, MessageTool) {
     nlohmann::json params = {{"channel", "test-channel"}, {"message", "Hi there"}};
-    auto result = tool_registry_->execute_tool("message", params);
+    auto result = tool_registry_->ExecuteTool("message", params);
     EXPECT_NE(result.find("test-channel"), std::string::npos);
 }
 
 TEST_F(ToolRegistryTest, MessageToolMissingParams) {
     nlohmann::json params = {{"channel", "x"}};
-    EXPECT_THROW(tool_registry_->execute_tool("message", params), std::runtime_error);
+    EXPECT_THROW(tool_registry_->ExecuteTool("message", params), std::runtime_error);
 }
 
 // --- write tool missing content ---
 
 TEST_F(ToolRegistryTest, WriteToolMissingContent) {
     nlohmann::json params = {{"path", (test_dir_ / "x.txt").string()}};
-    EXPECT_THROW(tool_registry_->execute_tool("write", params), std::runtime_error);
+    EXPECT_THROW(tool_registry_->ExecuteTool("write", params), std::runtime_error);
 }
 
 // --- edit tool missing params ---
@@ -167,58 +170,58 @@ TEST_F(ToolRegistryTest, EditToolMissingOldText) {
     f.close();
 
     nlohmann::json params = {{"path", file.string()}, {"newText", "x"}};
-    EXPECT_THROW(tool_registry_->execute_tool("edit", params), std::runtime_error);
+    EXPECT_THROW(tool_registry_->ExecuteTool("edit", params), std::runtime_error);
 }
 
 // --- has_tool ---
 
 TEST_F(ToolRegistryTest, HasToolTrue) {
-    EXPECT_TRUE(tool_registry_->has_tool("read"));
-    EXPECT_TRUE(tool_registry_->has_tool("write"));
-    EXPECT_TRUE(tool_registry_->has_tool("edit"));
-    EXPECT_TRUE(tool_registry_->has_tool("exec"));
-    EXPECT_TRUE(tool_registry_->has_tool("message"));
+    EXPECT_TRUE(tool_registry_->HasTool("read"));
+    EXPECT_TRUE(tool_registry_->HasTool("write"));
+    EXPECT_TRUE(tool_registry_->HasTool("edit"));
+    EXPECT_TRUE(tool_registry_->HasTool("exec"));
+    EXPECT_TRUE(tool_registry_->HasTool("message"));
 }
 
 TEST_F(ToolRegistryTest, HasToolFalse) {
-    EXPECT_FALSE(tool_registry_->has_tool("nonexistent"));
-    EXPECT_FALSE(tool_registry_->has_tool(""));
+    EXPECT_FALSE(tool_registry_->HasTool("nonexistent"));
+    EXPECT_FALSE(tool_registry_->HasTool(""));
 }
 
 // --- external tool registration ---
 
 TEST_F(ToolRegistryTest, RegisterExternalTool) {
-    tool_registry_->register_external_tool("custom_tool", "A custom tool",
+    tool_registry_->RegisterExternalTool("custom_tool", "A custom tool",
         nlohmann::json::object(),
         [](const nlohmann::json&) -> std::string { return "custom result"; });
 
-    EXPECT_TRUE(tool_registry_->has_tool("custom_tool"));
-    auto result = tool_registry_->execute_tool("custom_tool", nlohmann::json::object());
+    EXPECT_TRUE(tool_registry_->HasTool("custom_tool"));
+    auto result = tool_registry_->ExecuteTool("custom_tool", nlohmann::json::object());
     EXPECT_EQ(result, "custom result");
 }
 
 // --- chain tool registration ---
 
 TEST_F(ToolRegistryTest, RegisterChainTool) {
-    tool_registry_->register_chain_tool();
-    EXPECT_TRUE(tool_registry_->has_tool("chain"));
+    tool_registry_->RegisterChainTool();
+    EXPECT_TRUE(tool_registry_->HasTool("chain"));
 }
 
 // --- schema count ---
 
 TEST_F(ToolRegistryTest, SchemaCountMatchesRegistered) {
-    auto schemas = tool_registry_->get_tool_schemas();
+    auto schemas = tool_registry_->GetToolSchemas();
     EXPECT_EQ(schemas.size(), 5u);  // read, write, edit, exec, message
 
-    tool_registry_->register_chain_tool();
-    schemas = tool_registry_->get_tool_schemas();
+    tool_registry_->RegisterChainTool();
+    schemas = tool_registry_->GetToolSchemas();
     EXPECT_EQ(schemas.size(), 6u);
 }
 
 // --- schema has name and description ---
 
 TEST_F(ToolRegistryTest, SchemasHaveRequiredFields) {
-    auto schemas = tool_registry_->get_tool_schemas();
+    auto schemas = tool_registry_->GetToolSchemas();
     for (const auto& schema : schemas) {
         EXPECT_FALSE(schema.name.empty()) << "Schema name is empty";
         EXPECT_FALSE(schema.description.empty()) << "Schema for " << schema.name << " missing description";
@@ -229,6 +232,6 @@ TEST_F(ToolRegistryTest, SchemasHaveRequiredFields) {
 
 TEST_F(ToolRegistryTest, EmptyRegistryNoTools) {
     auto empty = std::make_unique<quantclaw::ToolRegistry>(logger_);
-    EXPECT_TRUE(empty->get_tool_schemas().empty());
-    EXPECT_FALSE(empty->has_tool("read"));
+    EXPECT_TRUE(empty->GetToolSchemas().empty());
+    EXPECT_FALSE(empty->HasTool("read"));
 }

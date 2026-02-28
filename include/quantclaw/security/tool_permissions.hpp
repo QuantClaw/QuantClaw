@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -11,11 +14,11 @@ public:
     explicit ToolPermissionChecker(const ToolPermissionConfig& config);
 
     // Check if a built-in tool is allowed
-    bool is_allowed(const std::string& tool_name) const;
+    bool IsAllowed(const std::string& tool_name) const;
 
     // Check if an MCP tool is allowed (qualified name: mcp__server__tool)
-    bool is_mcp_tool_allowed(const std::string& server_name,
-                             const std::string& tool_name) const;
+    bool IsMcpToolAllowed(const std::string& server_name,
+                          const std::string& tool_name) const;
 
 private:
     void expand_groups();

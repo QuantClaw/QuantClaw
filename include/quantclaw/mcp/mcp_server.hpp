@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -21,14 +24,14 @@ public:
     MCPTool(const std::string& name, const std::string& description);
     
     virtual ~MCPTool() = default;
-    const std::string& get_name() const { return name_; }
-    const std::string& get_description() const { return description_; }
-    
-    void add_parameter(const std::string& name, const std::string& type, 
+    const std::string& GetName() const { return name_; }
+    const std::string& GetDescription() const { return description_; }
+
+    void AddParameter(const std::string& name, const std::string& type,
                       const std::string& description, bool required = false);
-    
-    nlohmann::json get_schema() const;
-    std::string call(const nlohmann::json& arguments);
+
+    nlohmann::json GetSchema() const;
+    std::string Call(const nlohmann::json& arguments);
     
 protected:
     virtual std::string execute(const nlohmann::json& arguments) = 0;
@@ -43,8 +46,8 @@ class MCPServer {
 public:
     MCPServer(std::shared_ptr<spdlog::logger> logger);
     
-    void register_tool(std::unique_ptr<MCPTool> tool);
-    nlohmann::json handle_request(const nlohmann::json& request);
+    void RegisterTool(std::unique_ptr<MCPTool> tool);
+    nlohmann::json HandleRequest(const nlohmann::json& request);
     
 private:
     std::shared_ptr<spdlog::logger> logger_;

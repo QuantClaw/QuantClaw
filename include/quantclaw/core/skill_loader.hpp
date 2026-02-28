@@ -1,3 +1,6 @@
+// Copyright 2025 QuantClaw Contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -53,26 +56,26 @@ public:
     explicit SkillLoader(std::shared_ptr<spdlog::logger> logger);
 
     // Load skills from directory (compatible with OpenClaw SKILL.md format)
-    std::vector<SkillMetadata> load_skills_from_directory(
+    std::vector<SkillMetadata> LoadSkillsFromDirectory(
         const std::filesystem::path& skills_dir
     );
 
     // Multi-directory loading with dedup and config filtering
-    std::vector<SkillMetadata> load_skills(
+    std::vector<SkillMetadata> LoadSkills(
         const SkillsConfig& skills_config,
         const std::filesystem::path& workspace_path);
 
     // Check if skill can be loaded based on environment (gating)
-    bool check_skill_gating(const SkillMetadata& skill);
+    bool CheckSkillGating(const SkillMetadata& skill);
 
     // Get skill content for LLM context (includes resource path info)
-    std::string get_skill_context(const std::vector<SkillMetadata>& skills) const;
+    std::string GetSkillContext(const std::vector<SkillMetadata>& skills) const;
 
     // Install a skill's dependencies (returns true if all succeed)
-    bool install_skill(const SkillMetadata& skill);
+    bool InstallSkill(const SkillMetadata& skill);
 
     // Get all slash commands from loaded skills
-    std::vector<SkillCommand> get_all_commands(
+    std::vector<SkillCommand> GetAllCommands(
         const std::vector<SkillMetadata>& skills) const;
 
 private:
