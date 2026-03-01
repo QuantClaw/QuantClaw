@@ -286,7 +286,7 @@ The Docker image uses a multi-stage build (Ubuntu 22.04) and runs as a non-root 
 
 ## Plugin Ecosystem
 
-QuantClaw runs OpenClaw TypeScript plugins via a Node.js sidecar process. The C++ main process manages the sidecar lifecycle and communicates over Unix domain socket using JSON-RPC 2.0.
+QuantClaw runs OpenClaw TypeScript plugins via a Node.js sidecar process. The C++ main process manages the sidecar lifecycle and communicates over **TCP loopback (127.0.0.1)** using JSON-RPC 2.0.
 
 **Supported plugin capabilities**:
 - **Tools**: Plugin-defined tools callable by the agent
@@ -316,6 +316,33 @@ Plugins use `openclaw.plugin.json` or `quantclaw.plugin.json` manifests, compati
   }
 }
 ```
+
+### IPC Protocol (C++ Main Process ↔ Node.js Sidecar)
+
+The IPC between the C++ host and the sidecar uses **TCP loopback**, which works identically on Linux and Windows:
+
+**Connection setup**:
+1. The C++ host binds to `127.0.0.1:0` — the OS assigns a free port.
+2. The assigned port is forwarded to the sidecar child process via the `QUANTCLAW_PORT` environment variable.
+3. The sidecar connects with Node.js's built-in `net.createConnection(port, '127.0.0.1')` — no extra npm packages needed.
+
+**Frame format (NDJSON)**:
+
+Each message is one JSON object followed by a newline `\n` ([Newline-Delimited JSON](https://ndjson.org/)):
+
+```
+{"jsonrpc":"2.0","method":"plugin.tools","params":{},"id":1}\n
+{"jsonrpc":"2.0","result":[...],"id":1}\n
+```
+
+**Why `\n` never appears inside a JSON object**:
+
+The JSON specification ([RFC 8259 §7](https://www.rfc-editor.org/rfc/rfc8259#section-7)) mandates that control characters (U+0000–U+001F, including newline U+000A) inside strings **must** be escaped as `\n` (backslash + letter n, 2 bytes) — never as raw byte `0x0A`.
+
+- C++ side: `nlohmann::json::dump()` (no indent) produces compact JSON with all control characters auto-escaped.
+- Node.js side: `JSON.stringify()` (no indent) gives the same guarantee.
+
+The `\n` byte (`0x0A`) therefore **only** appears as a frame delimiter between messages, never inside a JSON payload. This is the same NDJSON framing used by Redis, Docker Events, and OpenAI streaming.
 
 ## Compatibility
 
