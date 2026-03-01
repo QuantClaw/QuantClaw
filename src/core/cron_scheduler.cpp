@@ -23,8 +23,14 @@ nlohmann::json CronJob::ToJson() const {
 
   auto to_iso = [](std::chrono::system_clock::time_point tp) -> std::string {
     auto t = std::chrono::system_clock::to_time_t(tp);
+    std::tm tm;
+#ifdef _WIN32
+    gmtime_s(&tm, &t);
+#else
+    gmtime_r(&t, &tm);
+#endif
     std::ostringstream ss;
-    ss << std::put_time(std::gmtime(&t), "%Y-%m-%dT%H:%M:%SZ");
+    ss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
     return ss.str();
   };
 
@@ -119,7 +125,12 @@ std::chrono::system_clock::time_point CronExpression::NextAfter(
     std::chrono::system_clock::time_point after) const {
   // Start from next minute
   auto t = std::chrono::system_clock::to_time_t(after);
-  std::tm tm = *std::localtime(&t);
+  std::tm tm;
+#ifdef _WIN32
+  localtime_s(&tm, &t);
+#else
+  localtime_r(&t, &tm);
+#endif
   tm.tm_sec = 0;
   tm.tm_min += 1;
   std::mktime(&tm);  // normalize

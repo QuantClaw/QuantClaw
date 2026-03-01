@@ -200,7 +200,12 @@ TEST(CronExpressionTest, NextAfter) {
   EXPECT_GT(next, now);
 
   auto t = std::chrono::system_clock::to_time_t(next);
-  std::tm tm = *std::localtime(&t);
+  std::tm tm;
+#ifdef _WIN32
+  localtime_s(&tm, &t);
+#else
+  localtime_r(&t, &tm);
+#endif
   EXPECT_EQ(tm.tm_hour, 12);
   EXPECT_EQ(tm.tm_min, 0);
 }
