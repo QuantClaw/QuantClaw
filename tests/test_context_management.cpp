@@ -470,4 +470,208 @@ TEST(QueueOverflowTest, SummarizedMessageHasPrefix) {
   EXPECT_TRUE(activated->message.find("messages]") != std::string::npos);
 }
 
+// ================================================================
+// P4 — ContextPruner Extended Tests (ported from OpenClaw)
+// ================================================================
+
+TEST_F(ContextPrunerTest, SoftPruneShortContentUnchanged) {
+  // Tool result with fewer than 2*soft_prune_lines lines is unchanged
+  std::string short_content;
+  for (int i = 0; i < 4; ++i) {
+    short_content += "Line " + std::to_string(i) + "\n";
+  }
+
+  std::vector<Message> history;
+  for (int i = 0; i < 5; ++i) {
+    history.push_back(Message{"user", "Q"});
+
+    Message assistant;
+    assistant.role = "assistant";
+    assistant.content.push_back(ContentBlock::MakeToolUse(
+        "t" + std::to_string(i), "tool", {}));
+    history.push_back(assistant);
+
+    Message tool_msg;
+    tool_msg.role = "user";
+    if (i == 0) {
+      tool_msg.content.push_back(
+          ContentBlock::MakeToolResult("t0", short_content));
+    } else {
+      tool_msg.content.push_back(
+          ContentBlock::MakeToolResult("t" + std::to_string(i), "short"));
+    }
+    history.push_back(tool_msg);
+  }
+
+  ContextPruner::Options opts;
+  opts.protect_recent = 2;
+  opts.soft_prune_lines = 3;
+  opts.max_tool_result_chars = 10;  // Force soft prune attempt
+
+  auto result = ContextPruner::Prune(history, opts);
+
+  // Find the result for t0 — short content should pass through unchanged
+  for (const auto& msg : result) {
+    for (const auto& block : msg.content) {
+      if (block.type == "tool_result" && block.tool_use_id == "t0") {
+        // 4 lines < 2*3=6 lines, so no pruning
+        EXPECT_TRUE(block.content.find("lines omitted") == std::string::npos);
+      }
+    }
+  }
+}
+
+TEST_F(ContextPrunerTest, HardPruneReplacesWithPlaceholder) {
+  // Very old tool result beyond hard_prune_after gets placeholder
+  auto history = make_history(20);
+  ContextPruner::Options opts;
+  opts.protect_recent = 3;
+  opts.hard_prune_after = 5;
+  opts.max_tool_result_chars = 10;
+
+  auto result = ContextPruner::Prune(history, opts);
+
+  // The first tool result (very old) should be hard pruned
+  bool found_placeholder = false;
+  for (const auto& msg : result) {
+    for (const auto& block : msg.content) {
+      if (block.type == "tool_result" &&
+          block.content == "[Tool result omitted — older context]") {
+        found_placeholder = true;
+        break;
+      }
+    }
+    if (found_placeholder) break;
+  }
+  EXPECT_TRUE(found_placeholder);
+}
+
+TEST_F(ContextPrunerTest, MultipleToolResultsInOneMessage) {
+  // Message with 2 tool_result blocks, one hard-pruned, one soft-pruned
+  std::vector<Message> history;
+
+  // Add many assistant turns first to create recency depth
+  for (int i = 0; i < 15; ++i) {
+    history.push_back(Message{"user", "Q" + std::to_string(i)});
+    Message a;
+    a.role = "assistant";
+    a.content.push_back(ContentBlock::MakeToolUse(
+        "t" + std::to_string(i), "tool", {}));
+    history.push_back(a);
+
+    Message tr;
+    tr.role = "user";
+    tr.content.push_back(
+        ContentBlock::MakeToolResult("t" + std::to_string(i), "result"));
+    history.push_back(tr);
+  }
+
+  // Now add a message with two tool results at the very start
+  // We'll insert it at the beginning (old position)
+  Message multi_tool;
+  multi_tool.role = "user";
+  std::string big_content;
+  for (int j = 0; j < 50; ++j) {
+    big_content += "Data line " + std::to_string(j) + "\n";
+  }
+  multi_tool.content.push_back(
+      ContentBlock::MakeToolResult("multi1", big_content));
+  multi_tool.content.push_back(
+      ContentBlock::MakeToolResult("multi2", "Short result"));
+
+  // Insert assistant + tool results at the beginning
+  Message multi_asst;
+  multi_asst.role = "assistant";
+  multi_asst.content.push_back(ContentBlock::MakeToolUse("multi1", "tool_a", {}));
+  multi_asst.content.push_back(ContentBlock::MakeToolUse("multi2", "tool_b", {}));
+
+  history.insert(history.begin(), multi_tool);
+  history.insert(history.begin(), multi_asst);
+  history.insert(history.begin(), Message{"user", "Initial question"});
+
+  ContextPruner::Options opts;
+  opts.protect_recent = 3;
+  opts.hard_prune_after = 5;
+  opts.max_tool_result_chars = 100;
+  opts.soft_prune_lines = 3;
+
+  auto result = ContextPruner::Prune(history, opts);
+
+  // Verify the message with multi1 and multi2 was processed
+  for (const auto& msg : result) {
+    for (const auto& block : msg.content) {
+      if (block.type == "tool_result" && block.tool_use_id == "multi1") {
+        // This large old result should be hard or soft pruned
+        EXPECT_TRUE(
+            block.content.find("omitted") != std::string::npos ||
+            block.content.find("...") != std::string::npos);
+      }
+    }
+  }
+}
+
+TEST_F(ContextPrunerTest, NonToolResultBlocksPreserved) {
+  // Text blocks in same message as tool_result are kept unchanged
+  std::vector<Message> history;
+  for (int i = 0; i < 10; ++i) {
+    history.push_back(Message{"user", "Q"});
+    Message a;
+    a.role = "assistant";
+    a.content.push_back(ContentBlock::MakeText("Thinking about this..."));
+    a.content.push_back(ContentBlock::MakeToolUse(
+        "t" + std::to_string(i), "tool", {}));
+    history.push_back(a);
+
+    Message tr;
+    tr.role = "user";
+    // Add a text block alongside the tool result
+    tr.content.push_back(ContentBlock::MakeText("Some context"));
+    std::string big;
+    for (int j = 0; j < 30; ++j) big += "Line " + std::to_string(j) + "\n";
+    tr.content.push_back(
+        ContentBlock::MakeToolResult("t" + std::to_string(i), big));
+    history.push_back(tr);
+  }
+
+  ContextPruner::Options opts;
+  opts.protect_recent = 2;
+  opts.max_tool_result_chars = 50;
+  opts.soft_prune_lines = 3;
+
+  auto result = ContextPruner::Prune(history, opts);
+
+  // Verify text blocks in the old messages are still present
+  bool found_text_block = false;
+  for (const auto& msg : result) {
+    if (msg.role != "user") continue;
+    for (const auto& block : msg.content) {
+      if (block.type == "text" && block.text == "Some context") {
+        found_text_block = true;
+        break;
+      }
+    }
+    if (found_text_block) break;
+  }
+  EXPECT_TRUE(found_text_block);
+}
+
+TEST_F(ContextPrunerTest, NoAssistantMessagesNoProtection) {
+  // History with no assistant messages: protect_threshold stays -1,
+  // no pruning happens
+  std::vector<Message> history;
+  for (int i = 0; i < 5; ++i) {
+    history.push_back(Message{"user", "Question " + std::to_string(i)});
+  }
+
+  ContextPruner::Options opts;
+  opts.protect_recent = 3;
+  opts.max_tool_result_chars = 10;
+
+  auto result = ContextPruner::Prune(history, opts);
+  EXPECT_EQ(result.size(), history.size());
+  for (size_t i = 0; i < history.size(); ++i) {
+    EXPECT_EQ(result[i].text(), history[i].text());
+  }
+}
+
 }  // namespace quantclaw

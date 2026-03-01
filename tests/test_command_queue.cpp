@@ -646,6 +646,90 @@ TEST_F(CommandQueueTest, DoubleStopIsNoop) {
 // Config parsing integration
 // ================================================================
 
+// ================================================================
+// P4 — Extended SessionLane Tests
+// ================================================================
+
+TEST_F(SessionLaneTest, RejectPolicyThirdEnqueueRejected) {
+  lane_->SetCap(2);
+  lane_->SetDropPolicy(DropPolicy::kReject);
+
+  lane_->Enqueue(MakeCmd("r-1", "msg1"));
+  lane_->Enqueue(MakeCmd("r-2", "msg2"));
+  lane_->Enqueue(MakeCmd("r-3", "msg3"));
+
+  auto dropped = lane_->ApplyCapOverflow();
+  // Reject policy drops the newest entries
+  EXPECT_FALSE(dropped.empty());
+  EXPECT_EQ(lane_->PendingCount(), 2u);
+
+  // The rejected command should be r-3 (newest)
+  bool found_r3 = false;
+  for (const auto& id : dropped) {
+    if (id == "r-3") found_r3 = true;
+  }
+  EXPECT_TRUE(found_r3);
+}
+
+TEST_F(SessionLaneTest, DropOldestPolicyDropsOldest) {
+  lane_->SetCap(2);
+  lane_->SetDropPolicy(DropPolicy::kDropOldest);
+
+  lane_->Enqueue(MakeCmd("do-1", "oldest"));
+  lane_->Enqueue(MakeCmd("do-2", "middle"));
+  lane_->Enqueue(MakeCmd("do-3", "newest"));
+
+  auto dropped = lane_->ApplyCapOverflow();
+  EXPECT_EQ(dropped.size(), 1u);
+  EXPECT_EQ(dropped[0], "do-1");
+  EXPECT_EQ(lane_->PendingCount(), 2u);
+
+  // Remaining should be do-2 and do-3
+  auto now = std::chrono::steady_clock::now();
+  auto first = lane_->TryActivate(now);
+  ASSERT_TRUE(first.has_value());
+  EXPECT_EQ(first->id, "do-2");
+}
+
+TEST_F(SessionLaneTest, InterruptClearsActiveAndReturnsId) {
+  lane_->Enqueue(MakeCmd("ia-1", "first"));
+  lane_->Enqueue(MakeCmd("ia-2", "second"));
+  lane_->Enqueue(MakeCmd("ia-3", "third"));
+
+  auto now = std::chrono::steady_clock::now();
+  lane_->TryActivate(now);
+  EXPECT_TRUE(lane_->HasActive());
+
+  auto aborted = lane_->InterruptActive();
+  ASSERT_TRUE(aborted.has_value());
+  EXPECT_EQ(*aborted, "ia-1");
+  EXPECT_FALSE(lane_->HasActive());
+}
+
+TEST_F(SessionLaneTest, DrainPendingSteeringEmptyWhenNoPending) {
+  auto text = lane_->DrainPendingAsSteeringText();
+  EXPECT_TRUE(text.empty());
+  EXPECT_EQ(text, "");
+}
+
+// ================================================================
+// P4 — Extended CommandQueue Tests
+// ================================================================
+
+TEST_F(CommandQueueTest, CancelNonexistentReturnsFalse) {
+  queue_->Start();
+  EXPECT_FALSE(queue_->Cancel("nonexistent-cmd-id"));
+}
+
+TEST_F(CommandQueueTest, AbortNonexistentReturnsFalse) {
+  queue_->Start();
+  EXPECT_FALSE(queue_->AbortSession("nonexistent-session-key"));
+}
+
+// ================================================================
+// Config parsing integration
+// ================================================================
+
 TEST(QueueConfigIntegration, ConfigParsesQueueSection) {
     nlohmann::json json_config = {
         {"queue", {

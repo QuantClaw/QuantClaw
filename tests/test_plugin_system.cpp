@@ -1003,3 +1003,99 @@ TEST_F(PluginSystemTest, StartStopServiceWithoutSidecar) {
   auto stop_result = sys.StopService("svc");
   EXPECT_TRUE(stop_result.contains("error"));
 }
+
+// ================================================================
+// P4 — Extended HookManager Tests
+// ================================================================
+
+TEST_F(HookManagerTest, UnregisterSpecificHandler) {
+  quantclaw::HookManager hooks(logger_);
+
+  std::vector<std::string> calls;
+  hooks.RegisterHook("before_model_resolve", "plugin-a",
+                      [&calls](const nlohmann::json&) -> nlohmann::json {
+                        calls.push_back("a");
+                        return {{"from", "a"}};
+                      });
+  hooks.RegisterHook("before_model_resolve", "plugin-b",
+                      [&calls](const nlohmann::json&) -> nlohmann::json {
+                        calls.push_back("b");
+                        return {{"from", "b"}};
+                      });
+
+  EXPECT_EQ(hooks.HandlerCount("before_model_resolve"), 2u);
+
+  // Unregister plugin-a
+  bool removed = hooks.UnregisterHook("before_model_resolve", "plugin-a");
+  EXPECT_TRUE(removed);
+  EXPECT_EQ(hooks.HandlerCount("before_model_resolve"), 1u);
+
+  // Fire and verify only plugin-b runs
+  calls.clear();
+  hooks.Fire("before_model_resolve", {});
+  ASSERT_EQ(calls.size(), 1u);
+  EXPECT_EQ(calls[0], "b");
+}
+
+TEST_F(HookManagerTest, ErrorInHandlerDoesNotBreakOthers) {
+  quantclaw::HookManager hooks(logger_);
+
+  std::vector<std::string> calls;
+  // Use a modifying hook so handlers run sequentially
+  hooks.RegisterHook("before_prompt_build", "bad-handler",
+                      [](const nlohmann::json&) -> nlohmann::json {
+                        throw std::runtime_error("handler exploded");
+                      }, 100);  // Higher priority, runs first
+  hooks.RegisterHook("before_prompt_build", "good-handler",
+                      [&calls](const nlohmann::json&) -> nlohmann::json {
+                        calls.push_back("good");
+                        return {{"ok", true}};
+                      }, 50);   // Lower priority, runs second
+
+  auto result = hooks.Fire("before_prompt_build", {});
+  // good-handler should have run despite bad-handler throwing
+  ASSERT_EQ(calls.size(), 1u);
+  EXPECT_EQ(calls[0], "good");
+  EXPECT_TRUE(result.value("ok", false));
+}
+
+TEST_F(HookManagerTest, HookModeForClassification) {
+  // Verify at least 5 hook names return correct modes
+  EXPECT_EQ(quantclaw::GetHookMode("before_model_resolve"),
+            quantclaw::HookMode::kModifying);
+  EXPECT_EQ(quantclaw::GetHookMode("llm_input"),
+            quantclaw::HookMode::kVoid);
+  EXPECT_EQ(quantclaw::GetHookMode("tool_result_persist"),
+            quantclaw::HookMode::kSync);
+  EXPECT_EQ(quantclaw::GetHookMode("message_received"),
+            quantclaw::HookMode::kVoid);
+  EXPECT_EQ(quantclaw::GetHookMode("before_tool_call"),
+            quantclaw::HookMode::kModifying);
+}
+
+TEST_F(HookManagerTest, ClearAllHandlers) {
+  quantclaw::HookManager hooks(logger_);
+
+  hooks.RegisterHook("before_model_resolve", "p1",
+                      [](const nlohmann::json&) -> nlohmann::json {
+                        return {{"cleared", false}};
+                      });
+  hooks.RegisterHook("llm_input", "p2",
+                      [](const nlohmann::json&) -> nlohmann::json {
+                        return {{"cleared", false}};
+                      });
+
+  EXPECT_EQ(hooks.HandlerCount("before_model_resolve"), 1u);
+  EXPECT_EQ(hooks.HandlerCount("llm_input"), 1u);
+  EXPECT_EQ(hooks.RegisteredHooks().size(), 2u);
+
+  hooks.Clear();
+
+  EXPECT_EQ(hooks.HandlerCount("before_model_resolve"), 0u);
+  EXPECT_EQ(hooks.HandlerCount("llm_input"), 0u);
+  EXPECT_TRUE(hooks.RegisteredHooks().empty());
+
+  // Fire should return empty after clear
+  auto result = hooks.Fire("before_model_resolve", {});
+  EXPECT_TRUE(result.empty());
+}

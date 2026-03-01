@@ -3,20 +3,13 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import * as net from "node:net";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import { RpcServer } from "../src/rpc-server.js";
 
-// Utility to create a temporary socket path.
-function tmpSocketPath(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qc-rpc-test-"));
-  return path.join(dir, "test.sock");
-}
-
-// Create a simple TCP/Unix server that the RpcServer can connect to.
-function createMockParent(socketPath: string): {
+// Create a simple TCP server that the RpcServer can connect to.
+// Binds to 127.0.0.1:0 so the OS picks a free port.
+function createMockParent(): {
   server: net.Server;
+  port: () => number;
   getClient: () => Promise<net.Socket>;
   close: () => void;
 } {
@@ -29,15 +22,13 @@ function createMockParent(socketPath: string): {
     resolveClient?.(socket);
   });
 
-  server.listen(socketPath);
+  server.listen(0, "127.0.0.1");
 
   return {
     server,
+    port: () => (server.address() as net.AddressInfo).port,
     getClient: () => clientPromise,
-    close: () => {
-      server.close();
-      try { fs.unlinkSync(socketPath); } catch {}
-    },
+    close: () => { server.close(); },
   };
 }
 
@@ -61,7 +52,6 @@ function readLine(socket: net.Socket, timeoutMs = 5000): Promise<string> {
 }
 
 describe("RpcServer", () => {
-  const sockets: string[] = [];
   const servers: Array<{ close: () => void }> = [];
 
   afterEach(() => {
@@ -69,22 +59,16 @@ describe("RpcServer", () => {
       try { s.close(); } catch {}
     }
     servers.length = 0;
-    for (const p of sockets) {
-      try { fs.unlinkSync(p); } catch {}
-      try { fs.rmdirSync(path.dirname(p)); } catch {}
-    }
-    sockets.length = 0;
   });
 
   it("should connect and respond to ping", async () => {
-    const sockPath = tmpSocketPath();
-    sockets.push(sockPath);
-
-    const parent = createMockParent(sockPath);
+    const parent = createMockParent();
     servers.push(parent);
+    // Wait for server to be listening before getting port
+    await new Promise<void>((r) => parent.server.listening ? r() : parent.server.once("listening", r));
 
     const rpc = new RpcServer({
-      socketPath: sockPath,
+      port: parent.port(),
       methods: { ping: () => ({}) },
     });
 
@@ -104,14 +88,12 @@ describe("RpcServer", () => {
   });
 
   it("should handle method not found", async () => {
-    const sockPath = tmpSocketPath();
-    sockets.push(sockPath);
-
-    const parent = createMockParent(sockPath);
+    const parent = createMockParent();
     servers.push(parent);
+    await new Promise<void>((r) => parent.server.listening ? r() : parent.server.once("listening", r));
 
     const rpc = new RpcServer({
-      socketPath: sockPath,
+      port: parent.port(),
       methods: { ping: () => ({}) },
     });
 
@@ -129,14 +111,12 @@ describe("RpcServer", () => {
   });
 
   it("should handle parse error", async () => {
-    const sockPath = tmpSocketPath();
-    sockets.push(sockPath);
-
-    const parent = createMockParent(sockPath);
+    const parent = createMockParent();
     servers.push(parent);
+    await new Promise<void>((r) => parent.server.listening ? r() : parent.server.once("listening", r));
 
     const rpc = new RpcServer({
-      socketPath: sockPath,
+      port: parent.port(),
       methods: { ping: () => ({}) },
     });
 
@@ -154,14 +134,12 @@ describe("RpcServer", () => {
   });
 
   it("should handle async method handlers", async () => {
-    const sockPath = tmpSocketPath();
-    sockets.push(sockPath);
-
-    const parent = createMockParent(sockPath);
+    const parent = createMockParent();
     servers.push(parent);
+    await new Promise<void>((r) => parent.server.listening ? r() : parent.server.once("listening", r));
 
     const rpc = new RpcServer({
-      socketPath: sockPath,
+      port: parent.port(),
       methods: {
         "plugin.tools": async () => [
           { name: "weather", description: "Get weather" },
@@ -184,14 +162,12 @@ describe("RpcServer", () => {
   });
 
   it("should handle method handler errors", async () => {
-    const sockPath = tmpSocketPath();
-    sockets.push(sockPath);
-
-    const parent = createMockParent(sockPath);
+    const parent = createMockParent();
     servers.push(parent);
+    await new Promise<void>((r) => parent.server.listening ? r() : parent.server.once("listening", r));
 
     const rpc = new RpcServer({
-      socketPath: sockPath,
+      port: parent.port(),
       methods: {
         failing: () => { throw new Error("intentional error"); },
       },
@@ -211,15 +187,13 @@ describe("RpcServer", () => {
   });
 
   it("should handle multiple sequential requests", async () => {
-    const sockPath = tmpSocketPath();
-    sockets.push(sockPath);
-
-    const parent = createMockParent(sockPath);
+    const parent = createMockParent();
     servers.push(parent);
+    await new Promise<void>((r) => parent.server.listening ? r() : parent.server.once("listening", r));
 
     let callCount = 0;
     const rpc = new RpcServer({
-      socketPath: sockPath,
+      port: parent.port(),
       methods: {
         counter: () => ({ count: ++callCount }),
       },
@@ -239,14 +213,12 @@ describe("RpcServer", () => {
   });
 
   it("should report connected state", async () => {
-    const sockPath = tmpSocketPath();
-    sockets.push(sockPath);
-
-    const parent = createMockParent(sockPath);
+    const parent = createMockParent();
     servers.push(parent);
+    await new Promise<void>((r) => parent.server.listening ? r() : parent.server.once("listening", r));
 
     const rpc = new RpcServer({
-      socketPath: sockPath,
+      port: parent.port(),
       methods: { ping: () => ({}) },
     });
 

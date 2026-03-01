@@ -53,16 +53,10 @@ bool SidecarManager::Start(const Options& opts) {
 
   opts_ = opts;
 
-  if (opts_.socket_path.empty()) {
-    std::string home = platform::home_directory();
-    opts_.socket_path = home + "/.quantclaw/sidecar.sock";
-  }
   if (opts_.pid_file.empty()) {
     std::string home = platform::home_directory();
     opts_.pid_file = home + "/.quantclaw/sidecar.pid";
   }
-
-  platform::IpcServer::cleanup(opts_.socket_path);
 
   if (!spawn_sidecar()) {
     return false;
@@ -96,8 +90,8 @@ void SidecarManager::Stop() {
       platform::ipc_close(ipc_handle_);
       ipc_handle_ = platform::kInvalidIpc;
     }
+    ipc_port_ = 0;
   }
-  platform::IpcServer::cleanup(opts_.socket_path);
   remove_pid_file();
 }
 
@@ -209,8 +203,8 @@ void SidecarManager::monitor_loop() {
           platform::ipc_close(ipc_handle_);
           ipc_handle_ = platform::kInvalidIpc;
         }
+        ipc_port_ = 0;
       }
-      platform::IpcServer::cleanup(opts_.socket_path);
 
       if (spawn_sidecar()) {
         restart_count_++;
@@ -235,17 +229,18 @@ bool SidecarManager::spawn_sidecar() {
     return false;
   }
 
-  // Create IPC server
-  platform::IpcServer server(opts_.socket_path);
+  // Create TCP IPC server — OS assigns a free loopback port.
+  platform::IpcServer server;
   if (!server.listen()) {
-    logger_->error("Failed to create IPC server at {}", opts_.socket_path);
+    logger_->error("Failed to create TCP IPC server");
     return false;
   }
-  platform::ipc_set_permissions(opts_.socket_path, 0600);
+  int port = server.port();
+  logger_->debug("IPC TCP server listening on 127.0.0.1:{}", port);
 
-  // Build env vars
+  // Build env vars — pass port instead of socket path.
   std::vector<std::string> env;
-  env.push_back("QUANTCLAW_SOCKET=" + opts_.socket_path);
+  env.push_back("QUANTCLAW_PORT=" + std::to_string(port));
   if (!opts_.plugin_config.is_null()) {
     env.push_back("QUANTCLAW_PLUGIN_CONFIG=" + opts_.plugin_config.dump());
   }
@@ -278,6 +273,7 @@ bool SidecarManager::spawn_sidecar() {
   {
     std::lock_guard<std::mutex> lock(ipc_mu_);
     ipc_handle_ = connected;
+    ipc_port_ = port;
   }
 
   return true;
@@ -309,7 +305,8 @@ void SidecarManager::kill_sidecar(bool force) {
 }
 
 bool SidecarManager::connect_ipc() {
-  platform::IpcClient client(opts_.socket_path);
+  if (ipc_port_ <= 0) return false;
+  platform::IpcClient client("127.0.0.1", ipc_port_);
   if (!client.connect()) return false;
   ipc_handle_ = client.handle();
   return true;

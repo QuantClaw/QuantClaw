@@ -48,7 +48,6 @@ class SidecarManager {
   struct Options {
     std::string node_binary = "node";
     std::string sidecar_script;  // path to sidecar entry point
-    std::string socket_path;     // IPC path (socket on Unix, pipe name on Win)
     std::string pid_file;
     int heartbeat_interval_ms = 5000;
     int heartbeat_timeout_count = 3;  // miss count before declaring dead
@@ -56,6 +55,9 @@ class SidecarManager {
     int max_restarts = 10;
     std::vector<std::string> env_whitelist;
     nlohmann::json plugin_config;  // passed to sidecar as startup config
+
+    // Deprecated: ignored. TCP port is assigned dynamically by the OS.
+    std::string socket_path;
   };
 
   // Start the sidecar process
@@ -95,6 +97,7 @@ class SidecarManager {
   std::atomic<bool> stopping_{false};
 
   platform::IpcHandle ipc_handle_ = platform::kInvalidIpc;
+  int ipc_port_ = 0;  // TCP port assigned after IpcServer::listen()
   std::mutex ipc_mu_;
 
   std::thread monitor_thread_;

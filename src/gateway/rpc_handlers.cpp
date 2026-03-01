@@ -15,6 +15,7 @@
 #include "quantclaw/core/session_compaction.hpp"
 #include "quantclaw/plugins/plugin_system.hpp"
 #include "quantclaw/gateway/command_queue.hpp"
+#include "quantclaw/core/message_commands.hpp"
 #include "quantclaw/config.hpp"
 #include <chrono>
 #include <functional>
@@ -135,6 +136,41 @@ void register_rpc_handlers(
 
         if (message.empty()) {
             throw std::runtime_error("message is required");
+        }
+
+        // --- In-conversation slash command interception ---
+        // Check if the message is a slash command (/new, /reset, /compact, etc.)
+        // before forwarding to the LLM.
+        {
+            quantclaw::MessageCommandParser::Handlers cmd_handlers;
+            cmd_handlers.reset_session = [session_manager](const std::string& key) {
+                session_manager->ResetSession(key);
+            };
+            cmd_handlers.compact_session = [session_manager, logger](const std::string& key) {
+                auto history = session_manager->GetHistory(key, -1);
+                if (history.size() > 20) {
+                    // Simple truncation (keep last 20 messages)
+                    session_manager->ResetSession(key);
+                    int keep = std::min(20, static_cast<int>(history.size()));
+                    for (int i = static_cast<int>(history.size()) - keep;
+                         i < static_cast<int>(history.size()); ++i) {
+                        session_manager->AppendMessage(key, history[i]);
+                    }
+                    logger->info("Compacted session {}: kept {} of {} messages",
+                                 key, keep, history.size());
+                }
+            };
+            cmd_handlers.get_status = [session_manager](const std::string& key) {
+                auto history = session_manager->GetHistory(key, -1);
+                return "Session: " + key + "\nMessages: " +
+                       std::to_string(history.size());
+            };
+
+            quantclaw::MessageCommandParser cmd_parser(std::move(cmd_handlers));
+            auto cmd_result = cmd_parser.Parse(message, session_key);
+            if (cmd_result.handled) {
+                return {session_key, cmd_result.reply};
+            }
         }
 
         // Get or create session

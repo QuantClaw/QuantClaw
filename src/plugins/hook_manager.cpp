@@ -253,6 +253,31 @@ nlohmann::json HookManager::ForwardToSidecar(const std::string& hook_name,
   return nlohmann::json::object();
 }
 
+bool HookManager::UnregisterHook(const std::string& hook_name,
+                                  const std::string& plugin_id) {
+  std::lock_guard<std::mutex> lock(mu_);
+  auto it = hooks_.find(hook_name);
+  if (it == hooks_.end()) return false;
+
+  auto& handlers = it->second;
+  auto before = handlers.size();
+  handlers.erase(
+      std::remove_if(handlers.begin(), handlers.end(),
+                     [&](const HookRegistration& r) {
+                       return r.plugin_id == plugin_id;
+                     }),
+      handlers.end());
+  if (handlers.empty()) {
+    hooks_.erase(it);
+  }
+  return handlers.size() < before;
+}
+
+void HookManager::Clear() {
+  std::lock_guard<std::mutex> lock(mu_);
+  hooks_.clear();
+}
+
 std::vector<std::string> HookManager::RegisteredHooks() const {
   std::lock_guard<std::mutex> lock(mu_);
   std::vector<std::string> names;

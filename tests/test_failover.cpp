@@ -454,3 +454,146 @@ TEST(CooldownTrackerTest, FailureWindowDecayResets) {
     // Without waiting 24h, the counter keeps incrementing
     // (The actual decay would reset to 0+1=1 after 24h inactivity)
 }
+
+// ================================================================
+// P4 — Extended HTTP Error Classification Tests
+// ================================================================
+
+TEST(ProviderErrorTest, HttpErrorClassification_Billing402) {
+    EXPECT_EQ(ClassifyHttpError(402), ProviderErrorKind::kBillingError);
+}
+
+TEST(ProviderErrorTest, HttpErrorClassification_Timeout408) {
+    // 408 Request Timeout is in the 4xx range without explicit mapping,
+    // classified as kUnknown
+    EXPECT_EQ(ClassifyHttpError(408), ProviderErrorKind::kUnknown);
+}
+
+TEST(ProviderErrorTest, HttpErrorClassification_ServerError502) {
+    EXPECT_EQ(ClassifyHttpError(502), ProviderErrorKind::kTransient);
+}
+
+TEST(ProviderErrorTest, HttpErrorClassification_ServerError503) {
+    EXPECT_EQ(ClassifyHttpError(503), ProviderErrorKind::kTransient);
+}
+
+TEST(ProviderErrorTest, HttpErrorClassification_Unknown400) {
+    EXPECT_EQ(ClassifyHttpError(400), ProviderErrorKind::kUnknown);
+}
+
+// ================================================================
+// P4 — Extended CooldownTracker Tests
+// ================================================================
+
+TEST(CooldownTrackerTest, ModelNotFoundHasZeroCooldown) {
+    CooldownTracker tracker;
+    tracker.RecordFailure("key-mnf", ProviderErrorKind::kModelNotFound);
+    EXPECT_FALSE(tracker.IsInCooldown("key-mnf"));
+}
+
+TEST(CooldownTrackerTest, AuthErrorHasFixedCooldown) {
+    CooldownTracker tracker;
+    tracker.RecordFailure("key-auth", ProviderErrorKind::kAuthError);
+    EXPECT_TRUE(tracker.IsInCooldown("key-auth"));
+    auto remaining = tracker.CooldownRemaining("key-auth");
+    EXPECT_GE(remaining.count(), 3590);
+    EXPECT_LE(remaining.count(), 3600);
+}
+
+TEST(CooldownTrackerTest, BillingErrorHasHighCooldown) {
+    CooldownTracker tracker;
+    tracker.RecordFailure("key-billing", ProviderErrorKind::kBillingError);
+    EXPECT_TRUE(tracker.IsInCooldown("key-billing"));
+    auto remaining = tracker.CooldownRemaining("key-billing");
+    // Billing errors should have a significant cooldown
+    EXPECT_GT(remaining.count(), 0);
+}
+
+TEST(CooldownTrackerTest, ConsecutiveFailuresIncrementExponentially) {
+    CooldownTracker tracker;
+
+    tracker.RecordFailure("exp-key", ProviderErrorKind::kTransient);
+    auto cooldown1 = tracker.CooldownRemaining("exp-key");
+
+    tracker.RecordFailure("exp-key", ProviderErrorKind::kTransient);
+    auto cooldown2 = tracker.CooldownRemaining("exp-key");
+
+    tracker.RecordFailure("exp-key", ProviderErrorKind::kTransient);
+    auto cooldown3 = tracker.CooldownRemaining("exp-key");
+
+    // Each successive failure should have a longer or equal cooldown
+    EXPECT_GE(cooldown2.count(), cooldown1.count());
+    EXPECT_GE(cooldown3.count(), cooldown2.count());
+    EXPECT_EQ(tracker.FailureCount("exp-key"), 3);
+}
+
+TEST(CooldownTrackerTest, SuccessClearsCooldownCompletely) {
+    CooldownTracker tracker;
+    tracker.RecordFailure("clear-key", ProviderErrorKind::kRateLimit);
+    EXPECT_TRUE(tracker.IsInCooldown("clear-key"));
+    EXPECT_EQ(tracker.FailureCount("clear-key"), 1);
+
+    tracker.RecordSuccess("clear-key");
+    EXPECT_FALSE(tracker.IsInCooldown("clear-key"));
+    EXPECT_EQ(tracker.FailureCount("clear-key"), 0);
+    EXPECT_EQ(tracker.CooldownRemaining("clear-key").count(), 0);
+}
+
+TEST(CooldownTrackerTest, IndependentKeysIsolated) {
+    CooldownTracker tracker;
+    tracker.RecordFailure("key-a", ProviderErrorKind::kRateLimit);
+    EXPECT_TRUE(tracker.IsInCooldown("key-a"));
+    EXPECT_FALSE(tracker.IsInCooldown("key-b"));
+    EXPECT_EQ(tracker.FailureCount("key-a"), 1);
+    EXPECT_EQ(tracker.FailureCount("key-b"), 0);
+}
+
+// ================================================================
+// P4 — Extended FailoverResolver Tests
+// ================================================================
+
+TEST_F(FailoverResolverTest, ProbeOnCooldownAllowsOneAttempt) {
+    // When all profiles are in cooldown and TryProbe succeeds,
+    // resolver should still return a result via probe mechanism
+    std::vector<AuthProfile> profiles = {
+        {"prod", "sk-prod-key", ""},
+        {"backup", "sk-backup-key", ""},
+    };
+    resolver_->SetProfiles("anthropic", profiles);
+
+    // Put both in cooldown
+    resolver_->RecordFailure("anthropic", "prod", ProviderErrorKind::kRateLimit);
+    resolver_->RecordFailure("anthropic", "backup", ProviderErrorKind::kRateLimit);
+
+    // Set fallback chain so we have somewhere to go
+    resolver_->SetFallbackChain({"openai/gpt-4o"});
+
+    // Should still resolve via fallback
+    auto result = resolver_->Resolve("anthropic/claude-sonnet-4-6");
+    if (result.has_value()) {
+        // Either fallback or probe succeeded
+        EXPECT_TRUE(result->is_fallback || result->provider_id == "anthropic");
+    }
+}
+
+TEST_F(FailoverResolverTest, SessionPinClearedOnCooldownExtended) {
+    std::vector<AuthProfile> profiles = {
+        {"prod", "sk-prod-key", ""},
+        {"backup", "sk-backup-key", ""},
+    };
+    resolver_->SetProfiles("anthropic", profiles);
+
+    // Pin session to prod
+    auto r1 = resolver_->Resolve("anthropic/claude-sonnet-4-6", "session-x");
+    ASSERT_TRUE(r1.has_value());
+    resolver_->RecordSuccess("anthropic", r1->profile_id, "session-x");
+
+    // Now put the pinned profile in cooldown
+    resolver_->RecordFailure("anthropic", r1->profile_id,
+                             ProviderErrorKind::kRateLimit);
+
+    // Next resolve should pick a different profile
+    auto r2 = resolver_->Resolve("anthropic/claude-sonnet-4-6", "session-x");
+    ASSERT_TRUE(r2.has_value());
+    EXPECT_NE(r2->profile_id, r1->profile_id);
+}

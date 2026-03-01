@@ -93,6 +93,13 @@ class HookManager {
   // List all registered hooks
   std::vector<std::string> RegisteredHooks() const;
 
+  // Unregister a specific handler by plugin_id from a hook
+  bool UnregisterHook(const std::string& hook_name,
+                      const std::string& plugin_id);
+
+  // Clear all registered handlers
+  void Clear();
+
   // Number of handlers for a specific hook
   size_t HandlerCount(const std::string& hook_name) const;
 

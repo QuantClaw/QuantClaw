@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // ---------------------------------------------------------------------------
-// JSON-RPC 2.0 server over Unix domain socket / named pipe.
+// JSON-RPC 2.0 server over TCP loopback.
 //
 // Protocol: line-delimited JSON — each message is one JSON object followed
 // by a single '\n'.  The C++ parent process (SidecarManager) acts as the
-// IPC *server* and the sidecar connects as a *client*.
+// TCP *server* and the sidecar connects as a *client*.
+//
+// The C++ parent passes the bound port via QUANTCLAW_PORT.  The sidecar
+// connects to 127.0.0.1:PORT using Node.js's standard net module — no
+// additional npm dependencies required, and works identically on Linux,
+// macOS, and Windows.
 // ---------------------------------------------------------------------------
 
 import * as net from "node:net";
@@ -17,7 +22,8 @@ export type RpcMethodHandler = (
 ) => Promise<unknown> | unknown;
 
 export interface RpcServerOptions {
-  socketPath: string;
+  port: number;
+  host?: string;
   methods: Record<string, RpcMethodHandler>;
   onError?: (err: Error) => void;
   onConnected?: () => void;
@@ -25,31 +31,33 @@ export interface RpcServerOptions {
 }
 
 /**
- * A JSON-RPC 2.0 client that connects to the C++ parent's Unix socket and
- * responds to incoming requests.
+ * A JSON-RPC 2.0 client that connects to the C++ parent's TCP loopback port
+ * and responds to incoming requests.
  */
 export class RpcServer {
   private socket: net.Socket | null = null;
   private buffer = "";
   private connected = false;
   private readonly methods: Record<string, RpcMethodHandler>;
-  private readonly socketPath: string;
+  private readonly port: number;
+  private readonly host: string;
   private readonly onError: (err: Error) => void;
   private readonly onConnected: () => void;
   private readonly onDisconnected: () => void;
 
   constructor(opts: RpcServerOptions) {
-    this.socketPath = opts.socketPath;
+    this.port = opts.port;
+    this.host = opts.host ?? "127.0.0.1";
     this.methods = opts.methods;
     this.onError = opts.onError ?? ((err) => console.error("[rpc]", err.message));
     this.onConnected = opts.onConnected ?? (() => {});
     this.onDisconnected = opts.onDisconnected ?? (() => {});
   }
 
-  /** Connect to the C++ parent's IPC socket. */
+  /** Connect to the C++ parent's TCP IPC port. */
   connect(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const socket = net.createConnection(this.socketPath, () => {
+      const socket = net.createConnection(this.port, this.host, () => {
         this.connected = true;
         this.onConnected();
         resolve();

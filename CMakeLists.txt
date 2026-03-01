@@ -48,7 +48,7 @@ set(QUANTCLAW_CORE_SOURCES
     src/core/cron_scheduler.cpp
     src/core/memory_search.cpp
     src/core/context_pruner.cpp
-    src/core/context_pruner.cpp
+    src/core/message_commands.cpp
     src/core/subagent.cpp
     # Providers
     src/providers/curl_raii.cpp
@@ -99,19 +99,19 @@ set(QUANTCLAW_CORE_SOURCES
     # Web
     src/web/web_server.cpp
     src/web/api_routes.cpp
+    # IPC — single TCP implementation for all platforms
+    src/platform/ipc_tcp.cpp
 )
 
-# Platform-specific sources
+# Platform-specific sources (process + service abstractions)
 if(WIN32)
     list(APPEND QUANTCLAW_CORE_SOURCES
         src/platform/process_win32.cpp
-        src/platform/ipc_win32.cpp
         src/platform/service_win32.cpp
     )
 else()
     list(APPEND QUANTCLAW_CORE_SOURCES
         src/platform/process_unix.cpp
-        src/platform/ipc_unix.cpp
         src/platform/service_unix.cpp
     )
 endif()
@@ -136,6 +136,11 @@ target_link_libraries(quantclaw_core
         OpenSSL::SSL
         OpenSSL::Crypto
 )
+
+# WinSock2 required by ipc_tcp.cpp on Windows
+if(WIN32)
+    target_link_libraries(quantclaw_core PUBLIC ws2_32)
+endif()
 
 add_executable(quantclaw src/main.cpp)
 target_link_libraries(quantclaw PRIVATE quantclaw_core)
@@ -206,6 +211,8 @@ if(BUILD_TESTS)
         tests/test_command_queue.cpp
         tests/test_failover.cpp
         tests/test_context_management.cpp
+        tests/test_session_compaction.cpp
+        tests/test_message_commands.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})

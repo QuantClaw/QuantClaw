@@ -101,30 +101,27 @@ TEST(PlatformProcess, WaitNonBlockingNotExited) {
   wait_process(pid, 5000);
 }
 
-// --- IPC tests ---
+// --- IPC tests (TCP loopback) ---
 
-TEST(PlatformIpc, ServerListenAndCleanup) {
-  std::string path = "/tmp/quantclaw_test_ipc.sock";
-  IpcServer::cleanup(path);
-
-  IpcServer server(path);
+TEST(PlatformIpc, ServerListenAndGetPort) {
+  // IpcServer binds to 127.0.0.1:0 and reports the assigned port.
+  IpcServer server;
   EXPECT_TRUE(server.listen());
-  EXPECT_EQ(server.path(), path);
+  EXPECT_GT(server.port(), 0);
   server.close();
-  IpcServer::cleanup(path);
+  // cleanup() is a no-op for TCP — just verify it doesn't crash.
+  IpcServer::cleanup("");
 }
 
 TEST(PlatformIpc, ClientServerRoundtrip) {
-  std::string path = "/tmp/quantclaw_test_ipc_rt.sock";
-  IpcServer::cleanup(path);
-
-  IpcServer server(path);
+  IpcServer server;
   ASSERT_TRUE(server.listen());
+  int port = server.port();
 
-  // Spawn a client thread
-  std::thread client_thread([&path]() {
+  // Spawn a client thread that connects to the server's port.
+  std::thread client_thread([port]() {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    IpcClient client(path);
+    IpcClient client("127.0.0.1", port);
     ASSERT_TRUE(client.connect());
 
     const char* msg = "hello\n";
@@ -143,35 +140,23 @@ TEST(PlatformIpc, ClientServerRoundtrip) {
 
   ipc_close(conn);
   server.close();
-  IpcServer::cleanup(path);
   client_thread.join();
 }
 
 TEST(PlatformIpc, AcceptTimeout) {
-  std::string path = "/tmp/quantclaw_test_ipc_timeout.sock";
-  IpcServer::cleanup(path);
-
-  IpcServer server(path);
+  IpcServer server;
   ASSERT_TRUE(server.listen());
 
-  // No client connects, should timeout
+  // No client connects — should timeout quickly.
   auto conn = server.accept(100);
   EXPECT_EQ(conn, kInvalidIpc);
 
   server.close();
-  IpcServer::cleanup(path);
 }
 
-TEST(PlatformIpc, SetPermissions) {
-  std::string path = "/tmp/quantclaw_test_ipc_perms.sock";
-  IpcServer::cleanup(path);
-
-  IpcServer server(path);
-  ASSERT_TRUE(server.listen());
-  ipc_set_permissions(path, 0600);
-
-  server.close();
-  IpcServer::cleanup(path);
+TEST(PlatformIpc, SetPermissionsIsNoOp) {
+  // ipc_set_permissions is a no-op for TCP; verify it doesn't crash.
+  ipc_set_permissions("", 0600);
 }
 
 // --- ServiceManager tests ---

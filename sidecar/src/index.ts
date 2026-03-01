@@ -9,7 +9,7 @@
 // TypeScript plugins via jiti, and serves JSON-RPC 2.0 requests.
 //
 // Environment variables (set by C++ SidecarManager):
-//   QUANTCLAW_SOCKET         — IPC socket path
+//   QUANTCLAW_PORT           — TCP port that the C++ parent listens on
 //   QUANTCLAW_PLUGIN_CONFIG  — JSON string with plugin configuration
 // ---------------------------------------------------------------------------
 
@@ -334,13 +334,14 @@ async function stopServices(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  const socketPath = process.env.QUANTCLAW_SOCKET;
-  if (!socketPath) {
-    logger.error("QUANTCLAW_SOCKET environment variable not set");
+  const portStr = process.env.QUANTCLAW_PORT;
+  if (!portStr) {
+    logger.error("QUANTCLAW_PORT environment variable not set");
     process.exit(1);
   }
 
-  logger.info(`sidecar starting, socket: ${socketPath}`);
+  const ipcPort = parseInt(portStr, 10);
+  logger.info(`sidecar starting, TCP port: ${ipcPort}`);
 
   // Parse startup config.
   const startupConfig = parseStartupConfig();
@@ -394,7 +395,7 @@ async function main(): Promise<void> {
   });
 
   const rpc = new RpcServer({
-    socketPath,
+    port: ipcPort,
     methods: rpcMethods,
     onError: (err) => logger.error(`[rpc] ${err.message}`),
     onConnected: () => logger.info("[rpc] connected to parent process"),
@@ -409,7 +410,7 @@ async function main(): Promise<void> {
   try {
     await rpc.connect();
   } catch (err) {
-    logger.error(`[rpc] failed to connect to ${socketPath}: ${String(err)}`);
+    logger.error(`[rpc] failed to connect to 127.0.0.1:${ipcPort}: ${String(err)}`);
     process.exit(1);
   }
 
