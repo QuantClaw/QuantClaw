@@ -7,6 +7,7 @@
 #include <vector>
 #include <unordered_map>
 #include <nlohmann/json.hpp>
+#include "quantclaw/constants.hpp"
 
 namespace quantclaw {
 
@@ -14,17 +15,17 @@ namespace quantclaw {
 
 struct AgentConfig {
     std::string model = "qwen-max";
-    int max_iterations = 15;
-    double temperature = 0.7;
-    int max_tokens = 4096;
+    int max_iterations = kDefaultMaxIterations;
+    double temperature = kDefaultTemperature;
+    int max_tokens = kDefaultMaxTokens;
     std::string thinking = "off";  // "off" | "low" | "medium" | "high"
     std::vector<std::string> fallbacks;  // Model fallback chain
 
     // Auto-compaction settings
     bool auto_compact = true;          // Enable automatic compaction
-    int compact_max_messages = 100;    // Compact when history exceeds this
-    int compact_keep_recent = 20;      // Keep this many recent messages
-    int compact_max_tokens = 100000;   // Compact when tokens exceed this
+    int compact_max_messages = kDefaultCompactMaxMessages;  // Compact when history exceeds this
+    int compact_keep_recent = kDefaultCompactKeepRecent;    // Keep this many recent messages
+    int compact_max_tokens = kDefaultCompactMaxTokens;      // Compact when tokens exceed this
 
     static AgentConfig FromJson(const nlohmann::json& json);
 };
@@ -32,7 +33,7 @@ struct AgentConfig {
 struct ProviderConfig {
     std::string api_key;
     std::string base_url;
-    int timeout = 30;
+    int timeout = kDefaultProviderTimeoutSec;
 
     static ProviderConfig FromJson(const nlohmann::json& json);
 };
@@ -60,7 +61,7 @@ struct ToolConfig {
     std::vector<std::string> denied_paths;
     std::vector<std::string> allowed_cmds;
     std::vector<std::string> denied_cmds;
-    int timeout = 30;
+    int timeout = kDefaultToolTimeoutSec;
 
     static ToolConfig FromJson(const nlohmann::json& json);
 };
@@ -77,7 +78,7 @@ struct ToolPermissionConfig {
 struct MCPServerConfig {
     std::string name;
     std::string url;
-    int timeout = 30;
+    int timeout = kDefaultMcpTimeoutSec;
 
     static MCPServerConfig FromJson(const nlohmann::json& json);
 };
@@ -104,18 +105,18 @@ struct GatewayAuthConfig {
 
 struct GatewayControlUiConfig {
     bool enabled = true;
-    int port = 18801;  // QuantClaw HTTP/Dashboard port
+    int port = kDefaultHttpPort;  // QuantClaw HTTP/Dashboard port
 
     static GatewayControlUiConfig FromJson(const nlohmann::json& json) {
         GatewayControlUiConfig c;
         c.enabled = json.value("enabled", true);
-        c.port = json.value("port", 18801);
+        c.port = json.value("port", kDefaultHttpPort);
         return c;
     }
 };
 
 struct GatewayConfig {
-    int port = 18800;  // QuantClaw WebSocket RPC port
+    int port = kDefaultGatewayPort;  // QuantClaw WebSocket RPC port
     std::string bind = "loopback";
     GatewayAuthConfig auth;
     GatewayControlUiConfig control_ui;

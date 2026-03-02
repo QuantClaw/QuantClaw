@@ -475,7 +475,7 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
 }
 
 int GatewayCommands::InstallCommand(const std::vector<std::string>& args) {
-    int port = 18789;
+    int port = kLegacyGatewayPort;
     for (size_t i = 0; i < args.size(); ++i) {
         if (args[i] == "--port" && i + 1 < args.size()) {
             port = std::stoi(args[++i]);

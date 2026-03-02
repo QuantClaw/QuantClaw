@@ -11,20 +11,20 @@ namespace quantclaw {
 AgentConfig AgentConfig::FromJson(const nlohmann::json& json) {
     AgentConfig config;
     config.model = json.value("model", "qwen-max");
-    config.max_iterations = json.value("maxIterations", json.value("max_iterations", 15));
-    config.temperature = json.value("temperature", 0.7);
-    config.max_tokens = json.value("maxTokens", json.value("max_tokens", 4096));
+    config.max_iterations = json.value("maxIterations", json.value("max_iterations", kDefaultMaxIterations));
+    config.temperature = json.value("temperature", kDefaultTemperature);
+    config.max_tokens = json.value("maxTokens", json.value("max_tokens", kDefaultMaxTokens));
     config.thinking = json.value("thinking", "off");
     config.fallbacks = json.value("fallbacks", std::vector<std::string>{});
 
     // Compaction settings
     config.auto_compact = json.value("autoCompact", json.value("auto_compact", true));
     config.compact_max_messages = json.value("compactMaxMessages",
-                                              json.value("compact_max_messages", 100));
+                                              json.value("compact_max_messages", kDefaultCompactMaxMessages));
     config.compact_keep_recent = json.value("compactKeepRecent",
-                                             json.value("compact_keep_recent", 20));
+                                             json.value("compact_keep_recent", kDefaultCompactKeepRecent));
     config.compact_max_tokens = json.value("compactMaxTokens",
-                                            json.value("compact_max_tokens", 100000));
+                                            json.value("compact_max_tokens", kDefaultCompactMaxTokens));
     return config;
 }
 
@@ -32,7 +32,7 @@ ProviderConfig ProviderConfig::FromJson(const nlohmann::json& json) {
     ProviderConfig config;
     config.api_key = json.value("apiKey", json.value("api_key", ""));
     config.base_url = json.value("baseUrl", json.value("base_url", ""));
-    config.timeout = json.value("timeout", 30);
+    config.timeout = json.value("timeout", kDefaultProviderTimeoutSec);
     return config;
 }
 
@@ -53,7 +53,7 @@ ToolConfig ToolConfig::FromJson(const nlohmann::json& json) {
     config.denied_paths = json.value("denied_paths", std::vector<std::string>{});
     config.allowed_cmds = json.value("allowed_cmds", std::vector<std::string>{});
     config.denied_cmds = json.value("denied_cmds", std::vector<std::string>{});
-    config.timeout = json.value("timeout", 30);
+    config.timeout = json.value("timeout", kDefaultToolTimeoutSec);
     return config;
 }
 
@@ -68,7 +68,7 @@ MCPServerConfig MCPServerConfig::FromJson(const nlohmann::json& json) {
     MCPServerConfig config;
     config.name = json.value("name", "");
     config.url = json.value("url", "");
-    config.timeout = json.value("timeout", 30);
+    config.timeout = json.value("timeout", kDefaultMcpTimeoutSec);
     return config;
 }
 
@@ -123,7 +123,7 @@ SkillsConfig SkillsConfig::FromJson(const nlohmann::json& json) {
 
 GatewayConfig GatewayConfig::FromJson(const nlohmann::json& json) {
     GatewayConfig config;
-    config.port = json.value("port", 18800);  // QuantClaw WebSocket RPC port
+    config.port = json.value("port", kDefaultGatewayPort);  // QuantClaw WebSocket RPC port
     config.bind = json.value("bind", "loopback");
     if (json.contains("auth")) {
         config.auth = GatewayAuthConfig::FromJson(json["auth"]);
@@ -157,13 +157,13 @@ QuantClawConfig QuantClawConfig::FromJson(const nlohmann::json& json) {
         std::string provider_name = llm.value("provider", "openai");
 
         config.agent.model = llm.value("model", "qwen-max");
-        config.agent.temperature = llm.value("temperature", 0.7);
-        config.agent.max_tokens = llm.value("maxTokens", 4096);
+        config.agent.temperature = llm.value("temperature", kDefaultTemperature);
+        config.agent.max_tokens = llm.value("maxTokens", kDefaultMaxTokens);
 
         ProviderConfig prov;
         prov.api_key = llm.value("apiKey", "");
         prov.base_url = llm.value("baseUrl", "");
-        prov.timeout = llm.value("timeout", 30);
+        prov.timeout = llm.value("timeout", kDefaultProviderTimeoutSec);
         config.providers[provider_name] = prov;
     }
 

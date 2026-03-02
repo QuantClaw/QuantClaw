@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <spdlog/spdlog.h>
+#include "quantclaw/constants.hpp"
 
 namespace quantclaw::platform {
 
@@ -18,7 +19,7 @@ class ServiceManager {
   ~ServiceManager() = default;
 
   // Install the service (systemd unit file on Linux, no-op on Windows).
-  int install(int port = 18789);
+  int install(int port = kLegacyGatewayPort);
 
   // Uninstall the service.
   int uninstall();

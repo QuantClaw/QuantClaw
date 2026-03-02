@@ -17,6 +17,11 @@
 #include "quantclaw/core/skill_loader.hpp"
 #include "quantclaw/core/memory_search.hpp"
 
+// Bring port/URL constants into scope (avoids quantclaw:: prefix for literals)
+using quantclaw::kDefaultGatewayPort;
+using quantclaw::kDefaultGatewayUrl;
+using quantclaw::kDefaultHttpPort;
+
 static std::shared_ptr<spdlog::logger> create_logger() {
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     console_sink->set_level(spdlog::level::info);
@@ -40,7 +45,7 @@ int main(int argc, char* argv[]) {
     try {
         auto cfg = quantclaw::QuantClawConfig::LoadFromFile(
             quantclaw::QuantClawConfig::DefaultConfigPath());
-        int port = cfg.gateway.port > 0 ? cfg.gateway.port : 18800;
+        int port = cfg.gateway.port > 0 ? cfg.gateway.port : kDefaultGatewayPort;
         std::string url = "ws://127.0.0.1:" + std::to_string(port);
         gateway_cmds->SetGatewayUrl(url);
         agent_cmds->SetGatewayUrl(url);

@@ -4,18 +4,39 @@
 #include "quantclaw/cli/onboard_commands.hpp"
 #include "quantclaw/config.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
+#include "quantclaw/platform/service.hpp"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
 #include <cstdlib>
+#include <random>
 #include <thread>
 #include <chrono>
 
 namespace quantclaw::cli {
 
+// ---------------------------------------------------------------------------
+// Token generation (OpenClaw-compatible: 48-char hex string)
+// ---------------------------------------------------------------------------
+std::string OnboardCommands::GenerateToken() {
+    static constexpr char kHexChars[] = "0123456789abcdef";
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dist(0, 15);
+    std::string token;
+    token.reserve(48);
+    for (int i = 0; i < 48; ++i) {
+        token += kHexChars[dist(gen)];
+    }
+    return token;
+}
+
 OnboardCommands::OnboardCommands(std::shared_ptr<spdlog::logger> logger)
     : logger_(logger) {}
 
+// ---------------------------------------------------------------------------
+// Main onboard wizard
+// ---------------------------------------------------------------------------
 int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
     bool install_daemon = false;
     bool skip_daemon = false;
@@ -34,6 +55,14 @@ int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
         return 1;
     }
 
+    // Load port for later steps
+    int port = 18800;
+    try {
+        auto cfg = QuantClawConfig::LoadFromFile(
+            QuantClawConfig::DefaultConfigPath());
+        if (cfg.gateway.port > 0) port = cfg.gateway.port;
+    } catch (...) {}
+
     // Step 2: Workspace
     PrintStep(2, 5, "Workspace Setup");
     if (SetupWorkspace() != 0) {
@@ -44,10 +73,10 @@ int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
     // Step 3: Daemon
     PrintStep(3, 5, "Daemon Setup");
     if (!skip_daemon) {
-        if (install_daemon || PromptYesNo("Install QuantClaw as system service?", true)) {
+        if (install_daemon ||
+            PromptYesNo("Install QuantClaw as user service (systemd)?", true)) {
             if (SetupDaemon() != 0) {
-                std::cerr << "Daemon setup failed" << std::endl;
-                return 1;
+                logger_->warn("Daemon setup failed, continuing");
             }
         }
     }
@@ -66,42 +95,63 @@ int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
 
     std::cout << "\n✓ Onboarding complete!" << std::endl;
     std::cout << "\nNext steps:" << std::endl;
-    std::cout << "  1. Start the gateway: quantclaw gateway" << std::endl;
-    std::cout << "  2. Open the dashboard: quantclaw dashboard" << std::endl;
-    std::cout << "  3. Send a message: quantclaw agent -m \"Hello\"" << std::endl;
+    std::cout << "  1. Start the gateway:  quantclaw gateway start" << std::endl;
+    std::cout << "  2. Check status:       quantclaw status" << std::endl;
+    std::cout << "  3. Send a message:     quantclaw agent -m \"Hello\"" << std::endl;
+    std::cout << "  4. Open the dashboard: http://127.0.0.1:" << port + 1 << std::endl;
     std::cout << "\nFor help: quantclaw --help" << std::endl;
 
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// quantclaw onboard --install-daemon
+// ---------------------------------------------------------------------------
 int OnboardCommands::InstallDaemonCommand(const std::vector<std::string>& /*args*/) {
-    std::cout << "Installing QuantClaw as system service..." << std::endl;
-    if (InstallDaemon()) {
-        std::cout << "✓ Daemon installed successfully" << std::endl;
-        std::cout << "\nStart the service:" << std::endl;
-        std::cout << "  quantclaw gateway start" << std::endl;
-        return 0;
-    } else {
-        std::cerr << "✗ Failed to install daemon" << std::endl;
-        return 1;
+    // Load or create config first (daemon needs port + token)
+    int port = 18800;
+    try {
+        auto cfg = QuantClawConfig::LoadFromFile(
+            QuantClawConfig::DefaultConfigPath());
+        if (cfg.gateway.port > 0) port = cfg.gateway.port;
+    } catch (...) {
+        // No config yet — run quick setup so config exists
+        std::cout << "No config found. Running quick setup first..." << std::endl;
+        if (QuickSetupCommand({}) != 0) return 1;
     }
+
+    std::cout << "Installing QuantClaw as user service..." << std::endl;
+    if (InstallDaemon(port)) {
+        std::cout << "✓ Daemon installed successfully" << std::endl;
+        std::cout << "\nManage the service:" << std::endl;
+        std::cout << "  quantclaw gateway start" << std::endl;
+        std::cout << "  quantclaw gateway stop" << std::endl;
+        std::cout << "  quantclaw gateway status" << std::endl;
+        return 0;
+    }
+    std::cerr << "✗ Failed to install daemon" << std::endl;
+    return 1;
 }
 
+// ---------------------------------------------------------------------------
+// quantclaw onboard --quick
+// ---------------------------------------------------------------------------
 int OnboardCommands::QuickSetupCommand(const std::vector<std::string>& /*args*/) {
     std::cout << "Running quick setup..." << std::endl;
+
+    // Token
+    std::string token = GenerateToken();
 
     if (!CreateWorkspaceDirectory()) {
         std::cerr << "Failed to create workspace" << std::endl;
         return 1;
     }
-
-    if (!CreateConfigFile()) {
+    if (!CreateConfigFile("anthropic/claude-sonnet-4-6", 18800, "127.0.0.1", token)) {
         std::cerr << "Failed to create config" << std::endl;
         return 1;
     }
-
-    if (!CreateSOULFile()) {
-        std::cerr << "Failed to create SOUL.md" << std::endl;
+    if (!CreateSOULFile() || !CreateAgentsFile() || !CreateToolsFile()) {
+        std::cerr << "Failed to create workspace files" << std::endl;
         return 1;
     }
 
@@ -188,9 +238,7 @@ std::string OnboardCommands::PromptChoice(const std::string& prompt, const std::
 }
 
 int OnboardCommands::SetupConfig() {
-    const char* home = std::getenv("HOME");
-    std::string home_str = home ? home : "/tmp";
-    std::string config_path = home_str + "/.quantclaw/quantclaw.json";
+    std::string config_path = QuantClawConfig::DefaultConfigPath();
 
     if (std::filesystem::exists(config_path)) {
         std::cout << "Config file already exists at: " << config_path << std::endl;
@@ -202,10 +250,17 @@ int OnboardCommands::SetupConfig() {
     std::cout << "\nLet's configure QuantClaw:" << std::endl;
 
     std::string model = PromptString("Default AI model", "anthropic/claude-sonnet-4-6");
-    std::string gateway_port = PromptString("Gateway port", "18800");
-    std::string gateway_bind = PromptString("Gateway bind address", "127.0.0.1");
+    std::string port_str = PromptString("Gateway port", std::to_string(kDefaultGatewayPort));
+    std::string bind = PromptString("Gateway bind address", "127.0.0.1");
 
-    if (!CreateConfigFile()) {
+    int port = 18800;
+    try { port = std::stoi(port_str); } catch (...) {}
+
+    // Auto-generate auth token (OpenClaw-compatible behaviour)
+    std::string token = GenerateToken();
+    std::cout << "  Auto-generated gateway auth token." << std::endl;
+
+    if (!CreateConfigFile(model, port, bind, token)) {
         return 1;
     }
 
@@ -217,8 +272,13 @@ int OnboardCommands::SetupWorkspace() {
     if (!CreateWorkspaceDirectory()) {
         return 1;
     }
-
     if (!CreateSOULFile()) {
+        return 1;
+    }
+    if (!CreateAgentsFile()) {
+        return 1;
+    }
+    if (!CreateToolsFile()) {
         return 1;
     }
 
@@ -227,25 +287,41 @@ int OnboardCommands::SetupWorkspace() {
 }
 
 int OnboardCommands::SetupDaemon() {
-    std::cout << "\nSetting up QuantClaw as a system service..." << std::endl;
+    int port = 18800;
+    try {
+        auto cfg = QuantClawConfig::LoadFromFile(
+            QuantClawConfig::DefaultConfigPath());
+        if (cfg.gateway.port > 0) port = cfg.gateway.port;
+    } catch (...) {}
 
-    if (InstallDaemon()) {
+    std::cout << "\nSetting up QuantClaw as a user service (systemd --user)..." << std::endl;
+
+    if (InstallDaemon(port)) {
         std::cout << "✓ Daemon installed successfully" << std::endl;
-        std::cout << "\nYou can now manage the service with:" << std::endl;
+        std::cout << "\nManage the service:" << std::endl;
         std::cout << "  quantclaw gateway start" << std::endl;
         std::cout << "  quantclaw gateway stop" << std::endl;
         std::cout << "  quantclaw gateway status" << std::endl;
         return 0;
-    } else {
-        std::cerr << "✗ Failed to install daemon" << std::endl;
-        std::cerr << "You can still run QuantClaw manually with: quantclaw gateway" << std::endl;
-        return 1;
     }
+    std::cerr << "✗ Failed to install daemon" << std::endl;
+    std::cerr << "You can still run QuantClaw manually: quantclaw gateway" << std::endl;
+    return 1;
 }
 
 int OnboardCommands::SetupSkills() {
-    std::cout << "\nSetting up built-in skills..." << std::endl;
-    std::cout << "✓ Skills are ready to use" << std::endl;
+    const char* home = std::getenv("HOME");
+    std::string home_str = home ? home : "/tmp";
+    auto skills_dir = std::filesystem::path(home_str) / ".quantclaw" / "skills";
+
+    try {
+        std::filesystem::create_directories(skills_dir);
+        std::cout << "  Skills directory: " << skills_dir.string() << std::endl;
+    } catch (const std::exception& e) {
+        logger_->warn("Failed to create skills directory: {}", e.what());
+    }
+
+    std::cout << "✓ Skills directory ready (install skills with: quantclaw skills install <name>)" << std::endl;
     return 0;
 }
 
@@ -256,19 +332,34 @@ int OnboardCommands::VerifySetup() {
     std::string home_str = home ? home : "/tmp";
 
     // Check config
-    std::string config_path = home_str + "/.quantclaw/quantclaw.json";
+    std::string config_path = QuantClawConfig::DefaultConfigPath();
     bool config_ok = std::filesystem::exists(config_path);
-    std::cout << "[" << (config_ok ? "✓" : "✗") << "] Config file" << std::endl;
+    std::cout << "  [" << (config_ok ? "✓" : "✗") << "] Config file" << std::endl;
 
     // Check workspace
-    auto workspace = std::filesystem::path(home_str) / ".quantclaw/agents/main/workspace";
+    auto workspace = std::filesystem::path(home_str) / ".quantclaw/agents/default/workspace";
     bool ws_ok = std::filesystem::exists(workspace);
-    std::cout << "[" << (ws_ok ? "✓" : "✗") << "] Workspace directory" << std::endl;
+    std::cout << "  [" << (ws_ok ? "✓" : "✗") << "] Workspace directory" << std::endl;
 
     // Check SOUL.md
-    auto soul_path = workspace / "SOUL.md";
-    bool soul_ok = std::filesystem::exists(soul_path);
-    std::cout << "[" << (soul_ok ? "✓" : "✗") << "] SOUL.md" << std::endl;
+    bool soul_ok = std::filesystem::exists(workspace / "SOUL.md");
+    std::cout << "  [" << (soul_ok ? "✓" : "✗") << "] SOUL.md" << std::endl;
+
+    // Check AGENTS.md
+    bool agents_ok = std::filesystem::exists(workspace / "AGENTS.md");
+    std::cout << "  [" << (agents_ok ? "✓" : "✗") << "] AGENTS.md" << std::endl;
+
+    // Try gateway connection
+    int port = 18800;
+    try {
+        auto cfg = QuantClawConfig::LoadFromFile(config_path);
+        if (cfg.gateway.port > 0) port = cfg.gateway.port;
+    } catch (...) {}
+
+    bool gw_ok = TestGatewayConnection(port);
+    std::cout << "  [" << (gw_ok ? "✓" : "-") << "] Gateway connection"
+              << (gw_ok ? "" : " (not running — start with: quantclaw gateway start)")
+              << std::endl;
 
     return (config_ok && ws_ok && soul_ok) ? 0 : 1;
 }
@@ -278,13 +369,22 @@ bool OnboardCommands::CreateWorkspaceDirectory() {
     std::string home_str = home ? home : "/tmp";
 
     try {
-        auto workspace = std::filesystem::path(home_str) / ".quantclaw/agents/main/workspace";
+        // OpenClaw-compatible: agents/default/workspace
+        auto workspace = std::filesystem::path(home_str) / ".quantclaw/agents/default/workspace";
         std::filesystem::create_directories(workspace);
 
-        // Create subdirectories
+        // Create standard subdirectories
         std::filesystem::create_directories(workspace / "skills");
         std::filesystem::create_directories(workspace / "scripts");
         std::filesystem::create_directories(workspace / "references");
+
+        // Sessions directory
+        auto sessions = std::filesystem::path(home_str) / ".quantclaw/agents/default/sessions";
+        std::filesystem::create_directories(sessions);
+
+        // Logs directory
+        std::filesystem::create_directories(
+            std::filesystem::path(home_str) / ".quantclaw/logs");
 
         return true;
     } catch (const std::exception& e) {
@@ -293,32 +393,38 @@ bool OnboardCommands::CreateWorkspaceDirectory() {
     }
 }
 
-bool OnboardCommands::CreateConfigFile() {
-    const char* home = std::getenv("HOME");
-    std::string home_str = home ? home : "/tmp";
-    std::string config_path = home_str + "/.quantclaw/quantclaw.json";
+bool OnboardCommands::CreateConfigFile(const std::string& model, int port,
+                                        const std::string& bind,
+                                        const std::string& token) {
+    std::string config_path = QuantClawConfig::DefaultConfigPath();
 
     try {
-        std::filesystem::create_directories(std::filesystem::path(config_path).parent_path());
+        std::filesystem::create_directories(
+            std::filesystem::path(config_path).parent_path());
 
         nlohmann::json config = {
             {"gateway", {
-                {"port", 18800},
-                {"bind", "127.0.0.1"},
-                {"auth", {{"mode", "token"}}}
+                {"port", port},
+                {"bind", bind},
+                {"auth", {
+                    {"mode", "token"},
+                    {"token", token}
+                }}
             }},
             {"models", {
-                {"defaultModel", "anthropic/claude-sonnet-4-6"},
+                {"defaultModel", model},
                 {"providers", {
-                    {"anthropic", {
-                        {"apiKey", ""}
-                    }}
+                    {"anthropic", {{"apiKey", ""}}},
+                    {"openai", {{"apiKey", ""}}}
                 }}
             }},
             {"agent", {
-                {"model", "anthropic/claude-sonnet-4-6"},
+                {"model", model},
                 {"autoCompact", true},
-                {"compactMaxMessages", 100}
+                {"compactMaxMessages", 100},
+                {"maxIterations", 15},
+                {"temperature", 0.7},
+                {"maxTokens", 4096}
             }},
             {"queue", {
                 {"maxConcurrent", 4},
@@ -334,6 +440,9 @@ bool OnboardCommands::CreateConfigFile() {
             {"tools", {
                 {"allow", nlohmann::json::array()},
                 {"exec", {{"ask", "on-miss"}}}
+            }},
+            {"mcp", {
+                {"servers", nlohmann::json::array()}
             }}
         };
 
@@ -348,111 +457,91 @@ bool OnboardCommands::CreateConfigFile() {
     }
 }
 
-bool OnboardCommands::CreateSOULFile() {
+bool OnboardCommands::CreateWorkspaceFile(const std::string& filename,
+                                           const std::string& content) {
     const char* home = std::getenv("HOME");
     std::string home_str = home ? home : "/tmp";
-    auto soul_path = std::filesystem::path(home_str) / ".quantclaw/agents/main/workspace/SOUL.md";
+    auto path = std::filesystem::path(home_str) /
+                ".quantclaw/agents/default/workspace" / filename;
 
     try {
-        std::ofstream file(soul_path);
-        file << "# QuantClaw Agent Identity\n\n";
-        file << "## Role\n";
-        file << "You are a helpful AI assistant powered by QuantClaw.\n\n";
-        file << "## Capabilities\n";
-        file << "- Answer questions and provide information\n";
-        file << "- Help with coding and technical tasks\n";
-        file << "- Assist with analysis and problem-solving\n\n";
-        file << "## Constraints\n";
-        file << "- Be honest about your limitations\n";
-        file << "- Respect user privacy\n";
-        file << "- Follow ethical guidelines\n";
+        std::ofstream file(path);
+        file << content;
         file.close();
-
         return true;
     } catch (const std::exception& e) {
-        logger_->error("Failed to create SOUL.md: {}", e.what());
+        logger_->error("Failed to create {}: {}", filename, e.what());
         return false;
     }
 }
 
-bool OnboardCommands::InstallDaemon() {
-#ifdef _WIN32
-    // Windows: Use sc.exe to create service
-    logger_->info("Windows service installation not yet implemented");
-    return false;
-#else
-    // Unix: Create systemd service
-    const char* home = std::getenv("HOME");
-    std::string home_str = home ? home : "/tmp";
-
-    try {
-        std::string service_file = "/etc/systemd/system/quantclaw.service";
-        std::string quantclaw_path = "/usr/local/bin/quantclaw";
-
-        // Check if we have sudo access
-        int ret = std::system("sudo -n true 2>/dev/null");
-        if (ret != 0) {
-            logger_->warn("Sudo access required for daemon installation");
-            return false;
-        }
-
-        // Create service file
-        std::string service_content = R"([Unit]
-Description=QuantClaw AI Assistant Gateway
-After=network.target
-
-[Service]
-Type=simple
-User=)" + std::string(std::getenv("USER") ? std::getenv("USER") : "root") + R"(
-ExecStart=)" + quantclaw_path + R"( gateway
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-)";
-
-        // Write service file
-        std::string cmd = "echo '" + service_content + "' | sudo tee " + service_file + " > /dev/null";
-        ret = std::system(cmd.c_str());
-        if (ret != 0) {
-            logger_->error("Failed to write service file");
-            return false;
-        }
-
-        // Reload systemd
-        ret = std::system("sudo systemctl daemon-reload");
-        if (ret != 0) {
-            logger_->error("Failed to reload systemd");
-            return false;
-        }
-
-        // Enable service
-        ret = std::system("sudo systemctl enable quantclaw.service");
-        if (ret != 0) {
-            logger_->error("Failed to enable service");
-            return false;
-        }
-
-        return true;
-    } catch (const std::exception& e) {
-        logger_->error("Failed to install daemon: {}", e.what());
-        return false;
-    }
-#endif
+bool OnboardCommands::CreateSOULFile() {
+    return CreateWorkspaceFile("SOUL.md",
+        "# QuantClaw Agent Identity\n"
+        "\n"
+        "## Role\n"
+        "You are a helpful AI assistant powered by QuantClaw.\n"
+        "\n"
+        "## Capabilities\n"
+        "- Answer questions and provide information\n"
+        "- Help with coding and technical tasks\n"
+        "- Assist with analysis and problem-solving\n"
+        "- Execute commands and manage files\n"
+        "\n"
+        "## Constraints\n"
+        "- Be honest about your limitations\n"
+        "- Respect user privacy\n"
+        "- Follow ethical guidelines\n"
+        "- Ask for confirmation before destructive operations\n");
 }
 
-bool OnboardCommands::TestGatewayConnection() {
-    try {
-        auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
-            "ws://127.0.0.1:18789", "", logger_);
+bool OnboardCommands::CreateAgentsFile() {
+    return CreateWorkspaceFile("AGENTS.md",
+        "# Agent Configuration\n"
+        "\n"
+        "## Default Agent\n"
+        "The default agent handles general-purpose tasks.\n"
+        "\n"
+        "## Custom Agents\n"
+        "You can define additional agents by creating sub-directories\n"
+        "under the workspace, each with its own SOUL.md.\n");
+}
 
+bool OnboardCommands::CreateToolsFile() {
+    return CreateWorkspaceFile("TOOLS.md",
+        "# Tool Configuration\n"
+        "\n"
+        "## Built-in Tools\n"
+        "QuantClaw includes several built-in tools:\n"
+        "- **exec**: Execute shell commands\n"
+        "- **read_file / write_file**: File operations\n"
+        "- **browser**: Web browsing and fetching\n"
+        "\n"
+        "## MCP Tools\n"
+        "Add MCP servers in quantclaw.json to extend tool capabilities.\n");
+}
+
+// ---------------------------------------------------------------------------
+// Daemon: delegate to platform::ServiceManager (user-level systemd)
+// ---------------------------------------------------------------------------
+bool OnboardCommands::InstallDaemon(int port) {
+    platform::ServiceManager service(logger_);
+    int ret = service.install(port);
+    return ret == 0;
+}
+
+// ---------------------------------------------------------------------------
+// Gateway health probe
+// ---------------------------------------------------------------------------
+bool OnboardCommands::TestGatewayConnection(int port) {
+    try {
+        std::string url = "ws://127.0.0.1:" + std::to_string(port);
+        auto client = std::make_shared<gateway::GatewayClient>(url, "", logger_);
         if (client->Connect(3000)) {
             client->Disconnect();
             return true;
         }
     } catch (const std::exception&) {}
-
     return false;
 }
 

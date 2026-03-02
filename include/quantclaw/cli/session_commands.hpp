@@ -7,6 +7,7 @@
 #include <vector>
 #include <memory>
 #include <spdlog/spdlog.h>
+#include "quantclaw/constants.hpp"
 
 namespace quantclaw::cli {
 
@@ -23,7 +24,7 @@ public:
 
 private:
     std::shared_ptr<spdlog::logger> logger_;
-    std::string gateway_url_ = "ws://127.0.0.1:18800";
+    std::string gateway_url_ = kDefaultGatewayUrl;
 };
 
 } // namespace quantclaw::cli
