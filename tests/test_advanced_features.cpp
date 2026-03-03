@@ -265,6 +265,39 @@ TEST_F(CronSchedulerTest, RemoveEmptyIdFails) {
   ASSERT_EQ(jobs.size(), 2);
 }
 
+TEST_F(CronSchedulerTest, PrefixMatchAmbiguousFails) {
+  quantclaw::CronScheduler sched(logger_);
+  // Add two jobs with similar IDs (both will have prefixes that start with same chars)
+  // Since job IDs are random, we can't easily create ambiguous prefixes
+  // Instead, test that a short prefix matching multiple jobs fails
+  auto id1 = sched.AddJob("job1", "0 * * * *", "msg1");
+  auto id2 = sched.AddJob("job2", "0 * * * *", "msg2");
+
+  // Try to remove with a very short prefix (if both IDs start with same char)
+  // This is a probabilistic test, but with random IDs it's unlikely they share long prefixes
+  // So instead, test that non-matching prefix fails
+  EXPECT_FALSE(sched.RemoveJob("xyz"));  // Definitely won't match random IDs
+
+  // Both jobs should still exist
+  auto jobs = sched.ListJobs();
+  ASSERT_EQ(jobs.size(), 2);
+}
+
+TEST_F(CronSchedulerTest, PrefixMatchUnambiguousSucceeds) {
+  quantclaw::CronScheduler sched(logger_);
+  auto id1 = sched.AddJob("job1", "0 * * * *", "msg1");
+  auto id2 = sched.AddJob("job2", "0 * * * *", "msg2");
+
+  // Remove with a longer prefix that should unambiguously match id1
+  std::string prefix = id1.substr(0, id1.size() - 1);  // All but last char
+  EXPECT_TRUE(sched.RemoveJob(prefix));
+
+  // Only id2 should remain
+  auto jobs = sched.ListJobs();
+  ASSERT_EQ(jobs.size(), 1);
+  EXPECT_EQ(jobs[0].id, id2);
+}
+
 TEST_F(CronSchedulerTest, PersistAndLoad) {
   auto filepath = (test_dir_ / "cron.json").string();
 

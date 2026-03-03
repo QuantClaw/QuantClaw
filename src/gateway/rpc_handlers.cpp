@@ -20,6 +20,7 @@
 #include "quantclaw/config.hpp"
 #include <cctype>
 #include <chrono>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -297,13 +298,27 @@ void register_rpc_handlers(
             auto iso_to_ms = [](const std::string& iso_str) -> int64_t {
                 if (iso_str.empty()) return 0;
                 std::tm tm = {};
+#ifdef _WIN32
+                // Windows: manual parsing since strptime is not available in MSVC
+                int year, month, day, hour, minute, second;
+                int parsed = sscanf_s(iso_str.c_str(), "%d-%d-%dT%d:%d:%dZ",
+                                      &year, &month, &day, &hour, &minute, &second);
+                if (parsed != 6) return 0;
+                tm.tm_year = year - 1900;
+                tm.tm_mon = month - 1;
+                tm.tm_mday = day;
+                tm.tm_hour = hour;
+                tm.tm_min = minute;
+                tm.tm_sec = second;
+                tm.tm_isdst = 0;  // UTC has no DST
+                // Use _mkgmtime64 on Windows for UTC time
+                auto time_t_val = _mkgmtime64(&tm);
+#else
+                // POSIX: use strptime for robust parsing
                 const char* result = strptime(iso_str.c_str(), "%Y-%m-%dT%H:%M:%SZ", &tm);
                 if (!result) return 0;
                 tm.tm_isdst = 0;  // UTC has no DST
-                // Use timegm for UTC (POSIX)
-#ifdef _WIN32
-                auto time_t_val = _mktime64(&tm);
-#else
+                // Use timegm for UTC (POSIX standard)
                 auto time_t_val = timegm(&tm);
 #endif
                 if (time_t_val < 0) return 0;

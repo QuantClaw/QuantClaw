@@ -889,7 +889,7 @@ std::string ToolRegistry::process_tool(const nlohmann::json& params) {
 }
 
 // ---------------------------------------------------------------------------
-// web_search_tool — Brave Search API (primary), Perplexity / Grok fallback
+// web_search_tool — Cascade: Brave → Tavily → Perplexity → DuckDuckGo → Grok
 // ---------------------------------------------------------------------------
 
 std::string ToolRegistry::web_search_tool(const nlohmann::json& params) {
@@ -898,123 +898,137 @@ std::string ToolRegistry::web_search_tool(const nlohmann::json& params) {
     std::string freshness = params.value("freshness", "");
     if (query.empty()) throw std::runtime_error("query is required");
 
-    // Determine provider and API key
-    const char* brave_key = std::getenv("BRAVE_API_KEY");
-    const char* perp_key  = std::getenv("PERPLEXITY_API_KEY");
-    const char* xai_key   = std::getenv("XAI_API_KEY");
+    // Determine provider and API keys
+    const char* brave_key  = std::getenv("BRAVE_API_KEY");
+    const char* tavily_key = std::getenv("TAVILY_API_KEY");
+    const char* perp_key   = std::getenv("PERPLEXITY_API_KEY");
+    const char* xai_key    = std::getenv("XAI_API_KEY");
+
+    std::string last_error;
 
     // --- Brave Search ---
     if (brave_key && *brave_key) {
-        std::string path = "/res/v1/web/search?q=" + url_encode(query) +
-                           "&count=" + std::to_string(count);
-        if (!freshness.empty()) path += "&freshness=" + freshness;
+        try {
+            std::string path = "/res/v1/web/search?q=" + url_encode(query) +
+                               "&count=" + std::to_string(count);
+            if (!freshness.empty()) path += "&freshness=" + freshness;
 
-        httplib::SSLClient cli("api.search.brave.com");
-        cli.set_default_headers({
-            {"Accept",               "application/json"},
-            {"Accept-Encoding",      "identity"},
-            {"X-Subscription-Token", brave_key}
-        });
-        cli.set_connection_timeout(10);
-        cli.set_read_timeout(15);
+            httplib::SSLClient cli("api.search.brave.com");
+            cli.set_default_headers({
+                {"Accept",               "application/json"},
+                {"Accept-Encoding",      "identity"},
+                {"X-Subscription-Token", brave_key}
+            });
+            cli.set_connection_timeout(10);
+            cli.set_read_timeout(15);
 
-        auto res = cli.Get(path);
-        if (!res) throw std::runtime_error("Brave Search: connection failed");
-        if (res->status != 200)
-            throw std::runtime_error("Brave Search HTTP " + std::to_string(res->status));
+            auto res = cli.Get(path);
+            if (!res) throw std::runtime_error("Brave Search: connection failed");
+            if (res->status != 200)
+                throw std::runtime_error("Brave Search HTTP " + std::to_string(res->status));
 
-        auto j = nlohmann::json::parse(res->body);
-        nlohmann::json results = nlohmann::json::array();
-        if (j.contains("web") && j["web"].contains("results")) {
-            for (const auto& r : j["web"]["results"]) {
-                nlohmann::json item;
-                item["title"]       = r.value("title", "");
-                item["url"]         = r.value("url", "");
-                item["description"] = r.value("description", "");
-                results.push_back(item);
+            auto j = nlohmann::json::parse(res->body);
+            nlohmann::json results = nlohmann::json::array();
+            if (j.contains("web") && j["web"].contains("results")) {
+                for (const auto& r : j["web"]["results"]) {
+                    nlohmann::json item;
+                    item["title"]       = r.value("title", "");
+                    item["url"]         = r.value("url", "");
+                    item["description"] = r.value("description", "");
+                    results.push_back(item);
+                }
             }
+            return nlohmann::json{{"provider", "brave"}, {"query", query},
+                                   {"results", results}}.dump();
+        } catch (const std::exception& e) {
+            last_error = std::string("Brave: ") + e.what();
         }
-        return nlohmann::json{{"provider", "brave"}, {"query", query},
-                               {"results", results}}.dump();
     }
 
     // --- Tavily Search ---
-    const char* tavily_key = std::getenv("TAVILY_API_KEY");
     if (tavily_key && *tavily_key) {
-        nlohmann::json body = {
-            {"api_key",      tavily_key},
-            {"query",        query},
-            {"max_results",  count},
-            {"search_depth", "basic"}
-        };
-        std::string body_str = body.dump();
+        try {
+            nlohmann::json body = {
+                {"api_key",      tavily_key},
+                {"query",        query},
+                {"max_results",  count},
+                {"search_depth", "basic"}
+            };
+            std::string body_str = body.dump();
 
-        httplib::SSLClient cli("api.tavily.com");
-        cli.set_default_headers({{"Content-Type", "application/json"}});
-        cli.set_connection_timeout(10);
-        cli.set_read_timeout(15);
+            httplib::SSLClient cli("api.tavily.com");
+            cli.set_default_headers({{"Content-Type", "application/json"}});
+            cli.set_connection_timeout(10);
+            cli.set_read_timeout(15);
 
-        auto res = cli.Post("/search", body_str, "application/json");
-        if (!res) throw std::runtime_error("Tavily: connection failed");
-        if (res->status != 200)
-            throw std::runtime_error("Tavily HTTP " + std::to_string(res->status));
+            auto res = cli.Post("/search", body_str, "application/json");
+            if (!res) throw std::runtime_error("Tavily: connection failed");
+            if (res->status != 200)
+                throw std::runtime_error("Tavily HTTP " + std::to_string(res->status));
 
-        auto j = nlohmann::json::parse(res->body);
-        nlohmann::json results = nlohmann::json::array();
-        if (j.contains("results")) {
-            for (const auto& r : j["results"]) {
-                nlohmann::json item;
-                item["title"]       = r.value("title", "");
-                item["url"]         = r.value("url", "");
-                item["description"] = r.value("content", "");
-                results.push_back(item);
+            auto j = nlohmann::json::parse(res->body);
+            nlohmann::json results = nlohmann::json::array();
+            if (j.contains("results")) {
+                for (const auto& r : j["results"]) {
+                    nlohmann::json item;
+                    item["title"]       = r.value("title", "");
+                    item["url"]         = r.value("url", "");
+                    item["description"] = r.value("content", "");
+                    results.push_back(item);
+                }
             }
+            return nlohmann::json{{"provider", "tavily"}, {"query", query},
+                                   {"results", results}}.dump();
+        } catch (const std::exception& e) {
+            last_error = std::string("Tavily: ") + e.what();
         }
-        return nlohmann::json{{"provider", "tavily"}, {"query", query},
-                               {"results", results}}.dump();
     }
 
     // --- Perplexity Sonar (OpenAI-compatible) ---
     if (perp_key && *perp_key) {
-        nlohmann::json body = {
-            {"model",    "perplexity/sonar"},
-            {"messages", nlohmann::json::array({
-                nlohmann::json{{"role", "user"}, {"content", query}}
-            })},
-            {"max_tokens", 1024}
-        };
-        std::string body_str = body.dump();
+        try {
+            nlohmann::json body = {
+                {"model",    "perplexity/sonar"},
+                {"messages", nlohmann::json::array({
+                    nlohmann::json{{"role", "user"}, {"content", query}}
+                })},
+                {"max_tokens", 1024}
+            };
+            std::string body_str = body.dump();
 
-        httplib::SSLClient cli("api.perplexity.ai");
-        cli.set_default_headers({
-            {"Authorization", std::string("Bearer ") + perp_key},
-            {"Content-Type",  "application/json"}
-        });
-        cli.set_connection_timeout(15);
-        cli.set_read_timeout(30);
+            httplib::SSLClient cli("api.perplexity.ai");
+            cli.set_default_headers({
+                {"Authorization", std::string("Bearer ") + perp_key},
+                {"Content-Type",  "application/json"}
+            });
+            cli.set_connection_timeout(15);
+            cli.set_read_timeout(30);
 
-        auto res = cli.Post("/chat/completions", body_str, "application/json");
-        if (!res) throw std::runtime_error("Perplexity: connection failed");
-        if (res->status != 200)
-            throw std::runtime_error("Perplexity HTTP " + std::to_string(res->status));
+            auto res = cli.Post("/chat/completions", body_str, "application/json");
+            if (!res) throw std::runtime_error("Perplexity: connection failed");
+            if (res->status != 200)
+                throw std::runtime_error("Perplexity HTTP " + std::to_string(res->status));
 
-        auto j = nlohmann::json::parse(res->body);
-        std::string answer;
-        if (j.contains("choices") && !j["choices"].empty()) {
-            answer = j["choices"][0]["message"].value("content", "");
+            auto j = nlohmann::json::parse(res->body);
+            std::string answer;
+            if (j.contains("choices") && !j["choices"].empty()) {
+                answer = j["choices"][0]["message"].value("content", "");
+            }
+            nlohmann::json results = nlohmann::json::array();
+            nlohmann::json perp_item;
+            perp_item["title"]       = "Perplexity Answer";
+            perp_item["url"]         = "";
+            perp_item["description"] = answer;
+            results.push_back(perp_item);
+            return nlohmann::json{{"provider", "perplexity"}, {"query", query},
+                                   {"results", results}}.dump();
+        } catch (const std::exception& e) {
+            last_error = std::string("Perplexity: ") + e.what();
         }
-        nlohmann::json results = nlohmann::json::array();
-        nlohmann::json perp_item;
-        perp_item["title"]       = "Perplexity Answer";
-        perp_item["url"]         = "";
-        perp_item["description"] = answer;
-        results.push_back(perp_item);
-        return nlohmann::json{{"provider", "perplexity"}, {"query", query},
-                               {"results", results}}.dump();
     }
 
     // --- DuckDuckGo HTML scraping (no API key needed) ---
-    {
+    try {
         std::string ddg_path = "/html/?q=" + url_encode(query);
 
         httplib::SSLClient cli("html.duckduckgo.com");
@@ -1050,19 +1064,24 @@ std::string ToolRegistry::web_search_tool(const nlohmann::json& params) {
                         url.substr(uddg, amp - uddg) : url.substr(uddg);
                     // Simple URL-decode for %XX
                     std::ostringstream decoded;
-                    for (size_t i = 0; i < encoded.size(); ++i) {
+                    size_t i = 0;
+                    while (i < encoded.size()) {
                         if (encoded[i] == '%' && i + 2 < encoded.size()) {
                             int hi = 0;
                             if (std::sscanf(encoded.substr(i + 1, 2).c_str(), "%x", &hi) == 1) {
                                 decoded << static_cast<char>(hi);
-                                i += 2;
+                                i += 3; // skip '%' and its two hex digits
+                                continue;
                             } else {
                                 decoded << encoded[i];
+                                ++i;
                             }
                         } else if (encoded[i] == '+') {
                             decoded << ' ';
+                            ++i;
                         } else {
                             decoded << encoded[i];
+                            ++i;
                         }
                     }
                     url = decoded.str();
@@ -1090,51 +1109,60 @@ std::string ToolRegistry::web_search_tool(const nlohmann::json& params) {
                                        {"results", results}}.dump();
             }
         }
-        // If DuckDuckGo failed or returned no results, fall through to Grok
+    } catch (const std::exception& e) {
+        last_error = std::string("DuckDuckGo: ") + e.what();
     }
 
     // --- xAI Grok ---
     if (xai_key && *xai_key) {
-        nlohmann::json body = {
-            {"model",    "grok-3-mini"},
-            {"messages", nlohmann::json::array({
-                nlohmann::json{{"role", "user"}, {"content", query}}
-            })},
-            {"max_tokens", 1024}
-        };
-        std::string body_str = body.dump();
+        try {
+            nlohmann::json body = {
+                {"model",    "grok-3-mini"},
+                {"messages", nlohmann::json::array({
+                    nlohmann::json{{"role", "user"}, {"content", query}}
+                })},
+                {"max_tokens", 1024}
+            };
+            std::string body_str = body.dump();
 
-        httplib::SSLClient cli("api.x.ai");
-        cli.set_default_headers({
-            {"Authorization", std::string("Bearer ") + xai_key},
-            {"Content-Type",  "application/json"}
-        });
-        cli.set_connection_timeout(10);
-        cli.set_read_timeout(30);
+            httplib::SSLClient cli("api.x.ai");
+            cli.set_default_headers({
+                {"Authorization", std::string("Bearer ") + xai_key},
+                {"Content-Type",  "application/json"}
+            });
+            cli.set_connection_timeout(10);
+            cli.set_read_timeout(30);
 
-        auto res = cli.Post("/v1/chat/completions", body_str, "application/json");
-        if (!res) throw std::runtime_error("xAI: connection failed");
-        if (res->status != 200)
-            throw std::runtime_error("xAI HTTP " + std::to_string(res->status));
+            auto res = cli.Post("/v1/chat/completions", body_str, "application/json");
+            if (!res) throw std::runtime_error("xAI: connection failed");
+            if (res->status != 200)
+                throw std::runtime_error("xAI HTTP " + std::to_string(res->status));
 
-        auto j = nlohmann::json::parse(res->body);
-        std::string answer;
-        if (j.contains("choices") && !j["choices"].empty()) {
-            answer = j["choices"][0]["message"].value("content", "");
+            auto j = nlohmann::json::parse(res->body);
+            std::string answer;
+            if (j.contains("choices") && !j["choices"].empty()) {
+                answer = j["choices"][0]["message"].value("content", "");
+            }
+            nlohmann::json results = nlohmann::json::array();
+            nlohmann::json grok_item;
+            grok_item["title"]       = "Grok Answer";
+            grok_item["url"]         = "";
+            grok_item["description"] = answer;
+            results.push_back(grok_item);
+            return nlohmann::json{{"provider", "grok"}, {"query", query},
+                                   {"results", results}}.dump();
+        } catch (const std::exception& e) {
+            last_error = std::string("Grok: ") + e.what();
         }
-        nlohmann::json results = nlohmann::json::array();
-        nlohmann::json grok_item;
-        grok_item["title"]       = "Grok Answer";
-        grok_item["url"]         = "";
-        grok_item["description"] = answer;
-        results.push_back(grok_item);
-        return nlohmann::json{{"provider", "grok"}, {"query", query},
-                               {"results", results}}.dump();
     }
 
-    throw std::runtime_error(
-        "web_search: all providers failed. Set BRAVE_API_KEY, TAVILY_API_KEY, "
-        "PERPLEXITY_API_KEY, or XAI_API_KEY. DuckDuckGo (no key) was also tried.");
+    // All providers failed
+    std::string error_msg = "web_search: no provider succeeded.";
+    if (!last_error.empty()) {
+        error_msg += " Last error: " + last_error;
+    }
+    error_msg += " Configure BRAVE_API_KEY, TAVILY_API_KEY, PERPLEXITY_API_KEY, or XAI_API_KEY. DuckDuckGo requires no key.";
+    throw std::runtime_error(error_msg);
 }
 
 // ---------------------------------------------------------------------------

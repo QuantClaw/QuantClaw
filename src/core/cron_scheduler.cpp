@@ -234,17 +234,34 @@ bool CronScheduler::RemoveJob(const std::string& id) {
   if (id.empty()) return false;  // Guard against empty id
 
   std::lock_guard<std::mutex> lock(mu_);
-  // Accept exact match or unambiguous prefix match (e.g. first 8 chars)
-  auto matcher = [&id](const CronJob& j) {
-    return j.id == id || j.id.substr(0, id.size()) == id;
-  };
-  auto it = std::remove_if(jobs_.begin(), jobs_.end(), matcher);
-  if (it == jobs_.end()) return false;
 
-  jobs_.erase(it, jobs_.end());
+  // Find jobs matching id (exact match or unambiguous prefix match)
+  std::vector<size_t> matches;
+  for (size_t i = 0; i < jobs_.size(); ++i) {
+    if (jobs_[i].id == id) {
+      // Exact match found, remove this job immediately
+      jobs_.erase(jobs_.begin() + i);
+      if (!storage_path_.empty()) {
+        nlohmann::json arr = nlohmann::json::array();
+        for (const auto& j : jobs_) arr.push_back(j.ToJson());
+        std::ofstream ofs(storage_path_);
+        ofs << arr.dump(2) << std::endl;
+      }
+      return true;
+    }
+    // Check for prefix match
+    if (id.size() < jobs_[i].id.size() &&
+        jobs_[i].id.substr(0, id.size()) == id) {
+      matches.push_back(i);
+    }
+  }
+
+  // Only allow prefix deletion if unambiguous (exactly one match)
+  if (matches.size() != 1) return false;
+
+  jobs_.erase(jobs_.begin() + matches[0]);
 
   if (!storage_path_.empty()) {
-    // Save outside lock would deadlock, so save inline
     nlohmann::json arr = nlohmann::json::array();
     for (const auto& j : jobs_) arr.push_back(j.ToJson());
     std::ofstream ofs(storage_path_);

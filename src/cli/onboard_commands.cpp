@@ -421,7 +421,7 @@ bool OnboardCommands::CreateConfigFile(const std::string& model, int port,
                 {"maxTokens", 8192}
             };
         } else {
-            // Only update model if not already set, preserve other agent settings
+            // Update model while preserving other agent settings
             config["agent"]["model"] = model;
         }
 

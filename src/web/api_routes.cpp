@@ -37,8 +37,8 @@ static void json_error(httplib::Response& res, int status, const std::string& me
 }
 
 static std::string generate_openai_session_key() {
-    static std::mt19937 gen(std::random_device{}());
-    static std::uniform_int_distribution<uint64_t> dist;
+    thread_local static std::mt19937 gen(std::random_device{}());
+    thread_local static std::uniform_int_distribution<uint64_t> dist;
     std::ostringstream ss;
     ss << "v1-chat:" << std::hex << dist(gen);
     return ss.str();
