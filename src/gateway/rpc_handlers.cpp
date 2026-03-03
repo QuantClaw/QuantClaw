@@ -611,60 +611,24 @@ void register_rpc_handlers(
     // --- models.list ---
     server.RegisterHandler(methods::kOcModelsList,
         [&config, provider_registry, logger](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
-            nlohmann::json models_arr = nlohmann::json::array();
+            nlohmann::json models = nlohmann::json::array();
 
-            // Try model catalog first (from models.providers config)
-            if (provider_registry) {
-                auto catalog = provider_registry->GetModelCatalog();
-                if (!catalog.empty()) {
-                    for (const auto& ce : catalog) {
-                        auto entry = ce.ToJson();
-                        entry["active"] = (ce.id == config.agent.model);
-                        models_arr.push_back(std::move(entry));
-                    }
-
-                    // Ensure active model is present
-                    bool active_found = false;
-                    for (const auto& m : models_arr) {
-                        if (m.value("active", false)) { active_found = true; break; }
-                    }
-                    if (!active_found) {
-                        models_arr.push_back({
-                            {"id", config.agent.model},
-                            {"name", config.agent.model},
-                            {"provider", "default"},
-                            {"active", true}
-                        });
-                    }
-
-                    // Build aliases map
-                    nlohmann::json aliases = nlohmann::json::object();
-                    for (const auto& a : provider_registry->Aliases()) {
-                        aliases[a.alias] = a.target;
-                    }
-
-                    return nlohmann::json{
-                        {"models", models_arr},
-                        {"current", config.agent.model},
-                        {"aliases", aliases}
-                    };
-                }
-            }
-
-            // Fallback: legacy format (no model catalog)
-            models_arr.push_back({
+            // Active model
+            models.push_back({
                 {"id", config.agent.model},
                 {"provider", "default"},
                 {"active", true}
             });
 
+            // List models from registered providers
             if (provider_registry) {
                 for (const auto& pid : provider_registry->ProviderIds()) {
                     auto p = provider_registry->GetProvider(pid);
                     if (p) {
                         for (const auto& m : p->GetSupportedModels()) {
+                            // Skip duplicate of active model
                             if (m == config.agent.model && pid == "default") continue;
-                            models_arr.push_back({
+                            models.push_back({
                                 {"id", m},
                                 {"provider", pid},
                                 {"active", m == config.agent.model}
@@ -674,18 +638,7 @@ void register_rpc_handlers(
                 }
             }
 
-            nlohmann::json aliases = nlohmann::json::object();
-            if (provider_registry) {
-                for (const auto& a : provider_registry->Aliases()) {
-                    aliases[a.alias] = a.target;
-                }
-            }
-
-            return nlohmann::json{
-                {"models", models_arr},
-                {"current", config.agent.model},
-                {"aliases", aliases}
-            };
+            return models;
         }
     );
 

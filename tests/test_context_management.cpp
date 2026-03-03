@@ -7,6 +7,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <filesystem>
 #include <fstream>
+#include <cstdlib>
 
 #include "quantclaw/core/context_pruner.hpp"
 #include "quantclaw/core/memory_search.hpp"
@@ -194,9 +195,13 @@ class BM25SearchTest : public ::testing::Test {
     auto logger = std::make_shared<spdlog::logger>("test", null_sink);
     search_ = std::make_unique<MemorySearch>(logger);
 
-    // Create temp directory with test files
-    temp_dir_ = std::filesystem::temp_directory_path() / "bm25_test";
-    std::filesystem::create_directories(temp_dir_);
+    // Create a unique temp directory to avoid conflicts when ctest --parallel
+    // runs each GTest case as a separate process sharing the same /tmp path.
+    std::string tmpl =
+        (std::filesystem::temp_directory_path() / "bm25_test_XXXXXX").string();
+    char* result = mkdtemp(tmpl.data());
+    ASSERT_NE(result, nullptr) << "mkdtemp failed";
+    temp_dir_ = result;
   }
 
   void TearDown() override {
