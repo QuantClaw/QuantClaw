@@ -573,6 +573,8 @@ int GatewayCommands::CallCommand(const std::vector<std::string>& args) {
 }
 
 int GatewayCommands::StartCommand(const std::vector<std::string>& /*args*/) {
+    logger_->info("Note: 'gateway start' attempts to start a systemd service.");
+    logger_->info("For foreground mode, use: quantclaw gateway run");
     gateway::DaemonManager daemon(logger_);
     return daemon.Start();
 }

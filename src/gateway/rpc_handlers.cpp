@@ -1531,8 +1531,6 @@ void register_rpc_handlers(
 
     // --- logs.tail ---
     // Return recent lines from the gateway log file.
-    // log_file_path is provided by the caller (derived from base_dir, not from env),
-    // so there is no user-controlled path injection (CodeQL cpp/path-injection).
     server.RegisterHandler("logs.tail",
         [logger, log_file_path](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
             int req_limit  = params.value("limit",    200);
@@ -1545,8 +1543,16 @@ void register_rpc_handlers(
             long long new_cursor = cursor;
             bool truncated = false;
 
-            if (!log_file_path.empty() && std::filesystem::exists(log_file_path)) {
-                std::ifstream ifs(log_file_path);
+            // Normalize the path and verify its structure before opening
+            // (guards against $HOME containing '..' traversal components).
+            namespace fs = std::filesystem;
+            fs::path safe = fs::path(log_file_path).lexically_normal();
+            bool path_ok = !safe.empty()
+                           && safe.filename() == "gateway.log"
+                           && safe.parent_path().filename() == "logs"
+                           && fs::exists(safe);
+            if (path_ok) {
+                std::ifstream ifs(safe);
                 if (ifs.is_open()) {
                     std::vector<std::string> all_lines;
                     std::string line;

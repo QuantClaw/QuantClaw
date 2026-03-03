@@ -80,10 +80,14 @@ public:
     void SetSessionKey(const std::string& key) { session_key_ = key; }
 
     // Set usage accumulator for token tracking
-    void SetUsageAccumulator(UsageAccumulator* acc) { usage_accumulator_ = acc; }
+    void SetUsageAccumulator(std::shared_ptr<UsageAccumulator> acc) {
+        usage_accumulator_ = acc;
+    }
 
     // Get usage accumulator (may be null)
-    UsageAccumulator* GetUsageAccumulator() const { return usage_accumulator_; }
+    std::shared_ptr<UsageAccumulator> GetUsageAccumulator() const {
+        return usage_accumulator_;
+    }
 
     // Set model dynamically (resolves via ProviderRegistry if available)
     void SetModel(const std::string& model_ref);
@@ -102,7 +106,7 @@ private:
     ProviderRegistry* provider_registry_ = nullptr;    // Non-owning, optional
     SubagentManager* subagent_manager_ = nullptr;      // Non-owning, optional
     FailoverResolver* failover_resolver_ = nullptr;    // Non-owning, optional
-    UsageAccumulator* usage_accumulator_ = nullptr;    // Non-owning, optional
+    std::shared_ptr<UsageAccumulator> usage_accumulator_;  // Shared ownership
     std::string session_key_;                          // For failover session pinning
     std::shared_ptr<spdlog::logger> logger_;
     AgentConfig agent_config_;

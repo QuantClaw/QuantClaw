@@ -310,7 +310,7 @@ public:
 
 TEST_F(P1AgentLoopTest, UsageAccumulatorTracksTokens) {
     auto mock = std::make_shared<UsageMockProvider>();
-    UsageAccumulator acc;
+    auto acc = std::make_shared<UsageAccumulator>();
 
     AgentConfig config;
     config.model = "test-model";
@@ -319,11 +319,11 @@ TEST_F(P1AgentLoopTest, UsageAccumulatorTracksTokens) {
     auto loop = std::make_unique<AgentLoop>(
         memory_manager_, skill_loader_, tool_registry_, mock, config, logger_);
     loop->SetSessionKey("test-session");
-    loop->SetUsageAccumulator(&acc);
+    loop->SetUsageAccumulator(acc);
 
     loop->ProcessMessage("Hello", {}, "System");
 
-    auto stats = acc.GetSession("test-session");
+    auto stats = acc->GetSession("test-session");
     EXPECT_EQ(stats.input_tokens, 100);
     EXPECT_EQ(stats.output_tokens, 50);
     EXPECT_EQ(stats.turns, 1);
@@ -331,7 +331,7 @@ TEST_F(P1AgentLoopTest, UsageAccumulatorTracksTokens) {
 
 TEST_F(P1AgentLoopTest, UsageAccumulatorTracksStreaming) {
     auto mock = std::make_shared<UsageMockProvider>();
-    UsageAccumulator acc;
+    auto acc = std::make_shared<UsageAccumulator>();
 
     AgentConfig config;
     config.model = "test-model";
@@ -340,11 +340,11 @@ TEST_F(P1AgentLoopTest, UsageAccumulatorTracksStreaming) {
     auto loop = std::make_unique<AgentLoop>(
         memory_manager_, skill_loader_, tool_registry_, mock, config, logger_);
     loop->SetSessionKey("test-stream");
-    loop->SetUsageAccumulator(&acc);
+    loop->SetUsageAccumulator(acc);
 
     loop->ProcessMessageStream("Hello", {}, "System", nullptr);
 
-    auto stats = acc.GetSession("test-stream");
+    auto stats = acc->GetSession("test-stream");
     EXPECT_EQ(stats.input_tokens, 200);
     EXPECT_EQ(stats.output_tokens, 100);
     EXPECT_EQ(stats.turns, 1);

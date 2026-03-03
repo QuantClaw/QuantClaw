@@ -298,7 +298,7 @@ int main(int argc, char* argv[]) {
             for (int i = 1; i < argc; ++i) args.push_back(argv[i]);
 
             if (args.empty()) {
-                std::cerr << "Usage: quantclaw config <get|set|unset|reload> [path] [value]"
+                std::cerr << "Usage: quantclaw config <get|set|unset|reload|validate|schema> [path] [value]"
                           << std::endl;
                 return 1;
             }
@@ -431,8 +431,33 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            if (sub == "validate") {
+                try {
+                    auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
+                    auto config = quantclaw::QuantClawConfig::LoadFromFile(config_file);
+                    std::cout << "Configuration is valid" << std::endl;
+                    return 0;
+                } catch (const std::exception& e) {
+                    std::cerr << "Configuration is invalid: " << e.what() << std::endl;
+                    return 1;
+                }
+            }
+
+            if (sub == "schema") {
+                std::cout << "Configuration schema:" << std::endl
+                          << "  agent:" << std::endl
+                          << "    model: string (default: gpt-4o-mini)" << std::endl
+                          << "    maxTokens: integer (default: 4096)" << std::endl
+                          << "    maxIterations: integer (default: 100)" << std::endl
+                          << "  gateway:" << std::endl
+                          << "    port: integer (default: 18800)" << std::endl
+                          << "  system:" << std::endl
+                          << "    logLevel: string (debug|info|warn|error)" << std::endl;
+                return 0;
+            }
+
             std::cerr << "Unknown config subcommand: " << sub << std::endl;
-            std::cerr << "Available: get, set, unset, reload" << std::endl;
+            std::cerr << "Available: get, set, unset, reload, validate, schema" << std::endl;
             return 1;
         }
     });
