@@ -248,8 +248,13 @@ TEST_F(RpcHandlersTest, SessionsListEmptyInitially) {
     ASSERT_TRUE(client->Connect(5000));
 
     auto result = client->Call("sessions.list", nlohmann::json::object());
-    ASSERT_TRUE(result.is_array());
-    EXPECT_EQ(result.size(), 0u);
+    // New shape: {ts, path, count, defaults, sessions:[]}
+    ASSERT_TRUE(result.is_object());
+    ASSERT_TRUE(result.contains("sessions"));
+    ASSERT_TRUE(result["sessions"].is_array());
+    EXPECT_EQ(result["sessions"].size(), 0u);
+    EXPECT_TRUE(result.contains("count"));
+    EXPECT_TRUE(result.contains("defaults"));
 
     client->Disconnect();
 }
@@ -262,20 +267,23 @@ TEST_F(RpcHandlersTest, SessionsListWithLimitOffset) {
     client->Call("agent.request", {{"message", "Hi"}, {"sessionKey", "a:1:main"}}, 10000);
     client->Call("agent.request", {{"message", "Hello"}, {"sessionKey", "b:2:main"}}, 10000);
 
-    // List all
+    // List all — new shape returns {sessions:[], count:N, ...}
     auto all = client->Call("sessions.list", {{"limit", 50}, {"offset", 0}});
-    ASSERT_TRUE(all.is_array());
-    EXPECT_GE(all.size(), 2u);
+    ASSERT_TRUE(all.is_object());
+    ASSERT_TRUE(all.contains("sessions"));
+    auto& all_sessions = all["sessions"];
+    ASSERT_TRUE(all_sessions.is_array());
+    EXPECT_GE(all_sessions.size(), 2u);
 
     // List with limit=1
     auto limited = client->Call("sessions.list", {{"limit", 1}, {"offset", 0}});
-    ASSERT_TRUE(limited.is_array());
-    EXPECT_EQ(limited.size(), 1u);
+    ASSERT_TRUE(limited.is_object());
+    EXPECT_EQ(limited["sessions"].size(), 1u);
 
     // List with offset past all sessions
     auto empty = client->Call("sessions.list", {{"limit", 10}, {"offset", 100}});
-    ASSERT_TRUE(empty.is_array());
-    EXPECT_EQ(empty.size(), 0u);
+    ASSERT_TRUE(empty.is_object());
+    EXPECT_EQ(empty["sessions"].size(), 0u);
 
     client->Disconnect();
 }
@@ -471,11 +479,13 @@ TEST_F(RpcHandlersTest, ChatHistoryAlias) {
         {"sessionKey", "oc:hist:test"}
     }, 10000);
 
-    // Call chat.history (OpenClaw alias for sessions.history)
+    // Call chat.history — new shape: {messages:[], thinkingLevel:null}
     auto result = client->Call("chat.history", {{"sessionKey", "oc:hist:test"}});
 
-    ASSERT_TRUE(result.is_array());
-    EXPECT_GE(result.size(), 1u);
+    ASSERT_TRUE(result.is_object());
+    ASSERT_TRUE(result.contains("messages"));
+    ASSERT_TRUE(result["messages"].is_array());
+    EXPECT_GE(result["messages"].size(), 1u);
 
     client->Disconnect();
 }
@@ -499,21 +509,26 @@ TEST_F(RpcHandlersTest, ModelsListStub) {
     client->Disconnect();
 }
 
-// Test tools.catalog
+// Test tools.catalog — new shape: {agentId, profiles:[], groups:[{tools:[]}]}
 TEST_F(RpcHandlersTest, ToolsCatalogStub) {
     auto client = make_client();
     ASSERT_TRUE(client->Connect(5000));
 
-    auto result = client->Call("tools.catalog");
+    auto result = client->Call("tools.catalog", nlohmann::json::object());
 
-    ASSERT_TRUE(result.is_array());
-    EXPECT_GE(result.size(), 1u);  // Should have builtin tools
+    ASSERT_TRUE(result.is_object());
+    EXPECT_TRUE(result.contains("agentId"));
+    ASSERT_TRUE(result.contains("profiles"));
+    ASSERT_TRUE(result["profiles"].is_array());
+    ASSERT_TRUE(result.contains("groups"));
+    ASSERT_TRUE(result["groups"].is_array());
+    EXPECT_GE(result["groups"].size(), 1u);
 
-    // Verify schema structure
-    for (const auto& tool : result) {
-        EXPECT_TRUE(tool.contains("name"));
-        EXPECT_TRUE(tool.contains("description"));
-        EXPECT_TRUE(tool.contains("parameters"));
+    // Verify group structure
+    for (const auto& group : result["groups"]) {
+        EXPECT_TRUE(group.contains("id"));
+        EXPECT_TRUE(group.contains("tools"));
+        ASSERT_TRUE(group["tools"].is_array());
     }
 
     client->Disconnect();

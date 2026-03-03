@@ -215,11 +215,13 @@ TEST_F(E2ETest, E2E_ConfigGet) {
     ASSERT_TRUE(client->Connect(5000));
 
     auto result = client->Call("config.get", nlohmann::json::object());
-    // Full config: should have agent and gateway sections
-    EXPECT_TRUE(result.contains("agent"));
-    EXPECT_TRUE(result.contains("gateway"));
-    EXPECT_TRUE(result["agent"].contains("model"));
-    EXPECT_TRUE(result["gateway"].contains("port"));
+    // Full config now returns ConfigSnapshot {path, exists, raw, hash, valid, config, issues}
+    EXPECT_TRUE(result.contains("config"));
+    EXPECT_TRUE(result.contains("valid"));
+    EXPECT_TRUE(result["config"].contains("agent"));
+    EXPECT_TRUE(result["config"].contains("gateway"));
+    EXPECT_TRUE(result["config"]["agent"].contains("model"));
+    EXPECT_TRUE(result["config"]["gateway"].contains("port"));
 
     client->Disconnect();
 }
@@ -280,14 +282,18 @@ TEST_F(E2ETest, E2E_SessionsAfterRequest) {
     // Send a request to create a session
     client->Call("agent.request", {{"message", "Hi"}}, 10000);
 
-    auto sessions = client->Call("sessions.list", nlohmann::json::object());
+    auto sessions_res = client->Call("sessions.list", nlohmann::json::object());
+    // New shape: {ts, path, count, defaults, sessions:[...]}
+    ASSERT_TRUE(sessions_res.is_object());
+    ASSERT_TRUE(sessions_res.contains("sessions"));
+    auto& sessions = sessions_res["sessions"];
     ASSERT_TRUE(sessions.is_array());
     EXPECT_GE(sessions.size(), 1u);
 
     // Verify session has expected fields
     auto& s = sessions[0];
     EXPECT_TRUE(s.contains("key"));
-    EXPECT_TRUE(s.contains("id"));
+    EXPECT_TRUE(s.contains("sessionId"));
 
     client->Disconnect();
 }

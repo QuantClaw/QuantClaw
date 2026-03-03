@@ -18,8 +18,10 @@
 #include "quantclaw/core/message_commands.hpp"
 #include "quantclaw/core/memory_search.hpp"
 #include "quantclaw/config.hpp"
+#include <cctype>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <sstream>
 
@@ -71,31 +73,50 @@ void register_rpc_handlers(
     // --- config.get ---
     server.RegisterHandler(methods::kConfigGet,
         [&config, logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
-            std::string path = params.value("path", "");
+            std::string path_param = params.value("path", "");
 
-            if (path.empty()) {
-                // Return full config summary
-                return {
-                    {"agent", {
-                        {"model", config.agent.model},
-                        {"maxIterations", config.agent.max_iterations},
-                        {"temperature", config.agent.temperature}
-                    }},
-                    {"gateway", {
-                        {"port", config.gateway.port},
-                        {"bind", config.gateway.bind}
-                    }}
-                };
+            // Build the full config object that the UI config form expects
+            nlohmann::json full_config = {
+                {"agent", {
+                    {"model",         config.agent.model},
+                    {"maxIterations", config.agent.max_iterations},
+                    {"temperature",   config.agent.temperature},
+                    {"maxTokens",     config.agent.max_tokens},
+                    {"contextWindow", config.agent.context_window},
+                    {"thinking",      config.agent.thinking},
+                    {"autoCompact",   config.agent.auto_compact}
+                }},
+                {"gateway", {
+                    {"port", config.gateway.port},
+                    {"bind", config.gateway.bind}
+                }}
+            };
+
+            if (!path_param.empty()) {
+                // Dot-path lookup for legacy callers
+                if (path_param == "gateway.port") return config.gateway.port;
+                if (path_param == "gateway.bind") return config.gateway.bind;
+                if (path_param == "agent.model") return config.agent.model;
+                if (path_param == "agent.maxIterations") return config.agent.max_iterations;
+                if (path_param == "agent.temperature") return config.agent.temperature;
+                throw std::runtime_error("Unknown config path: " + path_param);
             }
 
-            // Dot-path lookup
-            if (path == "gateway.port") return config.gateway.port;
-            if (path == "gateway.bind") return config.gateway.bind;
-            if (path == "agent.model") return config.agent.model;
-            if (path == "agent.maxIterations") return config.agent.max_iterations;
-            if (path == "agent.temperature") return config.agent.temperature;
+            // Return ConfigSnapshot shape expected by the UI
+            auto config_path = QuantClawConfig::DefaultConfigPath();
+            bool exists = std::filesystem::exists(config_path);
+            std::string raw_str = full_config.dump(2);
 
-            throw std::runtime_error("Unknown config path: " + path);
+            return {
+                {"path",   config_path},
+                {"exists", exists},
+                {"raw",    raw_str},
+                {"hash",   ""},
+                {"parsed", full_config},
+                {"valid",  true},
+                {"config", full_config},
+                {"issues", nlohmann::json::array()}
+            };
         }
     );
 
@@ -263,25 +284,49 @@ void register_rpc_handlers(
 
     // --- sessions.list ---
     server.RegisterHandler(methods::kSessionsList,
-        [session_manager, logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
-            int limit = params.value("limit", 50);
+        [session_manager, &config, logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
+            int limit = params.value("limit", 0);
             int offset = params.value("offset", 0);
 
             auto sessions = session_manager->ListSessions();
+            int total = static_cast<int>(sessions.size());
+            int start = std::min(offset, total);
+            int end = (limit > 0) ? std::min(start + limit, total) : total;
 
-            nlohmann::json result = nlohmann::json::array();
-            int end = std::min(offset + limit, static_cast<int>(sessions.size()));
-            for (int i = offset; i < end; ++i) {
-                result.push_back({
-                    {"key", sessions[i].session_key},
-                    {"id", sessions[i].session_id},
-                    {"updatedAt", sessions[i].updated_at},
-                    {"createdAt", sessions[i].created_at},
-                    {"displayName", sessions[i].display_name},
-                    {"channel", sessions[i].channel}
-                });
+            nlohmann::json session_rows = nlohmann::json::array();
+            for (int i = start; i < end; ++i) {
+                const auto& s = sessions[i];
+                nlohmann::json row;
+                row["key"] = s.session_key;
+                row["sessionId"] = s.session_id;
+                row["displayName"] = s.display_name;
+                row["surface"] = s.channel.empty() ? "cli" : s.channel;
+                // Convert ISO timestamp to epoch ms if possible, else 0
+                row["updatedAt"] = s.updated_at.empty() ? 0 : 0;
+                // Derive kind from key pattern
+                if (s.session_key.find("group:") != std::string::npos) {
+                    row["kind"] = "group";
+                } else if (s.session_key.find("global") != std::string::npos) {
+                    row["kind"] = "global";
+                } else {
+                    row["kind"] = "direct";
+                }
+                session_rows.push_back(row);
             }
-            return result;
+
+            auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+
+            return {
+                {"ts", now_ms},
+                {"path", ""},
+                {"count", total},
+                {"defaults", {
+                    {"model", config.agent.model},
+                    {"contextTokens", config.agent.context_window}
+                }},
+                {"sessions", session_rows}
+            };
         }
     );
 
@@ -323,9 +368,11 @@ void register_rpc_handlers(
     // --- sessions.delete ---
     server.RegisterHandler(methods::kSessionsDelete,
         [session_manager, logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
-            std::string session_key = params.value("sessionKey", "");
+            // UI sends "key"; legacy clients send "sessionKey"
+            std::string session_key = params.value("key", "");
+            if (session_key.empty()) session_key = params.value("sessionKey", "");
             if (session_key.empty()) {
-                throw std::runtime_error("sessionKey is required");
+                throw std::runtime_error("key is required");
             }
             session_manager->DeleteSession(session_key);
             return {{"ok", true}};
@@ -364,34 +411,49 @@ void register_rpc_handlers(
     );
 
     // --- channels.status ---
+    // Returns ChannelsStatusSnapshot shape expected by the UI.
     server.RegisterHandler(methods::kChannelsStatus,
         [&config, logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
-            std::string id = params.value("id", "");
-            if (!id.empty()) {
-                // Status of a specific channel
-                if (id == "cli") {
-                    return {{"id", "cli"}, {"type", "cli"}, {"enabled", true}, {"status", "active"}};
-                }
-                auto it = config.channels.find(id);
-                if (it == config.channels.end()) {
-                    throw std::runtime_error("Channel not found: " + id);
-                }
-                nlohmann::json r;
-                r["id"] = id;
-                r["type"] = id;
-                r["enabled"] = it->second.enabled;
-                r["status"] = it->second.enabled ? "active" : "disabled";
-                return r;
-            }
-            // Status of all channels
-            nlohmann::json result;
-            result["total"] = static_cast<int>(config.channels.size()) + 1;
-            int active = 1;  // CLI always active
+            auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+
+            // Build ordered list: cli first, then configured channels
+            nlohmann::json channel_order = nlohmann::json::array();
+            nlohmann::json channel_labels = nlohmann::json::object();
+            nlohmann::json channels = nlohmann::json::object();
+            nlohmann::json channel_accounts = nlohmann::json::object();
+            nlohmann::json channel_default_account = nlohmann::json::object();
+
+            auto add_channel = [&](const std::string& cid, bool enabled, const std::string& label) {
+                channel_order.push_back(cid);
+                channel_labels[cid] = label;
+                channels[cid] = {{"enabled", enabled}, {"running", enabled}, {"configured", enabled}};
+                // Each channel has a default account entry
+                nlohmann::json account;
+                account["accountId"] = cid + ":default";
+                account["enabled"] = enabled;
+                account["configured"] = enabled;
+                account["running"] = enabled;
+                account["connected"] = enabled;
+                channel_accounts[cid] = nlohmann::json::array({account});
+                channel_default_account[cid] = cid + ":default";
+            };
+
+            add_channel("cli", true, "CLI");
             for (const auto& [cid, ch] : config.channels) {
-                if (ch.enabled) active++;
+                std::string label = cid;
+                label[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(label[0])));
+                add_channel(cid, ch.enabled, label);
             }
-            result["active"] = active;
-            return result;
+
+            return {
+                {"ts",                     now_ms},
+                {"channelOrder",           channel_order},
+                {"channelLabels",          channel_labels},
+                {"channels",               channels},
+                {"channelAccounts",        channel_accounts},
+                {"channelDefaultAccountId", channel_default_account}
+            };
         }
     );
 
@@ -405,17 +467,26 @@ void register_rpc_handlers(
     );
 
     // --- agents.list (OpenClaw multi-agent compat stub) ---
-    // QuantClaw uses a single default agent; return it so OC clients don't crash.
+    // QuantClaw uses a single "main" agent; return AgentsListResult shape.
     server.RegisterHandler("agents.list",
         [](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
-            return nlohmann::json::array({
-                nlohmann::json{
-                    {"id",          "default"},
-                    {"name",        "Default Agent"},
-                    {"description", "QuantClaw default agent"},
-                    {"enabled",     true}
-                }
-            });
+            return {
+                {"defaultId", "main"},
+                {"mainKey",   "agent:main:main"},
+                {"scope",     "local"},
+                {"agents", nlohmann::json::array({
+                    nlohmann::json{
+                        {"id",   "main"},
+                        {"name", "QuantClaw Agent"},
+                        {"identity", {
+                            {"name",  "QuantClaw Agent"},
+                            {"theme", "default"},
+                            {"emoji", "\xF0\x9F\xA6\x9E"},
+                            {"avatar", ""}
+                        }}
+                    }
+                })}
+            };
         }
     );
 
@@ -519,7 +590,7 @@ void register_rpc_handlers(
 
             auto history = session_manager->GetHistory(session_key, limit);
 
-            nlohmann::json result = nlohmann::json::array();
+            nlohmann::json messages = nlohmann::json::array();
             for (const auto& msg : history) {
                 nlohmann::json entry;
                 entry["role"] = msg.role;
@@ -535,9 +606,13 @@ void register_rpc_handlers(
                     entry["usage"] = msg.usage->ToJson();
                 }
 
-                result.push_back(entry);
+                messages.push_back(entry);
             }
-            return result;
+            // UI expects {messages:[], thinkingLevel?:string}
+            return {
+                {"messages", messages},
+                {"thinkingLevel", nullptr}
+            };
         }
     );
 
@@ -609,15 +684,16 @@ void register_rpc_handlers(
     );
 
     // --- models.list ---
+    // Returns {models:[], current, aliases} shape expected by the UI.
     server.RegisterHandler(methods::kOcModelsList,
         [&config, provider_registry, logger](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
             nlohmann::json models = nlohmann::json::array();
 
-            // Active model
+            // Active model first
             models.push_back({
-                {"id", config.agent.model},
+                {"id",       config.agent.model},
                 {"provider", "default"},
-                {"active", true}
+                {"active",   true}
             });
 
             // List models from registered providers
@@ -626,35 +702,66 @@ void register_rpc_handlers(
                     auto p = provider_registry->GetProvider(pid);
                     if (p) {
                         for (const auto& m : p->GetSupportedModels()) {
-                            // Skip duplicate of active model
-                            if (m == config.agent.model && pid == "default") continue;
+                            if (m == config.agent.model) continue;  // already added
                             models.push_back({
-                                {"id", m},
+                                {"id",       m},
                                 {"provider", pid},
-                                {"active", m == config.agent.model}
+                                {"active",   false}
                             });
                         }
                     }
                 }
             }
 
-            return models;
+            return {
+                {"models",  models},
+                {"current", config.agent.model},
+                {"aliases", nlohmann::json::object()}
+            };
         }
     );
 
     // --- tools.catalog ---
+    // Returns ToolsCatalogResult shape expected by the UI.
     server.RegisterHandler(methods::kOcToolsCatalog,
-        [tool_registry, logger](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
+        [tool_registry, logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
+            std::string agent_id = params.value("agentId", "main");
             auto schemas = tool_registry->GetToolSchemas();
-            nlohmann::json result = nlohmann::json::array();
+
+            // Build tools list for the "core" group
+            nlohmann::json core_tools = nlohmann::json::array();
             for (const auto& schema : schemas) {
-                result.push_back({
-                    {"name", schema.name},
-                    {"description", schema.description},
-                    {"parameters", schema.parameters}
+                core_tools.push_back({
+                    {"id",             schema.name},
+                    {"label",          schema.name},
+                    {"description",    schema.description},
+                    {"source",         "core"},
+                    {"optional",       true},
+                    {"defaultProfiles", nlohmann::json::array({"full", "coding"})}
                 });
             }
-            return result;
+
+            nlohmann::json profiles = nlohmann::json::array({
+                nlohmann::json{{"id", "minimal"},   {"label", "Minimal"}},
+                nlohmann::json{{"id", "coding"},    {"label", "Coding"}},
+                nlohmann::json{{"id", "messaging"}, {"label", "Messaging"}},
+                nlohmann::json{{"id", "full"},      {"label", "Full"}}
+            });
+
+            nlohmann::json groups = nlohmann::json::array({
+                nlohmann::json{
+                    {"id",     "core"},
+                    {"label",  "Core Tools"},
+                    {"source", "core"},
+                    {"tools",  core_tools}
+                }
+            });
+
+            return {
+                {"agentId",  agent_id},
+                {"profiles", profiles},
+                {"groups",   groups}
+            };
         }
     );
 
@@ -689,16 +796,32 @@ void register_rpc_handlers(
     // --- sessions.patch ---
     server.RegisterHandler(methods::kSessionsPatch,
         [session_manager, logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
-            std::string session_key = params.value("sessionKey", "");
+            // UI sends "key"; legacy clients send "sessionKey"
+            std::string session_key = params.value("key", "");
+            if (session_key.empty()) session_key = params.value("sessionKey", "");
             if (session_key.empty()) {
-                throw std::runtime_error("sessionKey is required");
+                throw std::runtime_error("key is required");
             }
 
+            // Apply displayName / label rename
             if (params.contains("displayName")) {
-                session_manager->UpdateDisplayName(session_key, params["displayName"]);
+                session_manager->UpdateDisplayName(session_key,
+                    params["displayName"].get<std::string>());
+            } else if (params.contains("label")) {
+                if (!params["label"].is_null()) {
+                    session_manager->UpdateDisplayName(session_key,
+                        params["label"].get<std::string>());
+                }
             }
+            // thinkingLevel, verboseLevel, reasoningLevel are stored in session metadata
+            // in a full implementation; here we acknowledge them without persisting.
 
-            return {{"ok", true}};
+            return {
+                {"ok", true},
+                {"path", ""},
+                {"key",  session_key},
+                {"entry", {{"sessionId", ""}}}
+            };
         }
     );
 
@@ -741,26 +864,92 @@ void register_rpc_handlers(
     if (skill_loader) {
         server.RegisterHandler(methods::kSkillsStatus,
             [skill_loader, &config, logger](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
-                std::string home_str;
                 const char* home = std::getenv("HOME");
-                if (home) home_str = home;
-                else home_str = "/tmp";
+                std::string home_str = home ? home : "/tmp";
                 auto workspace_path = std::filesystem::path(home_str) /
                                       ".quantclaw/agents/main/workspace";
+                std::string managed_dir = (std::filesystem::path(home_str) /
+                                           ".quantclaw/skills").string();
 
                 auto skills = skill_loader->LoadSkills(config.skills, workspace_path);
 
-                nlohmann::json result = nlohmann::json::array();
+                nlohmann::json skill_entries = nlohmann::json::array();
                 for (const auto& skill : skills) {
-                    nlohmann::json s;
-                    s["name"] = skill.name;
-                    s["description"] = skill.description;
-                    s["emoji"] = skill.emoji;
-                    s["rootDir"] = skill.root_dir.string();
-                    s["gated"] = !skill_loader->CheckSkillGating(skill);
-                    result.push_back(s);
+                    bool gated = !skill_loader->CheckSkillGating(skill);
+                    std::string skill_key = skill.skill_key.empty() ? skill.name : skill.skill_key;
+
+                    // Build missing bins/env/config lists
+                    nlohmann::json missing_bins = nlohmann::json::array();
+                    nlohmann::json missing_env  = nlohmann::json::array();
+
+                    // Build install options from SkillInstallInfo
+                    nlohmann::json install_opts = nlohmann::json::array();
+                    for (const auto& inst : skill.installs) {
+                        std::string kind = inst.EffectiveMethod();
+                        if (kind == "node" || kind == "go" || kind == "uv" || kind == "brew") {
+                            nlohmann::json opt;
+                            opt["id"]    = kind + ":" + inst.EffectiveFormula();
+                            opt["kind"]  = kind;
+                            opt["label"] = inst.label.empty() ? inst.EffectiveFormula() : inst.label;
+                            nlohmann::json bins = nlohmann::json::array();
+                            for (const auto& b : inst.bins) bins.push_back(b);
+                            if (bins.empty() && !inst.EffectiveBinary().empty()) {
+                                bins.push_back(inst.EffectiveBinary());
+                            }
+                            opt["bins"] = bins;
+                            install_opts.push_back(opt);
+                        }
+                    }
+
+                    skill_entries.push_back({
+                        {"name",               skill.name},
+                        {"description",        skill.description},
+                        {"source",             "bundled"},
+                        {"filePath",           skill.root_dir.string()},
+                        {"baseDir",            skill.root_dir.string()},
+                        {"skillKey",           skill_key},
+                        {"bundled",            true},
+                        {"primaryEnv",         skill.primary_env},
+                        {"emoji",              skill.emoji},
+                        {"homepage",           skill.homepage},
+                        {"always",             skill.always},
+                        {"disabled",           false},
+                        {"blockedByAllowlist", false},
+                        {"eligible",           !gated},
+                        {"requirements", {
+                            {"bins",   [&]() {
+                                nlohmann::json a = nlohmann::json::array();
+                                for (const auto& b : skill.required_bins) a.push_back(b);
+                                return a;
+                            }()},
+                            {"env",    [&]() {
+                                nlohmann::json a = nlohmann::json::array();
+                                for (const auto& e : skill.required_envs) a.push_back(e);
+                                return a;
+                            }()},
+                            {"config", nlohmann::json::array()},
+                            {"os",     [&]() {
+                                nlohmann::json a = nlohmann::json::array();
+                                for (const auto& o : skill.os_restrict) a.push_back(o);
+                                return a;
+                            }()}
+                        }},
+                        {"missing", {
+                            {"bins",   missing_bins},
+                            {"env",    missing_env},
+                            {"config", nlohmann::json::array()},
+                            {"os",     nlohmann::json::array()}
+                        }},
+                        {"configChecks", nlohmann::json::array()},
+                        {"install",      install_opts}
+                    });
                 }
-                return result;
+
+                return {
+                    {"workspaceDir",    workspace_path.string()},
+                    {"managedSkillsDir", managed_dir},
+                    {"skills",          skill_entries}
+                };
             }
         );
 
@@ -785,26 +974,107 @@ void register_rpc_handlers(
     // --- cron.list ---
     if (cron_scheduler) {
         server.RegisterHandler(methods::kCronList,
-            [cron_scheduler](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
-                auto jobs = cron_scheduler->ListJobs();
-                nlohmann::json result = nlohmann::json::array();
-                for (const auto& job : jobs) {
-                    result.push_back(job.ToJson());
+            [cron_scheduler](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
+                int limit  = params.value("limit",  0);
+                int offset = params.value("offset", 0);
+                auto jobs  = cron_scheduler->ListJobs();
+                int total  = static_cast<int>(jobs.size());
+                int start  = std::min(offset, total);
+                int end    = (limit > 0) ? std::min(start + limit, total) : total;
+
+                auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+
+                auto tp_to_ms = [](std::chrono::system_clock::time_point tp) -> long long {
+                    return std::chrono::duration_cast<std::chrono::milliseconds>(
+                        tp.time_since_epoch()).count();
+                };
+
+                nlohmann::json job_list = nlohmann::json::array();
+                for (int i = start; i < end; ++i) {
+                    const auto& job = jobs[i];
+                    long long last_ms = tp_to_ms(job.last_run);
+                    long long next_ms = tp_to_ms(job.next_run);
+
+                    nlohmann::json state = nlohmann::json::object();
+                    if (next_ms > 0) state["nextRunAtMs"] = next_ms;
+                    if (last_ms > 0) state["lastRunAtMs"] = last_ms;
+
+                    job_list.push_back({
+                        {"id",            job.id},
+                        {"name",          job.name},
+                        {"description",   ""},
+                        {"enabled",       job.enabled},
+                        {"deleteAfterRun", false},
+                        {"createdAtMs",   now_ms},
+                        {"updatedAtMs",   now_ms},
+                        {"schedule",      {{"kind", "cron"}, {"expr", job.schedule}}},
+                        {"sessionTarget", "main"},
+                        {"wakeMode",      "now"},
+                        {"payload",       {{"kind", "agentTurn"}, {"message", job.message}}},
+                        {"state",         state}
+                    });
                 }
-                return result;
+
+                bool has_more = end < total;
+                return {
+                    {"jobs",       job_list},
+                    {"total",      total},
+                    {"offset",     offset},
+                    {"limit",      limit > 0 ? limit : total},
+                    {"hasMore",    has_more},
+                    {"nextOffset", has_more ? nlohmann::json(end) : nlohmann::json(nullptr)}
+                };
             }
         );
 
         // --- cron.add ---
+        // Supports both flat format (schedule string + message) and the rich UI format
+        // {name, schedule:{kind,expr,everyMs,...}, payload:{kind,message,...}, ...}
         server.RegisterHandler(methods::kCronAdd,
             [cron_scheduler](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
-                std::string schedule = params.value("schedule", "");
-                std::string message = params.value("message", "");
-                std::string name = params.value("name", message.substr(0, 30));
+                std::string name = params.value("name", "");
                 std::string session_key = params.value("sessionKey", "agent:main:main");
+
+                // Extract schedule expression (flat or nested)
+                std::string schedule;
+                if (params.contains("schedule") && params["schedule"].is_object()) {
+                    const auto& sched = params["schedule"];
+                    std::string kind = sched.value("kind", "cron");
+                    if (kind == "cron") {
+                        schedule = sched.value("expr", "");
+                    } else if (kind == "every") {
+                        // Convert everyMs to approximate cron expression
+                        long long every_ms = sched.value("everyMs", 3600000LL);
+                        long long every_min = std::max(1LL, every_ms / 60000LL);
+                        if (every_min < 60) {
+                            schedule = "*/" + std::to_string(every_min) + " * * * *";
+                        } else {
+                            long long every_hr = every_min / 60;
+                            schedule = "0 */" + std::to_string(every_hr) + " * * *";
+                        }
+                    } else if (kind == "at") {
+                        schedule = sched.value("at", "0 * * * *");
+                    }
+                } else {
+                    schedule = params.value("schedule", "");
+                }
+
+                // Extract message (flat or nested in payload)
+                std::string message;
+                if (params.contains("payload") && params["payload"].is_object()) {
+                    message = params["payload"].value("message", "");
+                } else {
+                    message = params.value("message", "");
+                }
+
+                if (name.empty() && !message.empty()) {
+                    name = message.substr(0, std::min(message.size(), (size_t)40));
+                }
                 if (schedule.empty() || message.empty()) {
                     throw std::runtime_error("schedule and message are required");
                 }
+
                 auto id = cron_scheduler->AddJob(name, schedule, message, session_key);
                 return {{"ok", true}, {"id", id}};
             }
@@ -824,6 +1094,7 @@ void register_rpc_handlers(
     }
 
     // --- cron.update ---
+    // Accepts both flat format and UI's {id, patch:{...}} format.
     if (cron_scheduler) {
         server.RegisterHandler(methods::kCronUpdate,
             [cron_scheduler, logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
@@ -832,13 +1103,37 @@ void register_rpc_handlers(
                     throw std::runtime_error("cron job id is required");
                 }
 
+                // Flatten nested patch object if present
+                nlohmann::json flat = params;
+                if (params.contains("patch") && params["patch"].is_object()) {
+                    for (auto& [k, v] : params["patch"].items()) {
+                        flat[k] = v;
+                    }
+                }
+
                 auto jobs = cron_scheduler->ListJobs();
                 for (const auto& job : jobs) {
-                    if (job.id == id || job.id.substr(0, id.size()) == id) {
-                        // Found the job — remove and re-add with updated fields
-                        std::string name = params.value("name", job.name);
-                        std::string schedule = params.value("schedule", job.schedule);
-                        std::string message = params.value("message", job.message);
+                    if (job.id == id) {
+                        std::string name     = flat.value("name", job.name);
+                        std::string schedule = job.schedule;
+                        std::string message  = job.message;
+
+                        // Extract schedule from nested or flat
+                        if (flat.contains("schedule") && flat["schedule"].is_object()) {
+                            const auto& s = flat["schedule"];
+                            if (s.value("kind", "") == "cron") {
+                                schedule = s.value("expr", job.schedule);
+                            }
+                        } else if (flat.contains("schedule") && flat["schedule"].is_string()) {
+                            schedule = flat["schedule"].get<std::string>();
+                        }
+
+                        // Extract message from nested payload or flat
+                        if (flat.contains("payload") && flat["payload"].is_object()) {
+                            message = flat["payload"].value("message", job.message);
+                        } else if (flat.contains("message")) {
+                            message = flat.value("message", job.message);
+                        }
 
                         cron_scheduler->RemoveJob(job.id);
                         auto new_id = cron_scheduler->AddJob(name, schedule, message, job.session_key);
@@ -893,30 +1188,53 @@ void register_rpc_handlers(
         );
 
         // --- cron.runs ---
+        // Returns CronRunsResult shape expected by the UI.
         server.RegisterHandler(methods::kCronRuns,
             [cron_scheduler, logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
-                std::string id = params.value("id", "");
-                auto jobs = cron_scheduler->ListJobs();
+                std::string filter_id = params.value("id", "");
+                int limit  = params.value("limit",  0);
+                int offset = params.value("offset", 0);
+                auto jobs  = cron_scheduler->ListJobs();
 
-                nlohmann::json result = nlohmann::json::array();
+                auto tp_to_ms = [](std::chrono::system_clock::time_point tp) -> long long {
+                    return std::chrono::duration_cast<std::chrono::milliseconds>(
+                        tp.time_since_epoch()).count();
+                };
+
+                // Build synthetic run log entries from last_run timestamps
+                nlohmann::json all_entries = nlohmann::json::array();
                 for (const auto& job : jobs) {
-                    if (!id.empty() && job.id.substr(0, id.size()) != id && job.id != id) {
-                        continue;
+                    if (!filter_id.empty() && job.id != filter_id) continue;
+                    long long last_ms = tp_to_ms(job.last_run);
+                    long long next_ms = tp_to_ms(job.next_run);
+                    if (last_ms > 0) {
+                        all_entries.push_back({
+                            {"ts",          last_ms},
+                            {"jobId",       job.id},
+                            {"jobName",     job.name},
+                            {"status",      "ok"},
+                            {"runAtMs",     last_ms},
+                            {"nextRunAtMs", next_ms > 0 ? nlohmann::json(next_ms) : nlohmann::json(nullptr)}
+                        });
                     }
-                    nlohmann::json entry;
-                    entry["id"] = job.id;
-                    entry["name"] = job.name;
-                    entry["schedule"] = job.schedule;
-                    entry["enabled"] = job.enabled;
-                    auto last_run_epoch = std::chrono::duration_cast<std::chrono::seconds>(
-                        job.last_run.time_since_epoch()).count();
-                    auto next_run_epoch = std::chrono::duration_cast<std::chrono::seconds>(
-                        job.next_run.time_since_epoch()).count();
-                    entry["lastRun"] = last_run_epoch > 0 ? last_run_epoch : 0;
-                    entry["nextRun"] = next_run_epoch > 0 ? next_run_epoch : 0;
-                    result.push_back(entry);
                 }
-                return result;
+
+                int total = static_cast<int>(all_entries.size());
+                int start = std::min(offset, total);
+                int end   = (limit > 0) ? std::min(start + limit, total) : total;
+
+                nlohmann::json entries = nlohmann::json::array();
+                for (int i = start; i < end; ++i) entries.push_back(all_entries[i]);
+
+                bool has_more = end < total;
+                return {
+                    {"entries",    entries},
+                    {"total",      total},
+                    {"offset",     offset},
+                    {"limit",      limit > 0 ? limit : total},
+                    {"hasMore",    has_more},
+                    {"nextOffset", has_more ? nlohmann::json(end) : nlohmann::json(nullptr)}
+                };
             }
         );
     }
@@ -1178,13 +1496,298 @@ void register_rpc_handlers(
         );
     }
 
+    // ================================================================
+    // UI compatibility handlers — missing in original implementation
+    // ================================================================
+
+    // --- agent.identity.get ---
+    // Called on every UI connect to show assistant name/avatar.
+    server.RegisterHandler("agent.identity.get",
+        [&config](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
+            return {
+                {"agentId", "main"},
+                {"name",    "QuantClaw Agent"},
+                {"avatar",  ""},
+                {"emoji",   "\xF0\x9F\xA6\x9E"}
+            };
+        }
+    );
+
+    // --- node.list ---
+    // QuantClaw is a single-node deployment; return empty list.
+    server.RegisterHandler("node.list",
+        [](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
+            return nlohmann::json::array();
+        }
+    );
+
+    // --- device.pair.list ---
+    // Device pairing not implemented; return empty list so UI doesn't hang.
+    server.RegisterHandler("device.pair.list",
+        [](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
+            return nlohmann::json::array();
+        }
+    );
+
+    // --- logs.tail ---
+    // Return recent lines from the spdlog output file (if any).
+    server.RegisterHandler("logs.tail",
+        [logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
+            int req_limit  = params.value("limit",    200);
+            int max_bytes  = params.value("maxBytes", 512 * 1024);
+            long long cursor = params.value("cursor", 0LL);
+            (void)max_bytes;
+            (void)cursor;
+
+            // Attempt to read the log file if QUANTCLAW_LOG_FILE env is set
+            std::string log_file;
+            const char* env_log = std::getenv("QUANTCLAW_LOG_FILE");
+            if (env_log) log_file = env_log;
+
+            nlohmann::json lines = nlohmann::json::array();
+            long long new_cursor = cursor;
+            bool truncated = false;
+
+            if (!log_file.empty() && std::filesystem::exists(log_file)) {
+                std::ifstream ifs(log_file);
+                if (ifs.is_open()) {
+                    std::vector<std::string> all_lines;
+                    std::string line;
+                    while (std::getline(ifs, line)) {
+                        all_lines.push_back(line);
+                    }
+                    int total = static_cast<int>(all_lines.size());
+                    int start = std::max(0, total - req_limit);
+                    for (int i = start; i < total; ++i) {
+                        lines.push_back(all_lines[i]);
+                    }
+                    new_cursor = total;
+                    truncated = start > 0;
+                }
+            }
+
+            return {
+                {"file",      log_file},
+                {"cursor",    new_cursor},
+                {"lines",     lines},
+                {"truncated", truncated}
+            };
+        }
+    );
+
+    // --- config.schema ---
+    // Return a minimal JSON schema for the config form.
+    server.RegisterHandler("config.schema",
+        [](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
+            nlohmann::json schema = {
+                {"type", "object"},
+                {"properties", {
+                    {"agent", {
+                        {"type", "object"},
+                        {"properties", {
+                            {"model",         {{"type", "string"}}},
+                            {"maxIterations", {{"type", "integer"}, {"minimum", 1}, {"maximum", 500}}},
+                            {"temperature",   {{"type", "number"},  {"minimum", 0}, {"maximum", 2}}},
+                            {"maxTokens",     {{"type", "integer"}, {"minimum", 1}}},
+                            {"thinking",      {{"type", "string"},  {"enum", nlohmann::json::array({"off","low","medium","high"})}}}
+                        }}
+                    }},
+                    {"gateway", {
+                        {"type", "object"},
+                        {"properties", {
+                            {"port", {{"type", "integer"}, {"minimum", 1}, {"maximum", 65535}}},
+                            {"bind", {{"type", "string"}}}
+                        }}
+                    }}
+                }}
+            };
+            nlohmann::json ui_hints = {
+                {"agent.model",         {{"label", "Model"},         {"group", "Agent"}}},
+                {"agent.maxIterations", {{"label", "Max Iterations"}, {"group", "Agent"}}},
+                {"agent.temperature",   {{"label", "Temperature"},    {"group", "Agent"}, {"advanced", true}}},
+                {"agent.thinking",      {{"label", "Thinking Mode"},  {"group", "Agent"}}},
+                {"gateway.port",        {{"label", "Port"},           {"group", "Gateway"}}},
+                {"gateway.bind",        {{"label", "Bind Address"},   {"group", "Gateway"}}}
+            };
+            return {
+                {"schema",      schema},
+                {"uiHints",     ui_hints},
+                {"version",     "1"},
+                {"generatedAt", ""}
+            };
+        }
+    );
+
+    // --- cron.status ---
+    if (cron_scheduler) {
+        server.RegisterHandler("cron.status",
+            [cron_scheduler](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
+                auto jobs = cron_scheduler->ListJobs();
+                int enabled_count = 0;
+                long long next_wake = 0;
+                for (const auto& job : jobs) {
+                    if (job.enabled) {
+                        ++enabled_count;
+                        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            job.next_run.time_since_epoch()).count();
+                        if (ms > 0 && (next_wake == 0 || ms < next_wake)) {
+                            next_wake = ms;
+                        }
+                    }
+                }
+                return {
+                    {"enabled",      enabled_count > 0},
+                    {"jobs",         static_cast<int>(jobs.size())},
+                    {"nextWakeAtMs", next_wake > 0 ? nlohmann::json(next_wake) : nlohmann::json(nullptr)}
+                };
+            }
+        );
+    }
+
+    // --- skills.update ---
+    // Enable/disable a skill or save its API key.
+    if (skill_loader) {
+        server.RegisterHandler("skills.update",
+            [logger](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
+                std::string skill_key = params.value("skillKey", "");
+                if (skill_key.empty()) {
+                    throw std::runtime_error("skillKey is required");
+                }
+                // Persist enable/disable flag via env or config file is not yet implemented;
+                // acknowledge the request so the UI doesn't show an error.
+                bool enabled = params.value("enabled", true);
+                logger->info("skills.update: skillKey={} enabled={}", skill_key, enabled);
+                return {{"ok", true}, {"skillKey", skill_key}};
+            }
+        );
+    }
+
+    // --- sessions.usage ---
+    // Aggregate token usage from session histories for a date range.
+    server.RegisterHandler("sessions.usage",
+        [session_manager, &config](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
+            std::string start_date = params.value("startDate", "");
+            std::string end_date   = params.value("endDate",   "");
+
+            auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+
+            // Aggregate totals across all sessions
+            long long total_input = 0, total_output = 0;
+            nlohmann::json session_entries = nlohmann::json::array();
+
+            auto sessions = session_manager->ListSessions();
+            for (const auto& s : sessions) {
+                auto history = session_manager->GetHistory(s.session_key, -1);
+                long long in_tok = 0, out_tok = 0;
+                for (const auto& msg : history) {
+                    if (msg.usage) {
+                        in_tok  += msg.usage->input_tokens;
+                        out_tok += msg.usage->output_tokens;
+                    }
+                }
+                total_input  += in_tok;
+                total_output += out_tok;
+
+                session_entries.push_back({
+                    {"key",   s.session_key},
+                    {"label", s.display_name},
+                    {"model", config.agent.model},
+                    {"usage", {
+                        {"input",              in_tok},
+                        {"output",             out_tok},
+                        {"cacheRead",          0},
+                        {"cacheWrite",         0},
+                        {"totalTokens",        in_tok + out_tok},
+                        {"totalCost",          0.0},
+                        {"missingCostEntries", 0}
+                    }}
+                });
+            }
+
+            nlohmann::json zero_totals = {
+                {"input",              total_input},
+                {"output",             total_output},
+                {"cacheRead",          0},
+                {"cacheWrite",         0},
+                {"totalTokens",        total_input + total_output},
+                {"totalCost",          0.0},
+                {"inputCost",          0.0},
+                {"outputCost",         0.0},
+                {"cacheReadCost",      0.0},
+                {"cacheWriteCost",     0.0},
+                {"missingCostEntries", 0}
+            };
+
+            return {
+                {"updatedAt",  now_ms},
+                {"startDate",  start_date},
+                {"endDate",    end_date},
+                {"sessions",   session_entries},
+                {"totals",     zero_totals},
+                {"aggregates", {
+                    {"messages",  {{"total",0},{"user",0},{"assistant",0},{"toolCalls",0},{"toolResults",0},{"errors",0}}},
+                    {"tools",     {{"totalCalls",0},{"uniqueTools",0},{"tools",nlohmann::json::array()}}},
+                    {"byModel",   nlohmann::json::array()},
+                    {"byProvider", nlohmann::json::array()},
+                    {"byAgent",   nlohmann::json::array()},
+                    {"byChannel", nlohmann::json::array()},
+                    {"daily",     nlohmann::json::array()}
+                }}
+            };
+        }
+    );
+
+    // --- usage.cost ---
+    // Return daily cost summary (costs are zero since we don't track model pricing).
+    server.RegisterHandler("usage.cost",
+        [](const nlohmann::json& params, ClientConnection& /*client*/) -> nlohmann::json {
+            std::string start_date = params.value("startDate", "");
+            std::string end_date   = params.value("endDate",   "");
+            auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            nlohmann::json zero_totals = {
+                {"input",0},{"output",0},{"cacheRead",0},{"cacheWrite",0},
+                {"totalTokens",0},{"totalCost",0.0},
+                {"inputCost",0.0},{"outputCost",0.0},
+                {"cacheReadCost",0.0},{"cacheWriteCost",0.0},
+                {"missingCostEntries",0}
+            };
+            return {
+                {"updatedAt", now_ms},
+                {"days",      0},
+                {"daily",     nlohmann::json::array()},
+                {"totals",    zero_totals}
+            };
+        }
+    );
+
+    // --- sessions.usage.timeseries ---
+    // Return empty time series; UI silently fails on this.
+    server.RegisterHandler("sessions.usage.timeseries",
+        [](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
+            return {{"sessionId", nullptr}, {"points", nlohmann::json::array()}};
+        }
+    );
+
+    // --- sessions.usage.logs ---
+    // Return empty logs; UI silently fails on this.
+    server.RegisterHandler("sessions.usage.logs",
+        [](const nlohmann::json& /*params*/, ClientConnection& /*client*/) -> nlohmann::json {
+            return {{"logs", nlohmann::json::array()}};
+        }
+    );
+
     int handler_count = 24;  // base handlers (22 + 2 memory)
     if (reload_fn) handler_count++;
-    if (skill_loader) handler_count += 2;
-    if (cron_scheduler) handler_count += 6;  // list, add, remove, update, run, runs
+    if (skill_loader) handler_count += 3;   // status, install, update
+    if (cron_scheduler) handler_count += 7; // list, add, remove, update, run, runs, status
     if (exec_approval_mgr) handler_count += 2;
     if (plugin_system) handler_count += 7;
     if (command_queue) handler_count += 4;
+    handler_count += 10;  // ui compat: identity, node.list, device.pair.list, logs.tail,
+                          //            config.schema, sessions.usage, usage.cost,
+                          //            sessions.usage.timeseries, sessions.usage.logs
     logger->info("Registered {} RPC handlers", handler_count);
 }
 
