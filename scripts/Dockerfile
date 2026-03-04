@@ -45,9 +45,11 @@ RUN mkdir -p build && cd build \
 # guarantees correct npm version for lockfileVersion 3.
 FROM node:20-slim AS node-builder
 
-# Copy package files first for better layer caching
+# Copy package files first for better layer caching.
+# Use explicit filenames (not glob) — some BuildKit versions mis-expand
+# package*.json and skip package-lock.json, causing `npm ci` to fail.
 WORKDIR /src/sidecar
-COPY sidecar/package*.json ./
+COPY sidecar/package.json sidecar/package-lock.json ./
 RUN npm ci
 
 # Copy source and compile

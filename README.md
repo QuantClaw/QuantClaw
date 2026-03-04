@@ -798,7 +798,7 @@ Apache License 2.0 — See [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-Contributions are welcome! Please read through the guidelines before submitting.
+Contributions are welcome!
 
 ### Workflow
 
@@ -808,6 +808,51 @@ Contributions are welcome! Please read through the guidelines before submitting.
 4. Format code: `./scripts/format-code.sh` (or use Docker: `./scripts/format-code-docker.sh`)
 5. Run tests: `cd build && ctest --output-on-failure`
 6. Commit and push, then open a Pull Request against `main`
+
+### Code style
+
+QuantClaw follows the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html), enforced with `clang-format`.
+
+**VS Code** — add to `.vscode/settings.json`:
+
+```json
+{
+    "C_Cpp.clang_format_style": "file",
+    "editor.formatOnSave": true
+}
+```
+
+**Pre-commit hook** (auto-formats before each commit):
+
+```bash
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/bash
+./scripts/format-code.sh
+git add -u
+EOF
+chmod +x .git/hooks/pre-commit
+```
+
+### Writing tests
+
+Tests use [Google Test](https://github.com/google/googletest). Run a specific suite with:
+
+```bash
+./build/quantclaw_tests --gtest_filter=AgentLoopTest.*
+```
+
+Example test structure:
+
+```cpp
+#include <gtest/gtest.h>
+#include "quantclaw/my_module.hpp"
+
+TEST(MyModuleTest, BasicFunctionality) {
+    MyModule module;
+    EXPECT_TRUE(module.initialize());
+    EXPECT_EQ(module.getValue(), 42);
+}
+```
 
 ### Commit message format
 
@@ -828,4 +873,4 @@ Contributions are welcome! Please read through the guidelines before submitting.
 - README updated if adding user-facing features
 - Unit tests added for new functionality
 
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for full details including IDE setup and troubleshooting build failures.
+Questions? Open an [issue](https://github.com/QuantClaw/QuantClaw/issues) or start a [discussion](https://github.com/QuantClaw/QuantClaw/discussions).

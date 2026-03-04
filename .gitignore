@@ -29,7 +29,6 @@ adapters/node_modules/
 adapters/package-lock.json
 sidecar/node_modules/
 sidecar/dist/
-sidecar/package-lock.json
 
 # Reference code (local only, not committed)
 refs/

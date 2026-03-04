@@ -802,7 +802,7 @@ Apache License 2.0 — 详见 [LICENSE](LICENSE)。
 
 ## 贡献
 
-欢迎贡献！请在提交前阅读以下指南。
+欢迎贡献！
 
 ### 工作流程
 
@@ -812,6 +812,51 @@ Apache License 2.0 — 详见 [LICENSE](LICENSE)。
 4. 格式化代码：`./scripts/format-code.sh`（或使用 Docker：`./scripts/format-code-docker.sh`）
 5. 运行测试：`cd build && ctest --output-on-failure`
 6. 提交并推送，然后向 `main` 分支发起 Pull Request
+
+### 代码规范
+
+QuantClaw 遵循 [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)，用 `clang-format` 强制执行。
+
+**VS Code** — 在 `.vscode/settings.json` 中添加：
+
+```json
+{
+    "C_Cpp.clang_format_style": "file",
+    "editor.formatOnSave": true
+}
+```
+
+**Pre-commit hook**（每次提交前自动格式化）：
+
+```bash
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/bash
+./scripts/format-code.sh
+git add -u
+EOF
+chmod +x .git/hooks/pre-commit
+```
+
+### 编写测试
+
+测试使用 [Google Test](https://github.com/google/googletest)。运行指定测试套件：
+
+```bash
+./build/quantclaw_tests --gtest_filter=AgentLoopTest.*
+```
+
+测试结构示例：
+
+```cpp
+#include <gtest/gtest.h>
+#include "quantclaw/my_module.hpp"
+
+TEST(MyModuleTest, BasicFunctionality) {
+    MyModule module;
+    EXPECT_TRUE(module.initialize());
+    EXPECT_EQ(module.getValue(), 42);
+}
+```
 
 ### Commit 消息格式
 
@@ -832,4 +877,4 @@ Apache License 2.0 — 详见 [LICENSE](LICENSE)。
 - 如果新增了用户可见的功能，请更新 README
 - 为新功能添加了单元测试
 
-详细说明（含 IDE 配置和构建故障排除）请参阅 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)。
+有问题？欢迎提 [Issue](https://github.com/QuantClaw/QuantClaw/issues) 或发起 [Discussion](https://github.com/QuantClaw/QuantClaw/discussions)。
