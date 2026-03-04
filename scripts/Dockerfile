@@ -1,9 +1,9 @@
 # QuantClaw Production Image — Multi-stage build
 #
 # Stages:
-#   cpp-builder  — compiles C++ binary
-#   node-builder — compiles Sidecar (TypeScript → JS)
-#   runtime      — minimal Ubuntu image with both artifacts
+#   cpp-builder  — compiles C++ binary (Ubuntu 22.04)
+#   node-builder — compiles Sidecar TS→JS (node:20-slim, official image)
+#   runtime      — minimal Ubuntu 22.04 image with both artifacts
 #
 # Build:
 #   docker build -f scripts/Dockerfile -t quantclaw:$(cat scripts/DOCKER_VERSION) .
@@ -40,25 +40,21 @@ RUN mkdir -p build && cd build \
     && make -j$(nproc) \
     && strip build/quantclaw 2>/dev/null || true
 
-# ── Stage 2: Sidecar (Node.js) build ────────────────────────────────────────
-FROM ubuntu:${UBUNTU_VERSION} AS node-builder
+# ── Stage 2: Sidecar (Node.js) build ─────────────────────────────────────────
+# Use the official Node.js image — avoids nodesource installation issues and
+# guarantees correct npm version for lockfileVersion 3.
+FROM node:20-slim AS node-builder
 
-ENV DEBIAN_FRONTEND=noninteractive
+# Copy package files first for better layer caching
+WORKDIR /src/sidecar
+COPY sidecar/package*.json ./
+RUN npm ci
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /src
-COPY sidecar/ ./sidecar/
-
-RUN cd sidecar \
-    && npm ci --omit=dev \
-    && npm run build
+# Copy source and compile
+COPY sidecar/src ./src
+COPY sidecar/tsconfig.json ./
+RUN npm run build \
+    && npm prune --omit=dev
 
 # ── Stage 3: Runtime ─────────────────────────────────────────────────────────
 FROM ubuntu:${UBUNTU_VERSION} AS runtime
@@ -77,17 +73,13 @@ LABEL org.opencontainers.image.title="QuantClaw" \
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Runtime C++ deps + Node.js runtime
+# C++ runtime deps only — Node.js binary is copied from node-builder below
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libcurl4 \
     libspdlog1 \
     zlib1g \
     ca-certificates \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user (mirrors ixwebsocket's adduser pattern)
@@ -98,7 +90,10 @@ COPY --from=cpp-builder --chown=root:root /src/build/quantclaw /usr/local/bin/qu
 RUN chmod +x /usr/local/bin/quantclaw \
     && ldd /usr/local/bin/quantclaw
 
-# Install Sidecar
+# Copy Node.js binary from node-builder (avoids nodesource installation in runtime)
+COPY --from=node-builder /usr/local/bin/node /usr/local/bin/node
+
+# Install Sidecar (dist + pruned node_modules)
 COPY --from=node-builder --chown=quantclaw:quantclaw /src/sidecar/dist /home/quantclaw/sidecar/dist
 COPY --from=node-builder --chown=quantclaw:quantclaw /src/sidecar/node_modules /home/quantclaw/sidecar/node_modules
 
