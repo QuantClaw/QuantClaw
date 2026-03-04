@@ -73,7 +73,7 @@ static std::string html_to_text(const std::string& html) {
 }
 
 static std::string generate_id(const std::string& prefix = "bg") {
-    static std::mt19937 rng(std::random_device{}());
+    thread_local static std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<uint32_t> dist;
     std::ostringstream ss;
     ss << prefix << "_" << std::hex << dist(rng);

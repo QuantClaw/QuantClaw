@@ -436,9 +436,9 @@ void SessionManager::LoadStore() {
 }
 
 std::string SessionManager::generate_session_id() const {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 15);
+    thread_local static std::random_device rd;
+    thread_local static std::mt19937 gen(rd());
+    thread_local static std::uniform_int_distribution<> dis(0, 15);
     static const char* hex = "0123456789abcdef";
 
     std::string id;

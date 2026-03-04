@@ -43,17 +43,22 @@ public:
               const AgentConfig& agent_config,
               std::shared_ptr<spdlog::logger> logger);
 
-    // Process a message with externally-provided history and system prompt
-    // Returns all new messages generated during the turn (assistant + tool_result)
+    // Process a message with externally-provided history and system prompt.
+    // Returns all new messages generated during the turn (assistant + tool_result).
+    // usage_session_key: if non-empty, usage is recorded under this key instead of
+    // session_key_ — allows per-request tracking without mutating shared state.
     std::vector<Message> ProcessMessage(const std::string& message,
                                          const std::vector<Message>& history,
-                                         const std::string& system_prompt);
+                                         const std::string& system_prompt,
+                                         const std::string& usage_session_key = "");
 
-    // Streaming version — returns all new messages generated during the turn
+    // Streaming version — returns all new messages generated during the turn.
+    // usage_session_key: same semantics as ProcessMessage.
     std::vector<Message> ProcessMessageStream(const std::string& message,
                                                  const std::vector<Message>& history,
                                                  const std::string& system_prompt,
-                                                 AgentEventCallback callback);
+                                                 AgentEventCallback callback,
+                                                 const std::string& usage_session_key = "");
 
     // Stop the current agent turn
     void Stop();

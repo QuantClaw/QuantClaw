@@ -230,9 +230,9 @@ nlohmann::json SessionLane::ToJson() const {
 // ================================================================
 
 static std::string generate_uuid() {
-  static std::random_device rd;
-  static std::mt19937 gen(rd());
-  static std::uniform_int_distribution<uint32_t> dist;
+  thread_local static std::random_device rd;
+  thread_local static std::mt19937 gen(rd());
+  thread_local static std::uniform_int_distribution<uint32_t> dist;
 
   std::ostringstream ss;
   ss << std::hex << std::setfill('0');

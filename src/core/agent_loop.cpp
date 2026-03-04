@@ -143,7 +143,10 @@ void AgentLoop::SetModel(const std::string& model_ref) {
 
 std::vector<Message> AgentLoop::ProcessMessage(const std::string& message,
                                                  const std::vector<Message>& history,
-                                                 const std::string& system_prompt) {
+                                                 const std::string& system_prompt,
+                                                 const std::string& usage_session_key) {
+    const std::string& effective_session_key =
+        usage_session_key.empty() ? session_key_ : usage_session_key;
     logger_->info("Processing message (non-streaming)");
     stop_requested_ = false;
 
@@ -249,8 +252,8 @@ std::vector<Message> AgentLoop::ProcessMessage(const std::string& message,
             auto response = provider->ChatCompletion(request);
 
             // --- Usage tracking ---
-            if (usage_accumulator_ && !session_key_.empty()) {
-                usage_accumulator_->Record(session_key_,
+            if (usage_accumulator_ && !effective_session_key.empty()) {
+                usage_accumulator_->Record(effective_session_key,
                     response.usage.prompt_tokens,
                     response.usage.completion_tokens);
             }
@@ -261,7 +264,7 @@ std::vector<Message> AgentLoop::ProcessMessage(const std::string& message,
             // Record success for failover tracking
             if (failover_resolver_ && !last_provider_id_.empty()) {
                 failover_resolver_->RecordSuccess(
-                    last_provider_id_, last_profile_id_, session_key_);
+                    last_provider_id_, last_profile_id_, effective_session_key);
             }
 
             if (!response.tool_calls.empty()) {
@@ -405,7 +408,10 @@ std::vector<Message> AgentLoop::ProcessMessage(const std::string& message,
 std::vector<Message> AgentLoop::ProcessMessageStream(const std::string& message,
                                                         const std::vector<Message>& history,
                                                         const std::string& system_prompt,
-                                                        AgentEventCallback callback) {
+                                                        AgentEventCallback callback,
+                                                        const std::string& usage_session_key) {
+    const std::string& effective_session_key =
+        usage_session_key.empty() ? session_key_ : usage_session_key;
     logger_->info("Processing message (streaming)");
     stop_requested_ = false;
 
@@ -582,8 +588,8 @@ std::vector<Message> AgentLoop::ProcessMessageStream(const std::string& message,
             });
 
             // --- Usage tracking ---
-            if (usage_accumulator_ && !session_key_.empty()) {
-                usage_accumulator_->Record(session_key_,
+            if (usage_accumulator_ && !effective_session_key.empty()) {
+                usage_accumulator_->Record(effective_session_key,
                     stream_usage.prompt_tokens,
                     stream_usage.completion_tokens);
             }
@@ -594,7 +600,7 @@ std::vector<Message> AgentLoop::ProcessMessageStream(const std::string& message,
             // Record success for failover tracking
             if (failover_resolver_ && !last_provider_id_.empty()) {
                 failover_resolver_->RecordSuccess(
-                    last_provider_id_, last_profile_id_, session_key_);
+                    last_provider_id_, last_profile_id_, effective_session_key);
             }
 
             // If we got a final response without tool calls, we're done

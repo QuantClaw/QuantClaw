@@ -632,7 +632,7 @@ void register_api_routes(
                         quantclaw::UsageAccumulator::Stats{};
 
                     auto new_messages = agent_loop->ProcessMessage(
-                        user_message, llm_history, system_prompt);
+                        user_message, llm_history, system_prompt, session_key);
 
                     auto usage_after = usage_acc ? usage_acc->GetSession(session_key) :
                         quantclaw::UsageAccumulator::Stats{};

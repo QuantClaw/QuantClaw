@@ -361,9 +361,9 @@ void GatewayServer::handle_rpc_request(const std::string& conn_id,
 
 void GatewayServer::send_challenge(ix::WebSocket& ws) {
     // Generate nonce
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 15);
+    thread_local static std::random_device rd;
+    thread_local static std::mt19937 gen(rd());
+    thread_local static std::uniform_int_distribution<> dis(0, 15);
     static const char* hex = "0123456789abcdef";
 
     std::string nonce;
