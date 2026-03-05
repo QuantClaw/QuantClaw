@@ -3,6 +3,7 @@
 
 #include "quantclaw/gateway/gateway_server.hpp"
 #include "quantclaw/gateway/protocol.hpp"
+#include "quantclaw/constants.hpp"
 #include "quantclaw/session/session_manager.hpp"
 #include "quantclaw/core/agent_loop.hpp"
 #include "quantclaw/core/prompt_builder.hpp"
@@ -21,6 +22,7 @@
 #include <cctype>
 #include <chrono>
 #include <ctime>
+#include <iomanip>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -51,7 +53,7 @@ void register_rpc_handlers(
             return {
                 {"status", "ok"},
                 {"uptime", server.GetUptimeSeconds()},
-                {"version", "0.2.0"}
+                {"version", quantclaw::kVersion}
             };
         }
     );
@@ -66,7 +68,7 @@ void register_rpc_handlers(
                 {"connections", server.GetConnectionCount()},
                 {"uptime", server.GetUptimeSeconds()},
                 {"sessions", sessions.size()},
-                {"version", "0.2.0"}
+                {"version", quantclaw::kVersion}
             };
         }
     );
@@ -298,27 +300,13 @@ void register_rpc_handlers(
             auto iso_to_ms = [](const std::string& iso_str) -> int64_t {
                 if (iso_str.empty()) return 0;
                 std::tm tm = {};
-#ifdef _WIN32
-                // Windows: manual parsing since strptime is not available in MSVC
-                int year, month, day, hour, minute, second;
-                int parsed = sscanf_s(iso_str.c_str(), "%d-%d-%dT%d:%d:%dZ",
-                                      &year, &month, &day, &hour, &minute, &second);
-                if (parsed != 6) return 0;
-                tm.tm_year = year - 1900;
-                tm.tm_mon = month - 1;
-                tm.tm_mday = day;
-                tm.tm_hour = hour;
-                tm.tm_min = minute;
-                tm.tm_sec = second;
+                std::istringstream ss(iso_str);
+                ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+                if (ss.fail()) return 0;
                 tm.tm_isdst = 0;  // UTC has no DST
-                // Use _mkgmtime64 on Windows for UTC time
+#ifdef _WIN32
                 auto time_t_val = _mkgmtime64(&tm);
 #else
-                // POSIX: use strptime for robust parsing
-                const char* result = strptime(iso_str.c_str(), "%Y-%m-%dT%H:%M:%SZ", &tm);
-                if (!result) return 0;
-                tm.tm_isdst = 0;  // UTC has no DST
-                // Use timegm for UTC (POSIX standard)
                 auto time_t_val = timegm(&tm);
 #endif
                 if (time_t_val < 0) return 0;
@@ -662,7 +650,7 @@ void register_rpc_handlers(
             return {
                 {"status", "ok"},
                 {"uptime", server.GetUptimeSeconds()},
-                {"version", "0.2.0"}
+                {"version", quantclaw::kVersion}
             };
         }
     );
@@ -693,7 +681,7 @@ void register_rpc_handlers(
                 {"port",        server.GetPort()},
                 {"connections", server.GetConnectionCount()},
                 {"uptime",      server.GetUptimeSeconds()},
-                {"version",     "0.2.0"},
+                {"version",     quantclaw::kVersion},
                 // OpenClaw compatibility fields
                 {"heartbeat", {
                     {"defaultAgentId", "default"},

@@ -1,0 +1,31 @@
+name: Cleanup PR Caches
+
+# Delete all Actions caches associated with a PR branch after the PR is closed.
+# This prevents the ccache and GHA caches from accumulating across merged/closed
+# PRs and consuming repository storage quota.
+#
+# Pattern borrowed from pikiwidb/.github/workflows/clean-cache.yml.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  actions: write   # required to delete caches
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Delete PR branch caches
+      run: |
+        gh extension install actions/gh-actions-cache
+        BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+        echo "Cleaning caches for branch: ${BRANCH}"
+        for key in $(gh actions-cache list -R "$REPO" -B "$BRANCH" -L 100 | cut -f 1); do
+          gh actions-cache delete "$key" -R "$REPO" -B "$BRANCH" --confirm
+          echo "Deleted cache: $key"
+        done
+        echo "Done."
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPO: ${{ github.repository }}

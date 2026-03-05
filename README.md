@@ -470,20 +470,136 @@ Any OpenClaw-compatible client can connect using the same `connect` + `chat.send
 
 ## Docker
 
-```bash
-# Build and run (Docker files are in scripts/ directory)
-docker compose -f scripts/docker-compose.yml up -d
+All Docker-related files live in the `scripts/` directory.
 
-# Or build manually
-docker build -f scripts/Dockerfile -t quantclaw .
-docker run -d \
-  -p 18800:18800 \
-  -e OPENAI_API_KEY=your-key \
-  -v quantclaw_data:/home/quantclaw/.quantclaw \
-  quantclaw
+### Image types
+
+| File | Purpose | Base | User |
+|------|---------|------|------|
+| `scripts/Dockerfile` | **Production** — minimal runtime image with C++ binary + Sidecar | Ubuntu 22.04 multi-stage | `quantclaw` (non-root) |
+| `scripts/Dockerfile.test` | **CI / Test** — runs C++ unit tests + Sidecar tests + E2E tests | Ubuntu 22.04 | root |
+| `scripts/Dockerfile.dev` | **Development** — full toolchain + source + `gdb`/`valgrind`, interactive shell | Ubuntu 22.04 | root |
+
+The production image uses a **three-stage build**: `cpp-builder` (compiles C++), `node-builder` (compiles TypeScript Sidecar), and `runtime` (copies only the final artifacts). It runs as a non-root user `quantclaw`.
+
+### DOCKER_VERSION
+
+`scripts/DOCKER_VERSION` is the single source of truth for the image version tag:
+
+```bash
+VERSION=$(cat scripts/DOCKER_VERSION)
+# → 0.3.0-alpha
 ```
 
-The Docker image uses a multi-stage build (Ubuntu 22.04) and runs as a non-root user. Configuration is persisted via the `/home/quantclaw/.quantclaw` volume. Docker files are located in the `scripts/` directory.
+All three Compose services use this value via the `QUANTCLAW_VERSION` environment variable.
+To set it explicitly before running Compose:
+
+```bash
+export QUANTCLAW_VERSION=$(cat scripts/DOCKER_VERSION)
+```
+
+### Quick start with Docker Compose
+
+```bash
+# Start the production gateway (detached)
+docker compose -f scripts/docker-compose.yml up -d quantclaw
+
+# View logs
+docker compose -f scripts/docker-compose.yml logs -f quantclaw
+
+# Run the full test suite in a one-shot container
+docker compose -f scripts/docker-compose.yml run --rm quantclaw-test
+
+# Start the dev container with a live source mount
+docker compose -f scripts/docker-compose.yml run --rm quantclaw-dev
+```
+
+The compose file defines three services:
+
+| Service | Image | Description |
+|---------|-------|-------------|
+| `quantclaw` | `quantclaw:VERSION` | Production gateway, restarts automatically |
+| `quantclaw-test` | `quantclaw-test:VERSION` | One-shot test runner |
+| `quantclaw-dev` | `quantclaw-dev:VERSION` | Dev shell with source volume mount |
+
+### Build manually
+
+```bash
+VERSION=$(cat scripts/DOCKER_VERSION)
+
+# Production image (with OCI labels)
+docker build \
+  -f scripts/Dockerfile \
+  --build-arg VERSION=$VERSION \
+  --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --build-arg VCS_REF=$(git rev-parse --short HEAD) \
+  -t quantclaw:$VERSION \
+  -t quantclaw:latest \
+  .
+
+# Test image
+docker build -f scripts/Dockerfile.test -t quantclaw-test:$VERSION .
+
+# Dev image
+docker build -f scripts/Dockerfile.dev -t quantclaw-dev:$VERSION .
+```
+
+### Run the production image
+
+```bash
+docker run -d \
+  --name quantclaw \
+  -p 18800:18800 \
+  -p 18801:18801 \
+  -e OPENAI_API_KEY=sk-... \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -e QUANTCLAW_LOG_LEVEL=info \
+  -v quantclaw_data:/home/quantclaw/.quantclaw \
+  quantclaw:latest
+```
+
+### Build args and environment variables
+
+**Build args** (for the production image):
+
+| Arg | Description |
+|-----|-------------|
+| `VERSION` | Written into OCI `org.opencontainers.image.version` label |
+| `BUILD_DATE` | ISO-8601 build timestamp for the OCI label |
+| `VCS_REF` | Git commit short SHA for the OCI label |
+| `UBUNTU_VERSION` | Ubuntu base image version (default: `22.04`) |
+
+**Runtime environment variables**:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | — | OpenAI / compatible provider API key |
+| `ANTHROPIC_API_KEY` | — | Anthropic API key |
+| `QUANTCLAW_LOG_LEVEL` | `info` | Log level: `debug` / `info` / `warn` / `error` |
+
+### Volumes and ports
+
+| Volume / Mount | Description |
+|----------------|-------------|
+| `/home/quantclaw/.quantclaw` | Config, workspace, sessions, and logs — **always persist this** |
+
+| Port | Protocol | Description |
+|------|----------|-------------|
+| `18800` | WebSocket | Gateway RPC endpoint |
+| `18801` | HTTP | Dashboard and REST API |
+
+## Scripts
+
+All helper scripts are in `scripts/`. Run them from the **repository root**.
+
+| Script | Description |
+|--------|-------------|
+| `scripts/build.sh` | Smart build wrapper: color output, `-c` clean, `--debug`, `--tests`, `--asan`/`--tsan`/`--ubsan` sanitizers, CPU auto-detect, missing-dep auto-install. |
+| `scripts/release.sh` | Build release tarball + SHA256 checksum. Reads version from `scripts/DOCKER_VERSION` or accepts an explicit version argument. Output goes to `dist/`. |
+| `scripts/install.sh` | Native install: detects OS, installs system deps, builds from source, creates workspace. Run as root: `sudo bash scripts/install.sh` |
+| `scripts/format-code.sh` | Format all C++ sources with `clang-format`. Pass `--check` for a dry-run (used in CI). |
+| `scripts/format-code-docker.sh` | Same as above but runs inside Docker — no local `clang-format` required. |
+| `scripts/build_ui.sh` | Build the web Dashboard UI assets. |
 
 ## Testing
 
@@ -602,17 +718,17 @@ QuantClaw aims for full compatibility with [OpenClaw](https://github.com/opencla
 | Plugin hooks (24 types) | **Full** | All hook names and modes (void/modifying/sync) aligned |
 | Plugin Sidecar IPC | **Full** | Tools, hooks, services, providers, commands, HTTP routes, gateway methods |
 | JSONL session format | **Partial** | Basic read/write compatible; missing branching (parentId), 8 entry types, write lock |
-| Config format | **Partial** | JSON only (no JSON5 comments/trailing commas), no `$include`, no `${VAR}` env substitution |
-| CLI commands | **Partial** | Core commands present; ~28 top-level commands from OpenClaw not yet implemented |
+| Config format | **Partial** | JSON5 (comments, trailing commas) and `${VAR}` env substitution supported; `$include` directive pending |
+| CLI commands | **Partial** | Core commands present; `approvals`, `tui` management CLI not yet implemented |
 | Gateway RPC protocol | **Partial** | ~30 methods implemented; ~85+ OpenClaw methods pending |
 | Provider system | **Partial** | OpenAI + Anthropic + 5 OpenAI-compatible; missing OAuth, GitHub Copilot, Qwen, etc. |
-| Agent loop | **Partial** | Core loop works; missing lane-based queue, auth rotation, overflow compaction |
+| Agent loop | **Partial** | Dynamic iterations (32–160), context guard, tool truncation, overflow compaction retry, budget pruning all implemented; multi-stage summary pending |
 | Memory search | **Partial** | BM25 keyword search only; missing hybrid vector search (embeddings, SQLite, MMR) |
-| Context management | **Partial** | Compaction + pruning work; missing multi-stage summary, budget-based pruning |
+| Context management | **Partial** | Budget-based compaction + pruning implemented; multi-stage summary pending |
 | Channel system | **Partial** | External subprocess adapters; no built-in channels, no 7-tier routing |
-| Security / Sandbox | **Partial** | RBAC + rate limiter + sandbox; missing Docker sandbox, security audit framework |
-| MCP | **Partial** | Basic implementation; method names and transport being aligned to spec |
-| Web API | **Partial** | 16 REST routes; missing OpenResponses API, webhook endpoints |
+| Security / Sandbox | **Partial** | RBAC + rate limiter + `setrlimit` sandbox; missing Docker sandbox, security audit framework |
+| MCP | **Partial** | Implemented with spec-compliant method names (`tools/list`, `tools/call`); transport aligned |
+| Web API | **Partial** | 16 REST routes; missing OpenResponses API (`/v1/responses`), webhook endpoints |
 
 ### Key Differences from OpenClaw
 
@@ -620,9 +736,9 @@ QuantClaw aims for full compatibility with [OpenClaw](https://github.com/opencla
 |--------|----------|-----------|
 | Default gateway port | `18789` | `18800` |
 | Default HTTP port | Same as gateway | `18801` (separate) |
-| Config format | JSON5 with `$include` and `${VAR}` | Strict JSON |
-| Default model | `anthropic/claude-sonnet-4-6` | `qwen-max` |
-| Default maxTokens | `8192` | `4096` |
+| Config format | JSON5 with `$include` and `${VAR}` | JSON5 + `${VAR}` (no `$include`) |
+| Default model | `anthropic/claude-sonnet-4-6` | `anthropic/claude-sonnet-4-6` |
+| Default maxTokens | `8192` | `8192` |
 | Auth profiles | Multi-profile with OAuth + rotation | Single key per provider |
 | Memory search | Hybrid (vector 0.7 + BM25 0.3) | BM25 only |
 | Plugin execution | In-process (same Node.js) | Out-of-process (sidecar via TCP) |
@@ -638,20 +754,19 @@ QuantClaw aims for full compatibility with [OpenClaw](https://github.com/opencla
 | C++ resource limits | `setrlimit` sandbox (CPU/memory/fsize/nproc) |
 | `viewer` RBAC role | Dedicated read-only role |
 
-For the full gap analysis, see [.claude/gap-analysis.md](.claude/gap-analysis.md).
-
 ## Roadmap
 
-Currently implemented: WebSocket/HTTP gateway, multi-provider LLM with failover, session persistence, plugin ecosystem, channel adapters, MCP support, onboarding wizard, and 769 passing tests (712 C++ + 57 sidecar).
+Currently implemented: WebSocket/HTTP gateway, multi-provider LLM with failover, session persistence, plugin ecosystem, channel adapters, MCP support, onboarding wizard, JSON5 config, `${VAR}` env substitution, dynamic agent iterations, budget-based context management — 791 passing tests (791 C++).
 
 Not yet implemented:
 - TUI interactive mode
-- Multiple agent profiles
-- JSON5 config with `$include` and `${VAR}` support
-- Hybrid memory search (vector + BM25)
+- `approvals`, `tui`, `gateway health/probe` management CLI
+- Config `$include` directive (modular config files)
+- Multiple auth profiles with OAuth credential flows
+- Hybrid memory search (vector embeddings + BM25, SQLite backend)
+- Multi-stage context compaction (chunk + merge strategy)
 - Built-in channel adapters (Telegram, Discord, Slack)
-- Docker sandbox isolation
-- OAuth credential flows
+- Docker sandbox isolation (per-session container)
 
 ## Troubleshooting
 
@@ -689,7 +804,7 @@ Apache License 2.0 — See [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-Contributions are welcome! Please read through the guidelines before submitting.
+Contributions are welcome!
 
 ### Workflow
 
@@ -699,6 +814,51 @@ Contributions are welcome! Please read through the guidelines before submitting.
 4. Format code: `./scripts/format-code.sh` (or use Docker: `./scripts/format-code-docker.sh`)
 5. Run tests: `cd build && ctest --output-on-failure`
 6. Commit and push, then open a Pull Request against `main`
+
+### Code style
+
+QuantClaw follows the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html), enforced with `clang-format`.
+
+**VS Code** — add to `.vscode/settings.json`:
+
+```json
+{
+    "C_Cpp.clang_format_style": "file",
+    "editor.formatOnSave": true
+}
+```
+
+**Pre-commit hook** (auto-formats before each commit):
+
+```bash
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/bash
+./scripts/format-code.sh
+git add -u
+EOF
+chmod +x .git/hooks/pre-commit
+```
+
+### Writing tests
+
+Tests use [Google Test](https://github.com/google/googletest). Run a specific suite with:
+
+```bash
+./build/quantclaw_tests --gtest_filter=AgentLoopTest.*
+```
+
+Example test structure:
+
+```cpp
+#include <gtest/gtest.h>
+#include "quantclaw/my_module.hpp"
+
+TEST(MyModuleTest, BasicFunctionality) {
+    MyModule module;
+    EXPECT_TRUE(module.initialize());
+    EXPECT_EQ(module.getValue(), 42);
+}
+```
 
 ### Commit message format
 
@@ -719,4 +879,4 @@ Contributions are welcome! Please read through the guidelines before submitting.
 - README updated if adding user-facing features
 - Unit tests added for new functionality
 
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for full details including IDE setup and troubleshooting build failures.
+Questions? Open an [issue](https://github.com/QuantClaw/QuantClaw/issues) or start a [discussion](https://github.com/QuantClaw/QuantClaw/discussions).

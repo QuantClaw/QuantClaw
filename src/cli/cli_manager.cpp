@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "quantclaw/cli/cli_manager.hpp"
+#include "quantclaw/constants.hpp"
 #include <iostream>
 #include <algorithm>
 #include <spdlog/spdlog.h>
 
 namespace quantclaw::cli {
 
-CLIManager::CLIManager() {
-    // Commands are registered by main() after construction
-}
+CLIManager::CLIManager() = default;
 
 void CLIManager::AddCommand(const Command& command) {
     commands_.push_back(command);
@@ -26,7 +25,9 @@ int CLIManager::Run(int argc, char** argv) {
 
     // Handle global flags
     if (command_name == "--version" || command_name == "-v") {
-        std::cout << "quantclaw 0.2.0" << std::endl;
+        std::cout << "quantclaw " << kVersion
+                  << " (build " << kGitCommit << " " << kBuildDate << ")"
+                  << std::endl;
         return 0;
     }
     if (command_name == "--help" || command_name == "-h") {

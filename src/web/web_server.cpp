@@ -8,7 +8,7 @@
 namespace quantclaw::web {
 
 WebServer::WebServer(int port, std::shared_ptr<spdlog::logger> logger)
-    : port_(port), logger_(logger), running_(false) {
+    : port_(port), logger_(std::move(logger)), running_(false) {
     logger_->info("WebServer initialized on port {}", port_);
 }
 
@@ -17,7 +17,7 @@ WebServer::~WebServer() {
 }
 
 void WebServer::AddRoute(const std::string& path, const std::string& method, RequestHandler handler) {
-    routes_[path] = {method, handler};
+    routes_[path] = {method, std::move(handler)};
     logger_->debug("Added route: {} {}", method, path);
 }
 

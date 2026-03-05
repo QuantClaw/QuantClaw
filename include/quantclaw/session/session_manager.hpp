@@ -10,9 +10,11 @@
 #include <memory>
 #include <filesystem>
 #include <mutex>
+#include <shared_mutex>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include "quantclaw/core/content_block.hpp"
+#include "quantclaw/common/noncopyable.hpp"
 
 namespace quantclaw {
 
@@ -87,7 +89,7 @@ struct SessionHandle {
 
 // --- Session Manager ---
 
-class SessionManager {
+class SessionManager : public Noncopyable {
 public:
     SessionManager(const std::filesystem::path& sessions_dir,
                    std::shared_ptr<spdlog::logger> logger);
@@ -129,7 +131,7 @@ public:
 private:
     std::filesystem::path sessions_dir_;
     std::shared_ptr<spdlog::logger> logger_;
-    mutable std::mutex mutex_;
+    mutable std::shared_mutex mutex_;  // shared for reads, exclusive for writes
 
     // session_key -> SessionInfo
     std::unordered_map<std::string, SessionInfo> store_;

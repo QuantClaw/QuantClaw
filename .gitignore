@@ -8,6 +8,12 @@ Testing/
 *.so
 *.dylib
 
+# Release artifacts (scripts/release.sh)
+dist/
+
+# clang compile commands (generated locally or by CI)
+compile_commands.json
+
 # IDE / editor
 .vscode/
 .idea/
@@ -29,7 +35,6 @@ adapters/node_modules/
 adapters/package-lock.json
 sidecar/node_modules/
 sidecar/dist/
-sidecar/package-lock.json
 
 # Reference code (local only, not committed)
 refs/

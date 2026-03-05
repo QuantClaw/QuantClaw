@@ -10,7 +10,32 @@
 // defined here so they can be changed in one place.
 // ============================================================
 
+// Fallbacks in case the file is included without CMake's compile definitions
+// (e.g., in a standalone IDE configuration or unit test binary).
+#ifndef QUANTCLAW_VERSION
+#  define QUANTCLAW_VERSION "dev"
+#endif
+#ifndef QUANTCLAW_BUILD_DATE
+#  define QUANTCLAW_BUILD_DATE "unknown"
+#endif
+#ifndef QUANTCLAW_GIT_COMMIT
+#  define QUANTCLAW_GIT_COMMIT "unknown"
+#endif
+
 namespace quantclaw {
+
+// ------------------------------------------------------------
+// Version information (injected by CMake at build time)
+// ------------------------------------------------------------
+
+/// Release version string (semver, e.g. "0.3.0")
+inline constexpr const char* kVersion   = QUANTCLAW_VERSION;
+
+/// Build date (ISO 8601, e.g. "2026-03-05")
+inline constexpr const char* kBuildDate = QUANTCLAW_BUILD_DATE;
+
+/// Short git commit hash (e.g. "a1b2c3d")
+inline constexpr const char* kGitCommit = QUANTCLAW_GIT_COMMIT;
 
 // ------------------------------------------------------------
 // Network ports

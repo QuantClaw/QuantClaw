@@ -11,6 +11,9 @@ node_modules/
 .github/
 refs/
 
+# Claude config (local only, not committed per .gitignore)
+.claude/
+
 # Editor/IDE
 .vscode/
 .idea/

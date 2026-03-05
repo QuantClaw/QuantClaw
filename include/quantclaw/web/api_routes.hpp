@@ -26,14 +26,14 @@ class WebServer;
 
 void register_api_routes(
     WebServer& server,
-    std::shared_ptr<quantclaw::SessionManager> session_manager,
-    std::shared_ptr<quantclaw::AgentLoop> agent_loop,
-    std::shared_ptr<quantclaw::PromptBuilder> prompt_builder,
-    std::shared_ptr<quantclaw::ToolRegistry> tool_registry,
+    const std::shared_ptr<quantclaw::SessionManager>& session_manager,
+    const std::shared_ptr<quantclaw::AgentLoop>& agent_loop,
+    const std::shared_ptr<quantclaw::PromptBuilder>& prompt_builder,
+    const std::shared_ptr<quantclaw::ToolRegistry>& tool_registry,
     const quantclaw::QuantClawConfig& config,
     quantclaw::gateway::GatewayServer& gateway_server,
-    std::shared_ptr<spdlog::logger> logger,
-    std::function<void()> reload_fn = nullptr,
+    const std::shared_ptr<spdlog::logger>& logger,
+    const std::function<void()>& reload_fn = nullptr,
     quantclaw::PluginSystem* plugin_system = nullptr);
 
 } // namespace quantclaw::web

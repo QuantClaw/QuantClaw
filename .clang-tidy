@@ -1,0 +1,185 @@
+---
+# QuantClaw clang-tidy configuration
+# Based on Google C++ Style Guide conventions.
+#
+# IMPORTANT: Do NOT place comments (# ...) inside the Checks YAML string.
+# YAML single-quoted strings treat '#' as literal text, which corrupts the
+# comma-separated check list and causes clang-tidy to silently ignore all
+# disabled entries.
+#
+# Run: clang-tidy -p build src/**/*.cpp
+
+# ── Disabled checks rationale ────────────────────────────────────────────────
+#
+# bugprone-easily-swappable-parameters:
+#   Many internal helpers take adjacent same-type params by convention.
+# bugprone-implicit-widening-of-multiplication-result:
+#   Common in numeric buffer-size arithmetic; not yet audited.
+# bugprone-reserved-identifier:
+#   _r_ used in QC_TRY macro — single-use internal name.
+# bugprone-signed-char-misuse:
+#   Not yet investigated; enable once codebase is audited.
+# bugprone-branch-clone:
+#   Frequent false positives on intentional symmetric switch arms.
+# bugprone-exception-escape:
+#   Several destructors call logging/IPC cleanup that may throw;
+#   suppressing until noexcept propagation is fully audited.
+#
+# clang-analyzer-cplusplus.NewDelete / NewDeleteLeaks:
+#   False positives with shared_ptr and arena allocators; ASAN covers this.
+# clang-analyzer-security.insecureAPI.rand:
+#   Flagged sites use rand() for non-crypto purposes (test data, IDs).
+# clang-analyzer-cplusplus.InnerPointer:
+#   False positives with string_view + json value refs in nlohmann::json.
+# clang-analyzer-core.CallAndMessage:
+#   False positive: analyzer misses optional/shared_ptr is-checked-before-deref.
+# clang-analyzer-deadcode.DeadStores:
+#   Fires on intentional RAII side-effect patterns.
+#
+# clang-diagnostic-implicit-int-float-conversion:
+#   Pending audit of JSON numeric conversions.
+# clang-diagnostic-unused-command-line-argument / ignored-optimization-argument:
+#   Compiler-driver flags in compile_commands.json trigger these on CI.
+#
+# google-readability-avoid-underscore-in-googletest-name:
+#   Test fixture names use underscores for readability.
+# google-default-arguments:
+#   Virtual overrides retain default args from OpenClaw API surface.
+# google-explicit-constructor:
+#   Many single-arg constructors are intentionally implicit for StatusOr.
+# google-runtime-int:
+#   size_t/int64_t mix in JSON and IPC layers; not yet audited.
+#
+# modernize-avoid-c-arrays:
+#   C-style arrays in wire-format headers and static lookup tables.
+# modernize-use-nodiscard:
+#   [[nodiscard]] is applied selectively; blanket application too noisy.
+# modernize-use-trailing-return-type:
+#   Project convention prefers classic return-type syntax.
+# modernize-pass-by-value:
+#   Many constructors deliberately take const-ref.
+# modernize-concat-nested-namespaces:
+#   Verbose nested namespace style retained for editor-fold compat.
+# modernize-return-braced-init-list:
+#   Explicit type in return improves readability for complex types.
+# modernize-use-equals-delete:
+#   Suppressed for already-private copy ctor/assign.
+# modernize-redundant-void-arg:
+#   Style preference: explicit (void) in C-linkage function pointers.
+#
+# readability-*: disabled wholesale — too noisy for this codebase.
+# readability-identifier-naming: requires renaming 700+ symbols.
+# cppcoreguidelines-*: disabled — overlaps with other checks.
+#
+# Additional suppressions for checks that fire on current codebase:
+# performance-unnecessary-value-param:
+#   Many callback/handler signatures take std::string by value intentionally.
+# google-readability-braces-around-statements:
+#   Single-line if/for bodies follow project convention without braces.
+# modernize-use-emplace:
+#   Several push_back sites use explicit construction for clarity.
+# bugprone-narrowing-conversions:
+#   JSON integer → size_t conversions; covered by runtime checks.
+# google-readability-casting:
+#   C-style casts in low-level IPC code; audited for correctness.
+# google-readability-function-size:
+#   A few large handler functions are intentionally monolithic.
+
+Checks: >-
+  bugprone-*,
+  clang-analyzer-*,
+  google-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  -readability-*,
+  -cppcoreguidelines-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-reserved-identifier,
+  -bugprone-signed-char-misuse,
+  -bugprone-branch-clone,
+  -bugprone-exception-escape,
+  -bugprone-narrowing-conversions,
+  -clang-analyzer-cplusplus.NewDelete,
+  -clang-analyzer-cplusplus.NewDeleteLeaks,
+  -clang-analyzer-security.insecureAPI.rand,
+  -clang-analyzer-cplusplus.InnerPointer,
+  -clang-analyzer-core.CallAndMessage,
+  -clang-analyzer-deadcode.DeadStores,
+  -clang-diagnostic-implicit-int-float-conversion,
+  -clang-diagnostic-unused-command-line-argument,
+  -clang-diagnostic-ignored-optimization-argument,
+  -clang-diagnostic-unused-lambda-capture,
+  -clang-diagnostic-unused-parameter,
+  -clang-diagnostic-switch,
+  -google-readability-avoid-underscore-in-googletest-name,
+  -google-default-arguments,
+  -google-explicit-constructor,
+  -google-runtime-int,
+  -google-readability-braces-around-statements,
+  -google-readability-casting,
+  -google-readability-function-size,
+  -google-readability-namespace-comments,
+  -modernize-avoid-c-arrays,
+  -modernize-use-nodiscard,
+  -modernize-use-trailing-return-type,
+  -modernize-pass-by-value,
+  -modernize-concat-nested-namespaces,
+  -modernize-return-braced-init-list,
+  -modernize-use-equals-delete,
+  -modernize-redundant-void-arg,
+  -modernize-use-auto,
+  -modernize-use-emplace,
+  -modernize-loop-convert,
+  -performance-unnecessary-value-param,
+  -performance-inefficient-vector-operation,
+  -performance-inefficient-string-concatenation,
+  -performance-move-const-arg,
+  -performance-unnecessary-copy-initialization,
+  -readability-convert-member-functions-to-static,
+  -readability-identifier-length,
+  -readability-function-cognitive-complexity,
+  -readability-magic-numbers,
+  -readability-make-member-function-const,
+  -readability-qualified-auto,
+  -readability-redundant-access-specifiers,
+  -readability-function-size,
+  -readability-else-after-return,
+  -readability-use-anyofallof,
+  -readability-implicit-bool-conversion
+
+WarningsAsErrors: '*'
+
+# Only lint QuantClaw's own headers; ignore third-party / generated files.
+HeaderFilterRegex: '(include/quantclaw/.+\.hpp|src/.+\.(hpp|h))'
+
+AnalyzeTemporaryDtors: true
+
+CheckOptions:
+  # Naming conventions (Google C++ Style Guide, adapted for QuantClaw)
+  - { key: readability-identifier-naming.ClassCase,              value: CamelCase  }
+  - { key: readability-identifier-naming.EnumCase,               value: CamelCase  }
+  - { key: readability-identifier-naming.FunctionCase,           value: CamelCase  }
+  - { key: readability-identifier-naming.NamespaceCase,          value: lower_case }
+  - { key: readability-identifier-naming.StructCase,             value: CamelCase  }
+  - { key: readability-identifier-naming.UnionCase,              value: CamelCase  }
+  - { key: readability-identifier-naming.TemplateParameterCase,  value: CamelCase  }
+  - { key: readability-identifier-naming.MacroDefinitionCase,    value: UPPER_CASE }
+
+  - { key: readability-identifier-naming.GlobalConstantCase,     value: CamelCase  }
+  - { key: readability-identifier-naming.GlobalConstantPrefix,   value: k          }
+  - { key: readability-identifier-naming.MemberConstantCase,     value: CamelCase  }
+  - { key: readability-identifier-naming.MemberConstantPrefix,   value: k          }
+  - { key: readability-identifier-naming.EnumConstantCase,       value: CamelCase  }
+  - { key: readability-identifier-naming.EnumConstantPrefix,     value: k          }
+
+  - { key: readability-identifier-naming.GlobalVariableCase,     value: lower_case }
+  - { key: readability-identifier-naming.GlobalVariablePrefix,   value: g_qc_      }
+  - { key: readability-identifier-naming.VariableCase,           value: lower_case }
+
+  - { key: readability-identifier-naming.PublicMethodCase,       value: CamelCase  }
+  - { key: readability-identifier-naming.PrivateMethodCase,      value: camelBack  }
+  - { key: readability-identifier-naming.ProtectedMethodCase,    value: camelBack  }
+  - { key: readability-identifier-naming.MemberCase,             value: lower_case }
+  - { key: readability-identifier-naming.MemberSuffix,           value: _          }

@@ -1,0 +1,140 @@
+name: Publish Docker Image
+
+# Triggered when a GitHub Release is published (including pre-releases).
+# Image is pushed to GitHub Container Registry (GHCR) — no Docker Hub secrets needed.
+#
+# Images published:
+#   ghcr.io/<owner>/quantclaw:v0.3.0
+#   ghcr.io/<owner>/quantclaw:0.3
+#   ghcr.io/<owner>/quantclaw:0
+#   ghcr.io/<owner>/quantclaw:latest   (stable releases only, not -alpha/-beta)
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write   # push to GHCR
+
+jobs:
+  push:
+    name: Build & Push (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract Docker metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          # "latest" only for stable releases (no pre-release suffix like -alpha, -rc)
+          type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+
+    - name: Build and push by digest
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: scripts/Dockerfile
+        platforms: ${{ matrix.platform }}
+        push: true
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ github.ref_name }}
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VCS_REF=${{ github.sha }}
+        outputs: type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Export digest
+      run: |
+        mkdir -p /tmp/digests
+        digest="${{ steps.build.outputs.digest }}"
+        touch "/tmp/digests/${digest#sha256:}"
+
+    - name: Upload digest
+      uses: actions/upload-artifact@v4
+      with:
+        name: digests-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
+        path: /tmp/digests/*
+        retention-days: 1
+
+  # ── Merge multi-arch manifests ────────────────────────────────────────────
+  merge:
+    name: Merge manifests & tag
+    needs: [push]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+    - name: Download amd64 digest
+      uses: actions/download-artifact@v4
+      with:
+        name: digests-amd64
+        path: /tmp/digests
+
+    - name: Download arm64 digest
+      uses: actions/download-artifact@v4
+      with:
+        name: digests-arm64
+        path: /tmp/digests
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+
+    - name: Create and push multi-arch manifest
+      working-directory: /tmp/digests
+      run: |
+        docker buildx imagetools create \
+          $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+          $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+
+    - name: Inspect final image
+      run: |
+        docker buildx imagetools inspect \
+          ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}

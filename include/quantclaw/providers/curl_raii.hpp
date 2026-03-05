@@ -11,7 +11,7 @@ struct curl_slist;
 
 // Forward-declare CURL as void* to avoid pulling in <curl/curl.h> in headers.
 // The actual curl typedefs are only needed in .cpp files.
-typedef void CURL;
+using CURL = void;
 
 namespace quantclaw {
 

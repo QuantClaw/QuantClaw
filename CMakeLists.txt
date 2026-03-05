@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(quantclaw LANGUAGES CXX)
+project(quantclaw VERSION 0.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,6 +10,38 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(BUILD_TESTS "Build tests" ON)
+
+# Sanitizer options (mutually exclusive: ASAN and TSAN cannot be combined)
+option(ENABLE_ASAN  "Build with AddressSanitizer + LeakSanitizer"   OFF)
+option(ENABLE_TSAN  "Build with ThreadSanitizer"                    OFF)
+option(ENABLE_UBSAN "Build with UndefinedBehaviorSanitizer"         OFF)
+
+if(ENABLE_ASAN AND ENABLE_TSAN)
+    message(FATAL_ERROR "ENABLE_ASAN and ENABLE_TSAN are mutually exclusive.")
+endif()
+
+# Sanitizers use -fsanitize= flags which are GCC/Clang only.
+if(NOT MSVC)
+    if(ENABLE_ASAN)
+        add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address)
+        message(STATUS "AddressSanitizer enabled")
+    endif()
+
+    if(ENABLE_TSAN)
+        add_compile_options(-fsanitize=thread)
+        add_link_options(-fsanitize=thread)
+        message(STATUS "ThreadSanitizer enabled")
+    endif()
+
+    if(ENABLE_UBSAN)
+        add_compile_options(-fsanitize=undefined -fno-sanitize-recover=all)
+        add_link_options(-fsanitize=undefined)
+        message(STATUS "UndefinedBehaviorSanitizer enabled")
+    endif()
+elseif(ENABLE_ASAN OR ENABLE_TSAN OR ENABLE_UBSAN)
+    message(WARNING "Sanitizers are not supported with MSVC; flags ignored.")
+endif()
 
 # Required dependencies
 find_package(spdlog REQUIRED)
@@ -118,6 +150,20 @@ else()
     )
 endif()
 
+# ── Build-time metadata ────────────────────────────────────────────────────
+# Git commit hash (short, 7 chars).  Falls back to "unknown" outside a repo.
+execute_process(
+    COMMAND git rev-parse --short HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE QC_GIT_COMMIT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT QC_GIT_COMMIT)
+    set(QC_GIT_COMMIT "unknown")
+endif()
+string(TIMESTAMP QC_BUILD_DATE "%Y-%m-%d")
+
 add_library(quantclaw_core STATIC ${QUANTCLAW_CORE_SOURCES})
 
 target_include_directories(quantclaw_core
@@ -125,6 +171,12 @@ target_include_directories(quantclaw_core
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_definitions(quantclaw_core PUBLIC
+    QUANTCLAW_VERSION="${PROJECT_VERSION}"
+    QUANTCLAW_BUILD_DATE="${QC_BUILD_DATE}"
+    QUANTCLAW_GIT_COMMIT="${QC_GIT_COMMIT}"
 )
 
 target_link_libraries(quantclaw_core
@@ -182,6 +234,9 @@ if(BUILD_TESTS)
         tests/test_skill_loader.cpp
         tests/test_memory_manager.cpp
         tests/test_agent_loop.cpp
+        tests/test_common_utils.cpp
+        tests/test_string_util.cpp
+        tests/test_parse_util.cpp
         tests/test_p1_features.cpp
         tests/test_mcp_server.cpp
         tests/test_mcp_integration.cpp

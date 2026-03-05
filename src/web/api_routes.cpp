@@ -48,14 +48,14 @@ static std::string generate_openai_session_key() {
 
 void register_api_routes(
     WebServer& server,
-    std::shared_ptr<quantclaw::SessionManager> session_manager,
-    std::shared_ptr<quantclaw::AgentLoop> agent_loop,
-    std::shared_ptr<quantclaw::PromptBuilder> prompt_builder,
-    std::shared_ptr<quantclaw::ToolRegistry> /*tool_registry*/,
+    const std::shared_ptr<quantclaw::SessionManager>& session_manager,
+    const std::shared_ptr<quantclaw::AgentLoop>& agent_loop,
+    const std::shared_ptr<quantclaw::PromptBuilder>& prompt_builder,
+    const std::shared_ptr<quantclaw::ToolRegistry>& /*tool_registry*/,
     const quantclaw::QuantClawConfig& config,
     quantclaw::gateway::GatewayServer& gateway_server,
-    std::shared_ptr<spdlog::logger> logger,
-    std::function<void()> reload_fn,
+    const std::shared_ptr<spdlog::logger>& logger,
+    const std::function<void()>& reload_fn,
     quantclaw::PluginSystem* plugin_system)
 {
     // --- GET /api/health ---
@@ -556,7 +556,7 @@ void register_api_routes(
                     std::thread worker(
                         [state, agent_loop, user_message,
                          llm_history = std::move(llm_history),
-                         system_prompt, model, resp_id, logger]() {
+                         system_prompt, model, resp_id, session_key, logger]() {
                             try {
                                 agent_loop->ProcessMessageStream(
                                     user_message, llm_history, system_prompt,
@@ -581,8 +581,8 @@ void register_api_routes(
                                             state->chunks.push(std::move(sse));
                                             state->cv.notify_one();
                                         }
-                                    }
-                                );
+                                    },
+                                    session_key);
 
                                 // Send [DONE] marker
                                 {
@@ -632,7 +632,7 @@ void register_api_routes(
                         quantclaw::UsageAccumulator::Stats{};
 
                     auto new_messages = agent_loop->ProcessMessage(
-                        user_message, llm_history, system_prompt);
+                        user_message, llm_history, system_prompt, session_key);
 
                     auto usage_after = usage_acc ? usage_acc->GetSession(session_key) :
                         quantclaw::UsageAccumulator::Stats{};

@@ -3,6 +3,7 @@
 
 #include "quantclaw/cli/gateway_commands.hpp"
 #include "quantclaw/gateway/gateway_server.hpp"
+#include "quantclaw/constants.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
 #include "quantclaw/gateway/daemon_manager.hpp"
 #include "quantclaw/gateway/protocol.hpp"
@@ -447,7 +448,7 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
                 nlohmann::json info = {
                     {"wsUrl", "ws://localhost:" + std::to_string(port)},
                     {"wsPort", port},
-                    {"version", "0.2.0"}
+                    {"version", quantclaw::kVersion}
                 };
                 res.status = 200;
                 res.set_content(info.dump(), "application/json");

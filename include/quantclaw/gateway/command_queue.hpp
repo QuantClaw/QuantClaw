@@ -18,6 +18,7 @@
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include "quantclaw/common/noncopyable.hpp"
 
 namespace quantclaw::gateway {
 
@@ -190,7 +191,7 @@ using EventSender = std::function<void(
 // and global concurrency limits.
 // ================================================================
 
-class CommandQueue {
+class CommandQueue : public quantclaw::Noncopyable {
  public:
   CommandQueue(const QueueConfig& config,
                AgentExecutor executor,
@@ -259,6 +260,9 @@ class CommandQueue {
   std::thread dispatcher_;
   std::atomic<bool> running_{false};
   std::atomic<int> active_count_{0};
+
+  // Worker threads (tracked so we can join them in Stop())
+  std::vector<std::thread> workers_;
 
   // cmd_id -> session_key (for Cancel lookup)
   std::unordered_map<std::string, std::string> command_to_session_;

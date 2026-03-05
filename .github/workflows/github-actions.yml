@@ -33,10 +33,22 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/local/.ghcup /usr/share/dotnet /usr/local/lib/android \
+                    /opt/ghc /opt/hostedtoolcache/CodeQL
+        df -h
+
+    - name: Set up ccache
+      uses: hendrikmuhs/ccache-action@v1.2.13
+      with:
+        key: ${{ github.job }}-${{ matrix.compiler }}
+        max-size: 500M
+
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y \
+        sudo apt-get install -y --no-install-recommends \
           cmake \
           ninja-build \
           libspdlog-dev \
@@ -54,7 +66,9 @@ jobs:
         cmake -B build \
           -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_CXX_STANDARD=17
+          -DCMAKE_CXX_STANDARD=17 \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
     - name: Build
       run: cmake --build build --parallel
@@ -93,6 +107,56 @@ jobs:
     - name: Test Docker image
       run: |
         docker run --rm quantclaw:test quantclaw --version || true
+
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          clang-14 clang-tidy-14 \
+          cmake ninja-build \
+          libspdlog-dev nlohmann-json3-dev \
+          libcurl4-openssl-dev libssl-dev
+
+    - name: Generate compile_commands.json
+      env:
+        CC: clang-14
+        CXX: clang++-14
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_CXX_STANDARD=17 \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        # Ensure headers are generated (if any)
+        cmake --build build --parallel --target quantclaw 2>/dev/null || true
+
+    - name: Run clang-tidy
+      run: |
+        find src -name '*.cpp' -not -path '*/ui/*' -print0 \
+          | xargs -0 -P$(nproc) clang-tidy-14 \
+              -p build \
+              --config-file=.clang-tidy \
+              2>&1 | tee /tmp/clang-tidy.log
+        # Filter out third-party dependency diagnostics before checking for errors.
+        grep -v '_deps/' /tmp/clang-tidy.log > /tmp/clang-tidy-filtered.log || true
+        if grep -q 'error:' /tmp/clang-tidy-filtered.log; then
+          echo "clang-tidy found errors — see log above"
+          exit 1
+        fi
+
+    - name: Upload clang-tidy log
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: clang-tidy-log
+        path: /tmp/clang-tidy.log
 
   format-check:
     name: Code Format Check
@@ -194,3 +258,71 @@ jobs:
           --suppress='*:ui/*' \
           -i ui \
           src/
+
+  sanitizers:
+    name: Sanitizers (${{ matrix.sanitizer }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sanitizer: asan
+            cmake_flag: -DENABLE_ASAN=ON
+            env_vars: ASAN_OPTIONS=detect_leaks=1:halt_on_error=1
+          - sanitizer: tsan
+            cmake_flag: -DENABLE_TSAN=ON
+            env_vars: TSAN_OPTIONS=halt_on_error=1
+          - sanitizer: ubsan
+            cmake_flag: -DENABLE_UBSAN=ON
+            env_vars: UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up ccache
+      uses: hendrikmuhs/ccache-action@v1.2.13
+      with:
+        key: ${{ github.job }}-${{ matrix.sanitizer }}
+        max-size: 300M
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          cmake ninja-build clang-14 libclang-rt-14-dev \
+          libspdlog-dev nlohmann-json3-dev \
+          libcurl4-openssl-dev libssl-dev
+
+    - name: Configure (${{ matrix.sanitizer }})
+      env:
+        CC: clang-14
+        CXX: clang++-14
+      run: |
+        cmake -B build \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DBUILD_TESTS=ON \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          ${{ matrix.cmake_flag }}
+
+    - name: Build
+      run: cmake --build build --parallel
+
+    - name: Run tests
+      working-directory: build
+      env:
+        # Inject sanitizer runtime options via the matrix variable.
+        # Each matrix entry sets exactly one XSAN_OPTIONS variable.
+        ASAN_OPTIONS: ${{ matrix.sanitizer == 'asan' && 'detect_leaks=1:halt_on_error=1' || '' }}
+        TSAN_OPTIONS: ${{ matrix.sanitizer == 'tsan' && 'halt_on_error=1' || '' }}
+        UBSAN_OPTIONS: ${{ matrix.sanitizer == 'ubsan' && 'halt_on_error=1:print_stacktrace=1' || '' }}
+      run: ctest --output-on-failure --parallel
+
+    - name: Upload results on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: sanitizer-${{ matrix.sanitizer }}-results
+        path: build/Testing/

@@ -42,8 +42,6 @@ template: |
   Version tags:
   - `https://github.com/$OWNER/$REPOSITORY/releases/tag/v$RESOLVED_VERSION`
 
-  **📒 Documentation**: https://github.com/$OWNER/$REPOSITORY/tree/main/docs
-
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
 
   Thanks to $CONTRIBUTORS for making this release possible.

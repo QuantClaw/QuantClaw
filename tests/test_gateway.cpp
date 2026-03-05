@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <gtest/gtest.h>
-#include <filesystem>
-#include <thread>
+#include <atomic>
 #include <chrono>
+#include <filesystem>
 #include <memory>
+#include <mutex>
+#include <thread>
 #include "quantclaw/gateway/gateway_server.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
 #include "quantclaw/gateway/protocol.hpp"
@@ -195,11 +197,13 @@ TEST_F(GatewayTest, BroadcastEvent) {
     ASSERT_TRUE(client.Connect(5000));
 
     // Subscribe to events
-    bool received = false;
+    std::atomic<bool> received{false};
+    std::mutex rx_mu;
     std::string received_data;
     client.Subscribe("test.event", [&](const std::string&, const nlohmann::json& payload) {
-        received = true;
+        std::lock_guard<std::mutex> lk(rx_mu);
         received_data = payload.value("msg", "");
+        received.store(true);
     });
 
     // Broadcast
@@ -208,8 +212,11 @@ TEST_F(GatewayTest, BroadcastEvent) {
     // Wait for delivery
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    EXPECT_TRUE(received);
-    EXPECT_EQ(received_data, "broadcast!");
+    EXPECT_TRUE(received.load());
+    {
+        std::lock_guard<std::mutex> lk(rx_mu);
+        EXPECT_EQ(received_data, "broadcast!");
+    }
 
     client.Disconnect();
 }

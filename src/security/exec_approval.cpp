@@ -246,8 +246,8 @@ void ExecApprovalManager::PruneExpired() {
 }
 
 std::string ExecApprovalManager::generate_request_id() const {
-  static std::mt19937 gen(std::random_device{}());
-  static std::uniform_int_distribution<uint64_t> dist;
+  thread_local static std::mt19937 gen(std::random_device{}());
+  thread_local static std::uniform_int_distribution<uint64_t> dist;
   std::ostringstream ss;
   ss << "req_" << std::hex << dist(gen);
   return ss.str();

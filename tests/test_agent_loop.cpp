@@ -7,6 +7,7 @@
 #include <fstream>
 #include "quantclaw/core/agent_loop.hpp"
 #include "quantclaw/core/memory_manager.hpp"
+#include "quantclaw/core/usage_accumulator.hpp"
 #include "quantclaw/tools/tool_registry.hpp"
 #include "quantclaw/providers/llm_provider.hpp"
 #include "quantclaw/config.hpp"
@@ -26,6 +27,7 @@ public:
         quantclaw::ChatCompletionResponse resp;
         resp.content = response_text;
         resp.finish_reason = "stop";
+        resp.usage = mock_usage;
         return resp;
     }
 
@@ -35,11 +37,15 @@ public:
         quantclaw::ChatCompletionResponse resp;
         resp.content = response_text;
         resp.is_stream_end = true;
+        resp.usage = mock_usage;
         callback(resp);
     }
 
     std::string GetProviderName() const override { return "mock"; }
     std::vector<std::string> GetSupportedModels() const override { return {"mock-model"}; }
+
+    // Configurable token counts for usage-tracking tests (default 0 keeps existing tests unaffected)
+    quantclaw::TokenUsage mock_usage;
 };
 
 class AgentLoopTest : public ::testing::Test {
@@ -236,4 +242,64 @@ TEST_F(AgentLoopTest, NonStreamReturnsNewMessages) {
     ASSERT_FALSE(new_msgs.empty());
     EXPECT_EQ(new_msgs.back().role, "assistant");
     EXPECT_EQ(new_msgs.back().content[0].text, "Non-stream final.");
+}
+
+// --- usage_session_key routing tests ---
+
+// Helper fixture alias for clarity
+class AgentLoopUsageKeyTest : public AgentLoopTest {
+protected:
+    void SetUp() override {
+        AgentLoopTest::SetUp();
+        accumulator_ = std::make_shared<quantclaw::UsageAccumulator>();
+        agent_loop_->SetUsageAccumulator(accumulator_);
+        agent_loop_->SetSessionKey("internal-session");
+        // Provide non-zero tokens so turns > 0 regardless of actual content
+        mock_provider_->mock_usage = {10, 5, 15};
+        mock_provider_->response_text = "ok";
+    }
+
+    std::shared_ptr<quantclaw::UsageAccumulator> accumulator_;
+};
+
+// When usage_session_key is non-empty, usage is recorded under that key (not session_key_)
+TEST_F(AgentLoopUsageKeyTest, UsageRecordedUnderCustomKey) {
+    agent_loop_->ProcessMessage("hi", {}, "sys", "custom-key");
+
+    EXPECT_EQ(accumulator_->GetSession("custom-key").turns, 1);
+    EXPECT_EQ(accumulator_->GetSession("internal-session").turns, 0);
+}
+
+// When usage_session_key is empty, usage falls back to session_key_
+TEST_F(AgentLoopUsageKeyTest, UsageFallsBackToSessionKey) {
+    agent_loop_->ProcessMessage("hi", {}, "sys");  // usage_session_key defaults to ""
+
+    EXPECT_EQ(accumulator_->GetSession("internal-session").turns, 1);
+    EXPECT_EQ(accumulator_->GetSession("custom-key").turns, 0);
+}
+
+// When both usage_session_key and session_key_ are empty, no usage is recorded
+TEST_F(AgentLoopUsageKeyTest, NeitherKeySetNoUsageRecorded) {
+    agent_loop_->SetSessionKey("");
+    agent_loop_->ProcessMessage("hi", {}, "sys");
+
+    EXPECT_EQ(accumulator_->GetGlobal().turns, 0);
+}
+
+// Stream: non-empty usage_session_key routes usage to that key
+TEST_F(AgentLoopUsageKeyTest, StreamUsageRecordedUnderCustomKey) {
+    agent_loop_->ProcessMessageStream("hi", {}, "sys",
+        [](const quantclaw::AgentEvent&) {}, "custom-key");
+
+    EXPECT_EQ(accumulator_->GetSession("custom-key").turns, 1);
+    EXPECT_EQ(accumulator_->GetSession("internal-session").turns, 0);
+}
+
+// Stream: empty usage_session_key falls back to session_key_
+TEST_F(AgentLoopUsageKeyTest, StreamUsageFallsBackToSessionKey) {
+    agent_loop_->ProcessMessageStream("hi", {}, "sys",
+        [](const quantclaw::AgentEvent&) {});
+
+    EXPECT_EQ(accumulator_->GetSession("internal-session").turns, 1);
+    EXPECT_EQ(accumulator_->GetSession("custom-key").turns, 0);
 }

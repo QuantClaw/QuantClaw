@@ -15,7 +15,7 @@ static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::stri
 }
 
 MCPClient::MCPClient(const std::string& server_url, std::shared_ptr<spdlog::logger> logger)
-    : server_url_(server_url), logger_(logger), request_id_(0) {
+    : server_url_(server_url), logger_(logger) {
     logger_->info("MCPClient initialized with server: {}", server_url_);
 }
 

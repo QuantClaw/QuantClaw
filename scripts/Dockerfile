@@ -1,11 +1,30 @@
-# Multi-stage build for minimal image size
-FROM ubuntu:22.04 AS builder
+# QuantClaw Production Image — Multi-stage build
+#
+# Stages:
+#   cpp-builder  — compiles C++ binary (Ubuntu 22.04)
+#   node-builder — compiles Sidecar TS→JS (node:20-slim, official image)
+#   runtime      — minimal Ubuntu 22.04 image with both artifacts
+#
+# Build:
+#   docker build -f scripts/Dockerfile -t quantclaw:$(cat scripts/DOCKER_VERSION) .
+# Run:
+#   docker run -d --name quantclaw \
+#     -p 18800:18800 -p 18801:18801 \
+#     -v quantclaw_data:/home/quantclaw/.quantclaw \
+#     quantclaw gateway run
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
+ARG UBUNTU_VERSION=22.04
+
+# ── Stage 1: C++ build ───────────────────────────────────────────────────────
+FROM ubuntu:${UBUNTU_VERSION} AS cpp-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
+    ca-certificates \
     libssl-dev \
     libcurl4-openssl-dev \
     nlohmann-json3-dev \
@@ -13,59 +32,90 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /app
-
-# Copy source code
+WORKDIR /src
 COPY . .
 
-# Build (IXWebSocket fetched automatically via FetchContent)
-RUN mkdir -p build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF .. && \
-    make -j$(nproc)
+RUN mkdir -p build && cd build \
+    && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF .. \
+    && make -j$(nproc) \
+    && (strip /src/build/quantclaw 2>/dev/null || true)
 
-# Runtime stage
-FROM ubuntu:22.04
+# ── Stage 2: Sidecar (Node.js) build ─────────────────────────────────────────
+# Use Debian Bullseye-based Node.js image so the copied node binary links
+# against glibc 2.31 — compatible with the runtime stage (ubuntu:22.04,
+# glibc 2.35). node:20-slim (Debian Bookworm) requires glibc >= 2.36 and
+# would fail at runtime on Ubuntu 22.04.
+FROM node:20-bullseye-slim AS node-builder
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+# Copy package files first for better layer caching.
+# Use explicit filenames (not glob) — some BuildKit versions mis-expand
+# package*.json and skip package-lock.json, causing `npm ci` to fail.
+WORKDIR /src/sidecar
+COPY sidecar/package.json sidecar/package-lock.json ./
+RUN npm ci
+
+# Copy source and compile
+COPY sidecar/src ./src
+COPY sidecar/tsconfig.json ./
+RUN npm run build \
+    && npm prune --omit=dev
+
+# ── Stage 3: Runtime ─────────────────────────────────────────────────────────
+FROM ubuntu:${UBUNTU_VERSION} AS runtime
+
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+LABEL org.opencontainers.image.title="QuantClaw" \
+      org.opencontainers.image.description="High-performance AI agent runtime (C++17)" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="https://github.com/QuantClaw/QuantClaw" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# C++ runtime deps only — Node.js binary is copied from node-builder below
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libcurl4 \
     libspdlog1 \
     zlib1g \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd -m -u 1000 quantclaw
+# Create non-root user (mirrors ixwebsocket's adduser pattern)
+RUN groupadd -r quantclaw && useradd -r -g quantclaw -m -d /home/quantclaw quantclaw
 
-# Set working directory
-WORKDIR /app
+# Install C++ binary
+COPY --from=cpp-builder --chown=root:root /src/build/quantclaw /usr/local/bin/quantclaw
+RUN chmod +x /usr/local/bin/quantclaw \
+    && ldd /usr/local/bin/quantclaw
 
-# Copy built binary from builder stage
-COPY --from=builder /app/build/quantclaw /usr/local/bin/quantclaw
+# Copy Node.js binary from node-builder (avoids nodesource installation in runtime)
+COPY --from=node-builder /usr/local/bin/node /usr/local/bin/node
 
-# Create workspace directory (OpenClaw-compatible layout)
-RUN mkdir -p /home/quantclaw/.quantclaw/agents/default/workspace && \
-    mkdir -p /home/quantclaw/.quantclaw/agents/default/sessions && \
-    mkdir -p /home/quantclaw/.quantclaw/logs && \
-    chown -R quantclaw:quantclaw /home/quantclaw
+# Install Sidecar (dist + pruned node_modules)
+COPY --from=node-builder --chown=quantclaw:quantclaw /src/sidecar/dist /home/quantclaw/sidecar/dist
+COPY --from=node-builder --chown=quantclaw:quantclaw /src/sidecar/node_modules /home/quantclaw/sidecar/node_modules
 
-# Set volumes for persistence
+# Runtime workspace layout (OpenClaw-compatible: agents/main/)
+RUN mkdir -p /home/quantclaw/.quantclaw/agents/main/workspace \
+             /home/quantclaw/.quantclaw/agents/main/sessions \
+             /home/quantclaw/.quantclaw/logs \
+    && chown -R quantclaw:quantclaw /home/quantclaw/.quantclaw
+
 VOLUME ["/home/quantclaw/.quantclaw"]
 
-# Expose ports
 EXPOSE 18800 18801
 
-# Switch to non-root user
 USER quantclaw
-
-# Set working directory
 WORKDIR /home/quantclaw
 
-# Health check via gateway
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD quantclaw health || exit 1
 
-# Default command: run gateway in foreground
 ENTRYPOINT ["quantclaw"]
-CMD ["gateway"]
+CMD ["gateway", "run"]

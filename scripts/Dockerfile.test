@@ -1,37 +1,62 @@
+# QuantClaw Test Image
+# Builds with tests enabled, runs unit tests + E2E tests.
+#
+# Build & run:
+#   docker build -f scripts/Dockerfile.test -t quantclaw-test .
+#   docker run --rm quantclaw-test
+#   docker-compose -f scripts/docker-compose.yml run quantclaw-test
+
 FROM ubuntu:22.04
 
-ENV DEBIAN_FRONTEND=noninteractive
+ARG DEBIAN_FRONTEND=noninteractive
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
+    ca-certificates \
+    curl \
     libssl-dev \
     libcurl4-openssl-dev \
     nlohmann-json3-dev \
     libspdlog-dev \
     zlib1g-dev \
-    curl \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Node.js 20 for sidecar tests
+# Download script first (inspect before running in production).
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x -o /tmp/nodesource_setup.sh \
+    && bash /tmp/nodesource_setup.sh \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -f /tmp/nodesource_setup.sh \
+    && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /app
 COPY . .
 
-# Build with tests enabled
-RUN mkdir -p build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON .. && \
-    make -j$(nproc)
+# Build C++ (tests enabled)
+RUN mkdir -p build && cd build \
+    && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON .. \
+    && make -j$(nproc)
 
-# Normalize line endings (CRLF -> LF) and make e2e script executable
-RUN sed -i 's/\r//' tests/e2e_test.sh && chmod +x tests/e2e_test.sh
+# Build Sidecar + its tests
+RUN cd sidecar \
+    && npm ci \
+    && npm run build
 
-# Create directories expected by the gateway
-RUN mkdir -p /root/.quantclaw/agents/default/workspace && \
-    mkdir -p /root/.quantclaw/agents/default/sessions && \
-    mkdir -p /root/.quantclaw/logs
+# Normalize line endings + ensure scripts are executable
+RUN find tests/ -name "*.sh" -exec sed -i 's/\r//' {} + \
+    && chmod +x tests/e2e_test.sh 2>/dev/null || true
 
-# Entry point: run unit tests, then CLI E2E tests
-CMD ["bash", "-c", "cd /app/build && ./quantclaw_tests && cd /app && bash tests/e2e_test.sh"]
+# Runtime workspace layout (OpenClaw-compatible: agents/main/)
+RUN mkdir -p /root/.quantclaw/agents/main/workspace \
+             /root/.quantclaw/agents/main/sessions \
+             /root/.quantclaw/logs
+
+# Entry: C++ unit tests → sidecar unit tests → CLI E2E
+CMD ["bash", "-c", \
+    "set -e && \
+     echo '=== C++ unit tests ===' && cd /app/build && ./quantclaw_tests && \
+     echo '=== Sidecar unit tests ===' && cd /app/sidecar && npm test && \
+     echo '=== E2E tests ===' && cd /app && bash tests/e2e_test.sh"]

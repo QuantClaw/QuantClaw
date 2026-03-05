@@ -203,7 +203,7 @@ SessionManager::SessionManager(const std::filesystem::path& sessions_dir,
 SessionHandle SessionManager::GetOrCreate(const std::string& session_key,
                                              const std::string& display_name,
                                              const std::string& channel) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     // Normalize session key to OpenClaw format: agent:<agentId>:<rest>
     std::string normalized = NormalizeSessionKey(session_key);
@@ -250,7 +250,7 @@ void SessionManager::AppendMessage(const std::string& session_key,
 }
 
 void SessionManager::AppendMessage(const std::string& session_key, const SessionMessage& msg) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     std::string normalized = NormalizeSessionKey(session_key);
     auto it = store_.find(normalized);
@@ -276,7 +276,7 @@ void SessionManager::AppendMessage(const std::string& session_key, const Session
 
 std::vector<SessionMessage> SessionManager::GetHistory(const std::string& session_key,
                                                          int max_messages) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
     std::vector<SessionMessage> messages;
 
     std::string normalized = NormalizeSessionKey(session_key);
@@ -311,7 +311,7 @@ std::vector<SessionMessage> SessionManager::GetHistory(const std::string& sessio
 }
 
 std::vector<SessionInfo> SessionManager::ListSessions() const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
     std::vector<SessionInfo> result;
     result.reserve(store_.size());
     for (const auto& [key, info] : store_) {
@@ -325,7 +325,7 @@ std::vector<SessionInfo> SessionManager::ListSessions() const {
 }
 
 void SessionManager::DeleteSession(const std::string& session_key) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     std::string normalized = NormalizeSessionKey(session_key);
     auto it = store_.find(normalized);
@@ -347,7 +347,7 @@ void SessionManager::DeleteSession(const std::string& session_key) {
 }
 
 void SessionManager::UpdateDisplayName(const std::string& session_key, const std::string& name) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     std::string normalized = NormalizeSessionKey(session_key);
     auto it = store_.find(normalized);
@@ -360,7 +360,7 @@ void SessionManager::UpdateDisplayName(const std::string& session_key, const std
 }
 
 void SessionManager::ResetSession(const std::string& session_key) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     std::string normalized = NormalizeSessionKey(session_key);
     auto it = store_.find(normalized);
@@ -436,9 +436,9 @@ void SessionManager::LoadStore() {
 }
 
 std::string SessionManager::generate_session_id() const {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 15);
+    thread_local static std::random_device rd;
+    thread_local static std::mt19937 gen(rd());
+    thread_local static std::uniform_int_distribution<> dis(0, 15);
     static const char* hex = "0123456789abcdef";
 
     std::string id;

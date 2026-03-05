@@ -109,7 +109,7 @@ TEST_F(CLIManagerTest, VersionFlag) {
         int ret = cli_->Run(args.argc(), args.argv());
         EXPECT_EQ(ret, 0);
     });
-    EXPECT_NE(output.find("0.2.0"), std::string::npos);
+    EXPECT_NE(output.find("quantclaw"), std::string::npos);
 }
 
 TEST_F(CLIManagerTest, VersionShortFlag) {
@@ -118,7 +118,7 @@ TEST_F(CLIManagerTest, VersionShortFlag) {
         int ret = cli_->Run(args.argc(), args.argv());
         EXPECT_EQ(ret, 0);
     });
-    EXPECT_NE(output.find("0.2.0"), std::string::npos);
+    EXPECT_NE(output.find("quantclaw"), std::string::npos);
 }
 
 TEST_F(CLIManagerTest, HelpFlag) {

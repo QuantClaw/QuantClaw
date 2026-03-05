@@ -16,6 +16,7 @@
 #include "quantclaw/gateway/protocol.hpp"
 #include "quantclaw/security/rbac.hpp"
 #include "quantclaw/security/rate_limiter.hpp"
+#include "quantclaw/common/noncopyable.hpp"
 
 namespace quantclaw::gateway {
 
@@ -76,7 +77,7 @@ private:
 
 using RpcHandler = std::function<nlohmann::json(const nlohmann::json& params, ClientConnection& client)>;
 
-class GatewayServer {
+class GatewayServer : public quantclaw::Noncopyable {
 public:
     GatewayServer(int port, std::shared_ptr<spdlog::logger> logger);
     ~GatewayServer();

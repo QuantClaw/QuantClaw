@@ -472,21 +472,132 @@ curl http://localhost:18801/api/plugins/commands
 
 ## Docker 部署
 
-```bash
-# 一键启动（Docker 文件位于 scripts/ 目录）
-docker compose -f scripts/docker-compose.yml up -d
+所有 Docker 相关文件均位于 `scripts/` 目录。
 
-# 或手动构建
-docker build -f scripts/Dockerfile -t quantclaw .
-docker run -d \
-  -p 18800:18800 \
-  -p 18801:18801 \
-  -e OPENAI_API_KEY=your-key \
-  -v quantclaw_data:/home/quantclaw/.quantclaw \
-  quantclaw
+### 镜像类型
+
+| 文件 | 用途 | 基础镜像 | 运行用户 |
+|------|------|----------|----------|
+| `scripts/Dockerfile` | **生产镜像** — 最小化运行时，含 C++ 二进制 + Sidecar | Ubuntu 22.04（可通过 `--build-arg UBUNTU_VERSION=` 覆盖）多阶段构建 | `quantclaw`（非 root）|
+| `scripts/Dockerfile.test` | **CI / 测试镜像** — 运行 C++ 单元测试 + Sidecar 测试 + E2E 测试 | Ubuntu 22.04 | root |
+| `scripts/Dockerfile.dev` | **开发镜像** — 完整工具链 + 源码 + `gdb`/`valgrind`，交互式 Shell | Ubuntu 22.04 | root |
+
+生产镜像采用**三阶段构建**：`cpp-builder`（编译 C++）、`node-builder`（编译 TypeScript Sidecar）、`runtime`（仅复制最终产物）。以非 root 用户 `quantclaw` 运行。
+
+### DOCKER_VERSION
+
+`scripts/DOCKER_VERSION` 是镜像版本号的唯一来源：
+
+```bash
+VERSION=$(cat scripts/DOCKER_VERSION)
+# → 0.3.0-alpha
 ```
 
-Docker 镜像使用多阶段构建（基于 Ubuntu 22.04），以非 root 用户运行。配置数据通过 `/home/quantclaw/.quantclaw` 卷持久化。Docker 文件位于 `scripts/` 目录。
+三个 Compose 服务均通过 `QUANTCLAW_VERSION` 环境变量读取此版本号。
+
+### 使用 Docker Compose 快速启动
+
+```bash
+# 后台启动生产网关
+docker compose -f scripts/docker-compose.yml up -d quantclaw
+
+# 查看日志
+docker compose -f scripts/docker-compose.yml logs -f quantclaw
+
+# 运行完整测试套件（一次性容器）
+docker compose -f scripts/docker-compose.yml run --rm quantclaw-test
+
+# 启动开发容器（挂载源码目录）
+docker compose -f scripts/docker-compose.yml run --rm quantclaw-dev
+```
+
+Compose 文件定义了三个服务：
+
+| 服务 | 镜像 | 说明 |
+|------|------|------|
+| `quantclaw` | `quantclaw:VERSION` | 生产网关，异常自动重启 |
+| `quantclaw-test` | `quantclaw-test:VERSION` | 一次性测试运行器 |
+| `quantclaw-dev` | `quantclaw-dev:VERSION` | 开发 Shell，挂载源码目录 |
+
+### 手动构建
+
+```bash
+VERSION=$(cat scripts/DOCKER_VERSION)
+
+# 生产镜像（含 OCI 元数据标签）
+docker build \
+  -f scripts/Dockerfile \
+  --build-arg VERSION=$VERSION \
+  --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --build-arg VCS_REF=$(git rev-parse --short HEAD) \
+  -t quantclaw:$VERSION \
+  -t quantclaw:latest \
+  .
+
+# 测试镜像
+docker build -f scripts/Dockerfile.test -t quantclaw-test:$VERSION .
+
+# 开发镜像
+docker build -f scripts/Dockerfile.dev -t quantclaw-dev:$VERSION .
+```
+
+### 运行生产镜像
+
+```bash
+docker run -d \
+  --name quantclaw \
+  -p 18800:18800 \
+  -p 18801:18801 \
+  -e OPENAI_API_KEY=sk-... \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -e QUANTCLAW_LOG_LEVEL=info \
+  -v quantclaw_data:/home/quantclaw/.quantclaw \
+  quantclaw:latest
+```
+
+### 构建参数与环境变量
+
+**构建参数**（生产镜像，通过 `--build-arg` 或 `docker-compose.yml` 传入）：
+
+| 参数 | 说明 |
+|------|------|
+| `VERSION` | 写入 OCI `org.opencontainers.image.version` 标签 |
+| `BUILD_DATE` | ISO-8601 构建时间戳，写入 OCI 标签 |
+| `VCS_REF` | Git commit 短 SHA，写入 OCI 标签 |
+| `UBUNTU_VERSION` | Ubuntu 基础镜像版本（默认 `22.04`） |
+
+**运行时环境变量**：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `OPENAI_API_KEY` | — | OpenAI / 兼容 Provider 的 API Key |
+| `ANTHROPIC_API_KEY` | — | Anthropic API Key |
+| `QUANTCLAW_LOG_LEVEL` | `info` | 日志级别：`debug` / `info` / `warn` / `error` |
+
+### 挂载卷与端口
+
+| 挂载卷 | 说明 |
+|--------|------|
+| `/home/quantclaw/.quantclaw` | 配置、工作空间、会话记录、日志 — **务必持久化** |
+
+| 端口 | 协议 | 说明 |
+|------|------|------|
+| `18800` | WebSocket | 网关 RPC 接入点 |
+| `18801` | HTTP | 仪表板和 REST API |
+
+## 脚本工具
+
+所有辅助脚本均位于 `scripts/` 目录，请**从仓库根目录**运行。
+
+| 脚本 | 说明 |
+|------|------|
+| `scripts/build.sh` | 智能构建脚本：彩色输出、`-c` 清理、`--debug`/`--tests`、`--asan`/`--tsan`/`--ubsan` 消毒器、自动检测 CPU 核数、缺失依赖自动安装。 |
+| `scripts/release.sh` | 构建发布 tarball 并生成 SHA256 校验文件。从 `scripts/DOCKER_VERSION` 读取版本或接受参数。输出到 `dist/`。 |
+| `scripts/install.sh` | 原生安装：自动检测系统（Ubuntu/Debian/Fedora/Arch），安装依赖、编译源码、创建工作空间。以 root 执行：`sudo bash scripts/install.sh` |
+| `scripts/format-code.sh` | 用 `clang-format` 格式化所有 C++ 源文件。加 `--check` 参数可做 dry-run（CI 使用）。 |
+| `scripts/format-code-docker.sh` | 同上，但在 Docker 内运行，无需本地安装 `clang-format`。 |
+| `scripts/build_ui.sh` | 构建 Web 仪表板 UI 静态资源。 |
+
 
 ## 测试
 
@@ -606,17 +717,17 @@ QuantClaw 目标是完全兼容 [OpenClaw](https://github.com/openclaw/openclaw)
 | 插件钩子（24 种） | **完全** | 所有 hook name 和 mode（void/modifying/sync）对齐 |
 | 插件 Sidecar IPC | **完全** | 工具、钩子、服务、Provider、命令、HTTP 路由、网关方法 |
 | JSONL 会话格式 | **部分** | 基本读写兼容；缺 branching（parentId）、8 种 entry type、write lock |
-| 配置格式 | **部分** | 仅支持 JSON（不支持 JSON5 注释/尾逗号）、无 `$include`、无 `${VAR}` 环境变量替换 |
-| CLI 命令 | **部分** | 核心命令已有；OpenClaw 约 28 个顶级命令尚未实现 |
+| 配置格式 | **部分** | 已支持 JSON5（注释、尾逗号）和 `${VAR}` 环境变量替换；`$include` 指令待实现 |
+| CLI 命令 | **部分** | 核心命令已有；`models`、`approvals`、`gateway health/probe`、频道管理 CLI 尚未实现 |
 | Gateway RPC 协议 | **部分** | 已实现约 30 个 method；OpenClaw 约 85+ 个 method 待补 |
 | Provider 系统 | **部分** | OpenAI + Anthropic + 5 个 OpenAI 兼容；缺 OAuth、GitHub Copilot、Qwen 等 |
-| Agent 循环 | **部分** | 核心循环可用；缺 lane-based queue、auth rotation、overflow compaction |
+| Agent 循环 | **部分** | 动态迭代次数（32–160）、上下文守卫、工具结果截断、overflow compaction retry、budget pruning 均已实现；multi-stage summary 待实现 |
 | 记忆搜索 | **部分** | 仅 BM25 关键词搜索；缺 hybrid vector search（embedding、SQLite、MMR） |
-| 上下文管理 | **部分** | compaction + pruning 可用；缺 multi-stage summary、budget-based pruning |
+| 上下文管理 | **部分** | Budget-based compaction + pruning 已实现；multi-stage summary 待实现 |
 | 频道系统 | **部分** | 外部 subprocess 适配器；无内置 channel、无 7-tier routing |
-| 安全 / 沙箱 | **部分** | RBAC + rate limiter + sandbox；缺 Docker sandbox、security audit |
-| MCP | **部分** | 基础实现；method name 和 transport 正在对齐规范 |
-| Web API | **部分** | 16 个 REST 路由；缺 OpenResponses API、webhook 端点 |
+| 安全 / 沙箱 | **部分** | RBAC + rate limiter + `setrlimit` 沙箱；缺 Docker sandbox、security audit |
+| MCP | **部分** | 已实现规范 method name（`tools/list`、`tools/call`），transport 已对齐 |
+| Web API | **部分** | 16 个 REST 路由；缺 OpenResponses API（`/v1/responses`）、webhook 端点 |
 
 ### 与 OpenClaw 的主要差异
 
@@ -624,9 +735,9 @@ QuantClaw 目标是完全兼容 [OpenClaw](https://github.com/openclaw/openclaw)
 |------|----------|-----------|
 | 默认网关端口 | `18789` | `18800` |
 | 默认 HTTP 端口 | 与网关共用 | `18801`（独立） |
-| 配置格式 | JSON5，支持 `$include` 和 `${VAR}` | 标准 JSON |
-| 默认模型 | `anthropic/claude-sonnet-4-6` | `qwen-max` |
-| 默认 maxTokens | `8192` | `4096` |
+| 配置格式 | JSON5，支持 `$include` 和 `${VAR}` | JSON5 + `${VAR}`（无 `$include`） |
+| 默认模型 | `anthropic/claude-sonnet-4-6` | `anthropic/claude-sonnet-4-6` |
+| 默认 maxTokens | `8192` | `8192` |
 | 认证 profile | 多 profile + OAuth + 轮换 | 每 provider 单 key |
 | 记忆搜索 | Hybrid（向量 0.7 + BM25 0.3） | 仅 BM25 |
 | 插件执行 | 进程内（同一 Node.js） | 进程外（sidecar via TCP） |
@@ -642,20 +753,19 @@ QuantClaw 目标是完全兼容 [OpenClaw](https://github.com/openclaw/openclaw)
 | C++ 资源限制沙箱 | `setrlimit`（CPU/内存/文件大小/进程数） |
 | `viewer` RBAC 角色 | 专用只读角色 |
 
-完整差异分析见 [.claude/gap-analysis.md](.claude/gap-analysis.md)。
-
 ## 路线图
 
-当前已实现：WebSocket/HTTP 网关、多 Provider LLM 与故障转移、会话持久化、插件生态、频道适配器、MCP 支持、Onboarding 向导，共通过 769 项测试（712 项 C++ + 57 项 Sidecar）。
+当前已实现：WebSocket/HTTP 网关、多 Provider LLM 与故障转移、会话持久化、插件生态、频道适配器、MCP 支持、Onboarding 向导、JSON5 配置、`${VAR}` 环境变量替换、动态 Agent 迭代次数、Budget-based 上下文管理，共通过 791 项 C++ 测试。
 
 尚未实现：
 - TUI 交互式终端界面
-- 多 Agent 配置文件支持
-- JSON5 配置（`$include` 和 `${VAR}` 支持）
-- Hybrid 记忆搜索（向量 + BM25）
+- `models`、`approvals`、`gateway health/probe`、频道管理 CLI 命令组
+- 配置 `$include` 指令（模块化配置文件）
+- 多 auth profile + OAuth 认证流程
+- Hybrid 记忆搜索（向量 embedding + BM25、SQLite 后端）
+- Multi-stage 上下文压缩（分块 + 合并策略）
 - 内置频道适配器（Telegram、Discord、Slack）
-- Docker 沙箱隔离
-- OAuth 认证流程
+- Docker 沙箱隔离（per-session 容器）
 
 ## 故障排除
 
@@ -693,7 +803,7 @@ Apache License 2.0 — 详见 [LICENSE](LICENSE)。
 
 ## 贡献
 
-欢迎贡献！请在提交前阅读以下指南。
+欢迎贡献！
 
 ### 工作流程
 
@@ -703,6 +813,51 @@ Apache License 2.0 — 详见 [LICENSE](LICENSE)。
 4. 格式化代码：`./scripts/format-code.sh`（或使用 Docker：`./scripts/format-code-docker.sh`）
 5. 运行测试：`cd build && ctest --output-on-failure`
 6. 提交并推送，然后向 `main` 分支发起 Pull Request
+
+### 代码规范
+
+QuantClaw 遵循 [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)，用 `clang-format` 强制执行。
+
+**VS Code** — 在 `.vscode/settings.json` 中添加：
+
+```json
+{
+    "C_Cpp.clang_format_style": "file",
+    "editor.formatOnSave": true
+}
+```
+
+**Pre-commit hook**（每次提交前自动格式化）：
+
+```bash
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/bash
+./scripts/format-code.sh
+git add -u
+EOF
+chmod +x .git/hooks/pre-commit
+```
+
+### 编写测试
+
+测试使用 [Google Test](https://github.com/google/googletest)。运行指定测试套件：
+
+```bash
+./build/quantclaw_tests --gtest_filter=AgentLoopTest.*
+```
+
+测试结构示例：
+
+```cpp
+#include <gtest/gtest.h>
+#include "quantclaw/my_module.hpp"
+
+TEST(MyModuleTest, BasicFunctionality) {
+    MyModule module;
+    EXPECT_TRUE(module.initialize());
+    EXPECT_EQ(module.getValue(), 42);
+}
+```
 
 ### Commit 消息格式
 
@@ -723,4 +878,4 @@ Apache License 2.0 — 详见 [LICENSE](LICENSE)。
 - 如果新增了用户可见的功能，请更新 README
 - 为新功能添加了单元测试
 
-详细说明（含 IDE 配置和构建故障排除）请参阅 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)。
+有问题？欢迎提 [Issue](https://github.com/QuantClaw/QuantClaw/issues) 或发起 [Discussion](https://github.com/QuantClaw/QuantClaw/discussions)。

@@ -1,8 +1,18 @@
 version: '3.8'
 
+x-build-args: &build-args
+  VERSION: ${QUANTCLAW_VERSION:-0.3.0-alpha}
+  BUILD_DATE: ${BUILD_DATE:-}
+  VCS_REF: ${VCS_REF:-}
+
 services:
   quantclaw:
-    build: .
+    build:
+      context: ..
+      dockerfile: scripts/Dockerfile
+      args:
+        <<: *build-args
+    image: quantclaw:${QUANTCLAW_VERSION:-0.3.0-alpha}
     container_name: quantclaw
     restart: unless-stopped
     ports:
@@ -11,8 +21,9 @@ services:
     volumes:
       - quantclaw_data:/home/quantclaw/.quantclaw
     environment:
-      - QUANTCLAW_LOG_LEVEL=info
+      - QUANTCLAW_LOG_LEVEL=${QUANTCLAW_LOG_LEVEL:-info}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     networks:
       - quantclaw_network
     healthcheck:
@@ -32,12 +43,31 @@ services:
 
   quantclaw-test:
     build:
-      context: .
-      dockerfile: Dockerfile.test
+      context: ..
+      dockerfile: scripts/Dockerfile.test
+    image: quantclaw-test:${QUANTCLAW_VERSION:-0.3.0-alpha}
     container_name: quantclaw-test
+
+  quantclaw-dev:
+    profiles: ["dev"]
+    build:
+      context: ..
+      dockerfile: scripts/Dockerfile.dev
+    image: quantclaw-dev:${QUANTCLAW_VERSION:-0.3.0-alpha}
+    container_name: quantclaw-dev
+    ports:
+      - "18802:18800"
+      - "18803:18801"
+    volumes:
+      - ..:/app            # live source mount for development
+      - quantclaw_dev_data:/root/.quantclaw
+    stdin_open: true
+    tty: true
 
 volumes:
   quantclaw_data:
+    driver: local
+  quantclaw_dev_data:
     driver: local
 
 networks:

@@ -73,7 +73,7 @@ static std::string html_to_text(const std::string& html) {
 }
 
 static std::string generate_id(const std::string& prefix = "bg") {
-    static std::mt19937 rng(std::random_device{}());
+    thread_local static std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<uint32_t> dist;
     std::ostringstream ss;
     ss << prefix << "_" << std::hex << dist(rng);
@@ -1190,8 +1190,9 @@ std::string ToolRegistry::web_fetch_tool(const nlohmann::json& params) {
         "localhost", "127.", "0.0.0.0", "::1", "10.", "192.168.", "169.254."
     };
     for (const auto& b : kBlocked) {
-        if (host.find(b) != std::string::npos)
+        if (host.find(b) != std::string::npos) {
             throw std::runtime_error("SSRF guard: blocked host " + host);
+        }
     }
 
     httplib::Headers headers = {
@@ -1217,8 +1218,9 @@ std::string ToolRegistry::web_fetch_tool(const nlohmann::json& params) {
         cli.set_follow_location(true);
         auto res = cli.Get(path, headers);
         if (!res) throw std::runtime_error("web_fetch: connection to " + host + " failed");
-        if (res->status >= 400)
+        if (res->status >= 400) {
             throw std::runtime_error("web_fetch HTTP " + std::to_string(res->status));
+        }
         handle_response(*res);
     } else {
         httplib::Client cli(host);
@@ -1227,8 +1229,9 @@ std::string ToolRegistry::web_fetch_tool(const nlohmann::json& params) {
         cli.set_follow_location(true);
         auto res = cli.Get(path, headers);
         if (!res) throw std::runtime_error("web_fetch: connection to " + host + " failed");
-        if (res->status >= 400)
+        if (res->status >= 400) {
             throw std::runtime_error("web_fetch HTTP " + std::to_string(res->status));
+        }
         handle_response(*res);
     }
 
@@ -1305,11 +1308,13 @@ std::string ToolRegistry::memory_get_tool(const nlohmann::json& params) {
     // Security: must remain inside workspace
     auto canonical = std::filesystem::weakly_canonical(full_path);
     auto ws_canon  = std::filesystem::weakly_canonical(workspace);
-    if (canonical.string().substr(0, ws_canon.string().size()) != ws_canon.string())
+    if (canonical.string().substr(0, ws_canon.string().size()) != ws_canon.string()) {
         throw std::runtime_error("Access denied: path outside workspace");
+    }
 
-    if (!std::filesystem::exists(full_path))
+    if (!std::filesystem::exists(full_path)) {
         throw std::runtime_error("File not found: " + rel_path);
+    }
 
     std::ifstream f(full_path);
     if (!f) throw std::runtime_error("Cannot read: " + rel_path);

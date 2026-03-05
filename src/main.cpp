@@ -1,6 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -8,7 +9,7 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/daily_file_sink.h>
 #include "quantclaw/config.hpp"
 #include "quantclaw/cli/cli_manager.hpp"
 #include "quantclaw/cli/gateway_commands.hpp"
@@ -32,9 +33,47 @@ static spdlog::level::level_enum parse_log_level(const std::string& s) {
     return spdlog::level::info;
 }
 
+// Enforce total log storage cap by removing the oldest rotated files that
+// exceed log_max_size_mb.  Called once at startup after the daily sink is
+// created — not on every write — to keep overhead negligible.
+static void enforce_log_size_cap(const std::string& log_dir, int max_size_mb) {
+    if (max_size_mb <= 0) return;  // 0 = unlimited
+
+    namespace fs = std::filesystem;
+    std::vector<fs::directory_entry> log_files;
+    try {
+        for (const auto& entry : fs::directory_iterator(log_dir)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".log") {
+                log_files.push_back(entry);
+            }
+        }
+    } catch (...) {
+        return;  // directory not readable — nothing to trim
+    }
+
+    // Sort oldest-first by last-write-time.
+    std::sort(log_files.begin(), log_files.end(),
+              [](const fs::directory_entry& a, const fs::directory_entry& b) {
+                  return fs::last_write_time(a) < fs::last_write_time(b);
+              });
+
+    // Sum total size and remove oldest until within budget.
+    std::uintmax_t total = 0;
+    for (const auto& f : log_files) total += fs::file_size(f);
+
+    auto cap = static_cast<std::uintmax_t>(max_size_mb) * 1024 * 1024;
+    for (size_t i = 0; i < log_files.size() && total > cap; ++i) {
+        auto sz = fs::file_size(log_files[i]);
+        std::error_code ec;
+        fs::remove(log_files[i].path(), ec);
+        if (!ec) total -= sz;
+    }
+}
+
 static std::shared_ptr<spdlog::logger> create_logger(
     const std::string& log_level = "info",
     const std::string& log_dir = "",
+    int log_retain_days = 7,
     int log_max_size_mb = 50) {
     auto level = parse_log_level(log_level);
 
@@ -47,17 +86,19 @@ static std::shared_ptr<spdlog::logger> create_logger(
     if (!log_dir.empty()) {
         try {
             std::filesystem::create_directories(log_dir);
-            // Divide total cap evenly across 5 rotated files (min 1 MiB each).
-            int max_mb = std::max(1, log_max_size_mb);
-            std::size_t per_file_bytes =
-                static_cast<std::size_t>(std::max(1, max_mb / 5)) * 1024 * 1024;
-            auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+            // Rotate at midnight; keep log_retain_days worth of files (0 = unlimited).
+            int retain = std::clamp(log_retain_days, 0, 65535);
+            auto file_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>(
                 log_dir + "/quantclaw.log",
-                per_file_bytes,
-                5);  // keep 5 rotated files
+                0, 0,          // rotate at 00:00 local time
+                false,         // truncate = false (append)
+                static_cast<uint16_t>(retain));
             file_sink->set_level(spdlog::level::debug);
             file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
             sinks.push_back(file_sink);
+
+            // Enforce total storage cap at startup.
+            enforce_log_size_cap(log_dir, log_max_size_mb);
         } catch (const std::exception& e) {
             // Console-only fallback — not fatal.
             std::cerr << "Warning: cannot open log file in " << log_dir
@@ -95,6 +136,7 @@ int main(int argc, char* argv[]) {
             quantclaw::QuantClawConfig::DefaultConfigPath()).parent_path();
         logger = create_logger(cfg.system.log_level,
                                (cfg_dir / "logs").string(),
+                               cfg.system.log_retention_days,
                                cfg.system.log_max_size_mb);
     } catch (...) {
         // No config file yet — defaults are fine.

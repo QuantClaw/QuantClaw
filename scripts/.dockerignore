@@ -1,6 +1,35 @@
+# Build artifacts
 build/
 build_test/
-.git/
-.claude/
 *.o
 *.a
+*.so
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Claude / IDE
+.claude/
+.vscode/
+.idea/
+
+# Docs / CI (not needed in image)
+*.md
+*.txt
+docs/
+.github/
+
+# Reference code (large, not needed)
+refs/
+
+# Test smoke scripts / node_modules (sidecar has its own)
+scripts/smoke-tests/
+node_modules/
+
+# Secrets / env
+.env
+.env.*
+*.pem
+*.key

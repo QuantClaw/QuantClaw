@@ -3,6 +3,7 @@
 
 #include "quantclaw/gateway/command_queue.hpp"
 
+#include <algorithm>
 #include <random>
 #include <sstream>
 #include <iomanip>
@@ -230,9 +231,9 @@ nlohmann::json SessionLane::ToJson() const {
 // ================================================================
 
 static std::string generate_uuid() {
-  static std::random_device rd;
-  static std::mt19937 gen(rd());
-  static std::uniform_int_distribution<uint32_t> dist;
+  thread_local static std::random_device rd;
+  thread_local static std::mt19937 gen(rd());
+  thread_local static std::uniform_int_distribution<uint32_t> dist;
 
   std::ostringstream ss;
   ss << std::hex << std::setfill('0');
@@ -274,6 +275,17 @@ void CommandQueue::Stop() {
   cv_.notify_all();
   if (dispatcher_.joinable()) {
     dispatcher_.join();
+  }
+  // Join all worker threads to avoid use-after-free.
+  std::vector<std::thread> workers_to_join;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    workers_to_join.swap(workers_);
+  }
+  for (auto& w : workers_to_join) {
+    if (w.joinable()) {
+      w.join();
+    }
   }
   logger_->info("CommandQueue stopped");
 }
@@ -465,7 +477,22 @@ void CommandQueue::dispatcher_loop() {
 
     auto now = std::chrono::steady_clock::now();
 
-    for (auto& [key, lane] : lanes_) {
+    // Collect session keys first to avoid iterator invalidation.
+    // (Releasing mu_ mid-iteration would let other threads modify lanes_.)
+    std::vector<std::string> session_keys;
+    session_keys.reserve(lanes_.size());
+    for (const auto& [key, _] : lanes_) {
+      session_keys.push_back(key);
+    }
+
+    // Collect commands to dispatch without releasing the lock.
+    std::vector<QueuedCommand> to_dispatch;
+
+    for (const auto& key : session_keys) {
+      auto it = lanes_.find(key);
+      if (it == lanes_.end()) continue;
+      auto& lane = it->second;
+
       if (lane->HasActive()) continue;
       if (active_count_ >= config_.max_concurrent) break;
 
@@ -478,15 +505,9 @@ void CommandQueue::dispatcher_loop() {
 
       // Collect mode: batch remaining pending messages
       if (command.mode == QueueMode::kCollect && lane->HasPending()) {
-        nlohmann::json collected = nlohmann::json::array();
-        // Force-activate remaining pending (ignore debounce for collected)
-        while (lane->HasPending()) {
-          // Drain directly
-          std::string steering = lane->DrainPendingAsSteeringText();
-          if (!steering.empty()) {
-            command.params["collectedMessages"] = steering;
-          }
-          break;
+        std::string steering = lane->DrainPendingAsSteeringText();
+        if (!steering.empty()) {
+          command.params["collectedMessages"] = steering;
         }
       }
 
@@ -494,25 +515,24 @@ void CommandQueue::dispatcher_loop() {
       if (command.mode == QueueMode::kFollowup) {
         // The command we just activated is the one to run.
         // Discard everything else in pending.
-        while (lane->PendingCount() > 1) {
-          // We can't easily discard from SessionLane without
-          // more API. For now, drain as steering and discard.
+        if (lane->PendingCount() > 1) {
           lane->DrainPendingAsSteeringText();
         }
       }
 
       active_count_++;
       command_to_session_.erase(command.id);
-
-      // Dispatch to a new thread
-      lock.unlock();
-
-      std::thread([this, cmd = std::move(command)]() mutable {
-        execute_command(std::move(cmd));
-      }).detach();
-
-      lock.lock();
+      to_dispatch.push_back(std::move(command));
     }
+
+    // Clean up completed workers to prevent unbounded growth.
+    workers_.erase(
+        std::remove_if(workers_.begin(), workers_.end(),
+                        [](std::thread& t) {
+                          if (!t.joinable()) return true;
+                          return false;
+                        }),
+        workers_.end());
 
     // Clean up idle lanes (no active, no pending, avoid map bloat)
     for (auto it = lanes_.begin(); it != lanes_.end();) {
@@ -521,6 +541,16 @@ void CommandQueue::dispatcher_loop() {
       } else {
         ++it;
       }
+    }
+
+    // Release the lock, then dispatch worker threads.
+    lock.unlock();
+
+    for (auto& cmd : to_dispatch) {
+      std::lock_guard<std::mutex> wlock(mu_);
+      workers_.emplace_back([this, c = std::move(cmd)]() mutable {
+        execute_command(std::move(c));
+      });
     }
   }
 }

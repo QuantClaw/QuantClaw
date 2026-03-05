@@ -254,8 +254,8 @@ int SubagentManager::CleanupCompleted() {
 }
 
 std::string SubagentManager::generate_run_id() const {
-  static std::mt19937 gen(std::random_device{}());
-  static std::uniform_int_distribution<uint64_t> dist;
+  thread_local static std::mt19937 gen(std::random_device{}());
+  thread_local static std::uniform_int_distribution<uint64_t> dist;
   std::ostringstream ss;
   ss << "sub_" << std::hex << dist(gen);
   return ss.str();
@@ -263,8 +263,8 @@ std::string SubagentManager::generate_run_id() const {
 
 std::string SubagentManager::generate_session_key(
     const std::string& agent_id) const {
-  static std::mt19937 gen(std::random_device{}());
-  static std::uniform_int_distribution<uint64_t> dist;
+  thread_local static std::mt19937 gen(std::random_device{}());
+  thread_local static std::uniform_int_distribution<uint64_t> dist;
   std::ostringstream ss;
   ss << "agent:" << agent_id << ":subagent:" << std::hex << dist(gen);
   return ss.str();
