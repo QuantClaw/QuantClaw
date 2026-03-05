@@ -412,8 +412,8 @@ protected:
     std::atomic<int> exec_count_{0};
     std::string last_executed_msg_;
     std::string last_executed_session_;
-    bool block_execution_ = false;
-    bool running_ = true;
+    std::atomic<bool> block_execution_{false};
+    std::atomic<bool> running_{true};
 
     std::mutex resp_mu_;
     std::condition_variable resp_cv_;
