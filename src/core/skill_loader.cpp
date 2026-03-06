@@ -548,10 +548,11 @@ nlohmann::json SkillLoader::parse_yaml_frontmatter(const std::string& yaml_str) 
 
         if (trimmed.empty()) continue;
 
-        // Pop stack until we find a context at strictly lower indent.
-        // Using '>' (not '>=') so sibling keys at the same indent stay
-        // in the same parent object instead of being popped out.
-        while (ctx.size() > 1 && ctx.top().first > indent && trimmed[0] != '-') {
+        // Pop stack until we find a context at a lower indent level.
+        // The '- ' array-item check was removed so that object-array items
+        // (e.g. the commands: list) correctly close the previous item's
+        // context before starting a new one.
+        while (ctx.size() > 1 && ctx.top().first > indent) {
             ctx.pop();
         }
 
@@ -601,7 +602,46 @@ nlohmann::json SkillLoader::parse_yaml_frontmatter(const std::string& yaml_str) 
             }
 
             if (arr) {
-                arr->push_back(val);
+                // Detect "- key: value" — start of an object in the array.
+                // A valid YAML key contains only alphanumeric, '_', or '-'
+                // characters (no slashes or spaces), so this won't mis-fire
+                // on plain strings or URLs like "- https://example.com".
+                size_t colon_in_val = val.find(':');
+                bool is_obj_item = false;
+                if (colon_in_val != std::string::npos && colon_in_val > 0) {
+                    is_obj_item = true;
+                    for (size_t i = 0; i < colon_in_val; ++i) {
+                        char c = val[i];
+                        if (!std::isalnum(static_cast<unsigned char>(c)) &&
+                            c != '_' && c != '-') {
+                            is_obj_item = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (is_obj_item) {
+                    // Push a new object into the array and enter its context.
+                    arr->push_back(nlohmann::json::object());
+                    nlohmann::json& obj_ref = arr->back();
+                    std::string obj_key = val.substr(0, colon_in_val);
+                    std::string obj_val = val.substr(colon_in_val + 1);
+                    obj_val.erase(0, obj_val.find_first_not_of(" \t"));
+                    while (!obj_val.empty() &&
+                           (obj_val.back() == ' ' || obj_val.back() == '\t')) {
+                        obj_val.pop_back();
+                    }
+                    if (obj_val.size() >= 2 &&
+                        obj_val.front() == '"' && obj_val.back() == '"') {
+                        obj_val = obj_val.substr(1, obj_val.size() - 2);
+                    }
+                    if (!obj_val.empty()) obj_ref[obj_key] = obj_val;
+                    // indent+1: any sub-property at deeper indent goes here;
+                    // the next '-' at 'indent' will pop this entry cleanly.
+                    ctx.push({indent + 1, &obj_ref});
+                } else {
+                    arr->push_back(val);
+                }
             }
             continue;
         }

@@ -573,3 +573,125 @@ skillKey: "my-key"
     EXPECT_EQ(skills[0].homepage, "https://example.com");
     EXPECT_EQ(skills[0].skill_key, "my-key");
 }
+
+// ── Search skill ──────────────────────────────────────────────────────────────
+
+TEST_F(SkillLoaderTest, SearchSkillAlwaysLoaded) {
+    // always:true means the skill loads regardless of env/binary availability.
+    write_skill("search", R"(---
+name: search
+emoji: "🔍"
+description: Web search with automatic provider fallback (Tavily -> DuckDuckGo)
+always: true
+commands:
+  - name: search
+    description: Search the web for a query
+    toolName: web_search
+    argMode: freeform
+---
+
+Use the `web_search` tool to search the web.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+    EXPECT_EQ(skills[0].name, "search");
+    EXPECT_TRUE(skills[0].always);
+}
+
+TEST_F(SkillLoaderTest, SearchSkillHasSearchCommand) {
+    write_skill("search", R"(---
+name: search
+always: true
+commands:
+  - name: search
+    description: Search the web for a query
+    toolName: web_search
+    argMode: freeform
+---
+
+Use the `web_search` tool.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+
+    const auto& cmds = skills[0].commands;
+    ASSERT_EQ(cmds.size(), 1u);
+    EXPECT_EQ(cmds[0].name, "search");
+    EXPECT_EQ(cmds[0].tool_name, "web_search");
+    EXPECT_EQ(cmds[0].arg_mode, "freeform");
+}
+
+TEST_F(SkillLoaderTest, SearchSkillContentMentionsProviders) {
+    write_skill("search", R"(---
+name: search
+always: true
+---
+
+Use the `web_search` tool to search the web.
+Providers: Tavily (TAVILY_API_KEY), DuckDuckGo (free fallback).
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+    EXPECT_NE(skills[0].content.find("web_search"), std::string::npos);
+    EXPECT_NE(skills[0].content.find("Tavily"), std::string::npos);
+    EXPECT_NE(skills[0].content.find("DuckDuckGo"), std::string::npos);
+}
+
+TEST_F(SkillLoaderTest, SearchSkillNoRequiredBinsOrEnvs) {
+    // DuckDuckGo fallback requires no API key, so no hard gating.
+    write_skill("search", R"(---
+name: search
+always: true
+---
+
+Content.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+    EXPECT_TRUE(skills[0].required_bins.empty());
+    EXPECT_TRUE(skills[0].required_envs.empty());
+}
+
+TEST_F(SkillLoaderTest, SearchSkillGetAllCommandsIncludesSearch) {
+    write_skill("search", R"(---
+name: search
+always: true
+commands:
+  - name: search
+    description: Search the web
+    toolName: web_search
+    argMode: freeform
+---
+
+Content.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    auto all_cmds = skill_loader_->GetAllCommands(skills);
+
+    ASSERT_EQ(all_cmds.size(), 1u);
+    EXPECT_EQ(all_cmds[0].name, "search");
+    EXPECT_EQ(all_cmds[0].tool_name, "web_search");
+}
+
+TEST_F(SkillLoaderTest, SearchSkillContextOutputContainsName) {
+    write_skill("search", R"(---
+name: search
+emoji: "🔍"
+description: Web search
+always: true
+---
+
+Use `web_search` for queries.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    std::string ctx = skill_loader_->GetSkillContext(skills);
+
+    EXPECT_NE(ctx.find("search"), std::string::npos);
+    EXPECT_NE(ctx.find("web_search"), std::string::npos);
+}

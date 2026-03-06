@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "quantclaw/cli/onboard_commands.hpp"
+#include "quantclaw/builtin_skills.hpp"
 #include "quantclaw/config.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
 #include "quantclaw/platform/service.hpp"
@@ -306,12 +307,40 @@ int OnboardCommands::SetupSkills() {
 
     try {
         std::filesystem::create_directories(skills_dir);
-        std::cout << "  Skills directory: " << skills_dir.string() << std::endl;
     } catch (const std::exception& e) {
         logger_->warn("Failed to create skills directory: {}", e.what());
+        return 1;
     }
 
-    std::cout << "✓ Skills directory ready (install skills with: quantclaw skills install <name>)" << std::endl;
+    int installed = 0;
+    int skipped = 0;
+    for (const auto& skill : GetBuiltinSkills()) {
+        auto skill_dir = skills_dir / skill.name;
+        auto skill_file = skill_dir / "SKILL.md";
+
+        if (std::filesystem::exists(skill_file)) {
+            ++skipped;
+            continue;
+        }
+
+        try {
+            std::filesystem::create_directories(skill_dir);
+            std::ofstream f(skill_file);
+            f << skill.content;
+            std::cout << "  + skill: " << skill.name << std::endl;
+            ++installed;
+        } catch (const std::exception& e) {
+            logger_->warn("Failed to install skill '{}': {}", skill.name, e.what());
+        }
+    }
+
+    if (installed > 0) {
+        std::cout << "✓ Installed " << installed << " built-in skill(s) to "
+                  << skills_dir.string() << std::endl;
+    } else {
+        std::cout << "✓ Built-in skills already present (" << skipped
+                  << " skipped)" << std::endl;
+    }
     return 0;
 }
 

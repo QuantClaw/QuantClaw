@@ -347,6 +347,7 @@ Skills extend the agent's capabilities by injecting contextual instructions and 
 
 | Skill | Description | Always Active |
 |-------|-------------|---------------|
+| 🔍 `search` | Web search via `web_search` tool (Tavily → DuckDuckGo fallback) | Yes |
 | 🌦️ `weather` | Check current weather via wttr.in | Yes |
 | 🐙 `github` | Interact with GitHub using the `gh` CLI | No (requires `gh`) |
 | 🏥 `healthcheck` | System health audit and diagnostics | Yes |
