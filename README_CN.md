@@ -349,6 +349,7 @@ quantclaw dashboard       # 在浏览器中打开 Web UI
 
 | 技能 | 描述 | 始终激活 |
 |------|------|----------|
+| 🔍 `search` | 网页搜索，使用 `web_search` 工具（Tavily 优先，DuckDuckGo 兜底） | 是 |
 | 🌦️ `weather` | 通过 wttr.in 查询当前天气 | 是 |
 | 🐙 `github` | 使用 `gh` CLI 与 GitHub 交互 | 否（需要 `gh`）|
 | 🏥 `healthcheck` | 系统健康审计与诊断 | 是 |

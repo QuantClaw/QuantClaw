@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -1333,9 +1334,11 @@ int main(int argc, char* argv[]) {
                     auto arr = result.is_array() ? result
                                : (result.contains("plugins") ? result["plugins"]
                                                              : nlohmann::json::array());
+                    bool found = false;
                     for (const auto& p : arr) {
                         if (!plugin_id.empty() && p.value("id", "") != plugin_id)
                             continue;
+                        found = true;
                         std::cout << "Plugin: " << p.value("id", "") << std::endl;
                         if (p.contains("version"))
                             std::cout << "  version:  " << p["version"] << std::endl;
@@ -1353,6 +1356,10 @@ int main(int argc, char* argv[]) {
                         if (p.contains("error"))
                             std::cout << "  error:    " << p["error"] << std::endl;
                         std::cout << std::endl;
+                    }
+                    if (!plugin_id.empty() && !found) {
+                        std::cerr << "Plugin not found: " << plugin_id << std::endl;
+                        return 1;
                     }
                     return 0;
                 } catch (const std::exception& e) {

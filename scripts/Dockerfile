@@ -107,6 +107,10 @@ RUN mkdir -p /home/quantclaw/.quantclaw/agents/main/workspace \
              /home/quantclaw/.quantclaw/logs \
     && chown -R quantclaw:quantclaw /home/quantclaw/.quantclaw
 
+# Install built-in skills to global skills directory.
+# Must be before VOLUME so the files are part of the image layer.
+COPY --chown=quantclaw:quantclaw assets/skills/ /home/quantclaw/.quantclaw/skills/
+
 VOLUME ["/home/quantclaw/.quantclaw"]
 
 EXPOSE 18800 18801

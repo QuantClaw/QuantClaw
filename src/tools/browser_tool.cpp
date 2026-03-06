@@ -3,6 +3,7 @@
 
 #include "quantclaw/tools/browser_tool.hpp"
 
+#include "quantclaw/common/parse_util.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -230,6 +231,7 @@ bool BrowserSession::launch_local() {
 
   if (ws_url.empty()) {
     logger_->error("Browser DevTools endpoint not ready on port {}", port);
+    close();
     return false;
   }
 
@@ -237,6 +239,7 @@ bool BrowserSession::launch_local() {
   bool connected = connect_cdp_websocket(ws_url);
   if (!connected) {
     logger_->warn("Port {} may already be in use. Consider setting a unique cdp_debug_port.", port);
+    close();
   }
   return connected;
 }
@@ -252,18 +255,42 @@ bool BrowserSession::connect_remote() {
   if (ws_url.rfind("http", 0) == 0) {
     try {
       // Parse host/port from HTTP URL
+      bool is_https = (ws_url.rfind("https", 0) == 0);
       std::regex http_re(R"(https?://([^:/]+):?(\d*))");
       std::smatch m;
       if (std::regex_search(ws_url, m, http_re)) {
         std::string host = m[1].str();
-        int port = m[2].str().empty() ? 80 : std::stoi(m[2].str());
-        httplib::Client http(host, port);
-        http.set_connection_timeout(3, 0);
-        auto res = http.Get("/json/version");
-        if (res && res->status == 200) {
-          auto j = nlohmann::json::parse(res->body);
-          ws_url = j.value("webSocketDebuggerUrl", ws_url);
+        int port = 80;
+        if (m[2].str().empty()) {
+          port = is_https ? 443 : 80;
+        } else {
+          auto parsed = ParsePort(m[2].str());
+          if (!parsed) {
+            logger_->error("Invalid port in remote CDP URL: {}", ws_url);
+            return false;
+          }
+          port = *parsed;
         }
+        auto fetch_ws = [&](auto& client) {
+          client.set_connection_timeout(3, 0);
+          auto res = client.Get("/json/version");
+          if (res && res->status == 200) {
+            auto j = nlohmann::json::parse(res->body);
+            ws_url = j.value("webSocketDebuggerUrl", ws_url);
+          }
+        };
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+        if (is_https) {
+          httplib::SSLClient ssl_client(host, port);
+          fetch_ws(ssl_client);
+        } else {
+          httplib::Client plain_client(host, port);
+          fetch_ws(plain_client);
+        }
+#else
+        httplib::Client plain_client(host, port);
+        fetch_ws(plain_client);
+#endif
       }
     } catch (...) {}
     // If the URL still starts with "http", we failed to resolve a WS URL
@@ -290,7 +317,10 @@ bool BrowserSession::connect_cdp_websocket(const std::string& ws_url) {
         if (msg_id >= 0) {
           {
             std::lock_guard<std::mutex> lock(cdp_mu_);
-            cdp_responses_[msg_id] = j;
+            // Only store response for requests still in-flight
+            if (cdp_pending_ids_.count(msg_id)) {
+              cdp_responses_[msg_id] = j;
+            }
           }
           cdp_cv_.notify_all();
         }
@@ -330,6 +360,12 @@ std::string BrowserSession::cdp_send(const std::string& method,
 
   int id = ++cdp_id_;
   nlohmann::json msg = {{"id", id}, {"method", method}, {"params", params}};
+
+  // Register as pending before sending so the callback can match it
+  {
+    std::lock_guard<std::mutex> pending_lock(cdp_mu_);
+    cdp_pending_ids_.insert(id);
+  }
   cdp_ws_.send(msg.dump());
   logger_->debug("CDP send id={} method={}", id, method);
 
@@ -342,12 +378,14 @@ std::string BrowserSession::cdp_send(const std::string& method,
 
   if (!ok) {
     logger_->warn("CDP timeout for method: {}", method);
-    cdp_responses_.erase(id);  // clean up any late-arriving response
+    cdp_responses_.erase(id);
+    cdp_pending_ids_.erase(id);
     return "{}";
   }
 
   auto resp = cdp_responses_[id];
   cdp_responses_.erase(id);
+  cdp_pending_ids_.erase(id);
 
   if (resp.contains("error")) {
     logger_->warn("CDP error for {}: {}", method, resp["error"].dump());

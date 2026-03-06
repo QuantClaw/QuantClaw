@@ -179,7 +179,7 @@ target_compile_definitions(quantclaw_core PUBLIC
     QUANTCLAW_GIT_COMMIT="${QC_GIT_COMMIT}"
 )
 
-target_compile_definitions(quantclaw_core PRIVATE
+target_compile_definitions(quantclaw_core PUBLIC
     CPPHTTPLIB_OPENSSL_SUPPORT
 )
 
@@ -275,6 +275,7 @@ if(BUILD_TESTS)
         tests/test_context_management.cpp
         tests/test_session_compaction.cpp
         tests/test_message_commands.cpp
+        tests/test_builtin_skills.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})

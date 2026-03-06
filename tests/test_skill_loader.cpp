@@ -573,3 +573,256 @@ skillKey: "my-key"
     EXPECT_EQ(skills[0].homepage, "https://example.com");
     EXPECT_EQ(skills[0].skill_key, "my-key");
 }
+
+// ── Search skill ──────────────────────────────────────────────────────────────
+
+TEST_F(SkillLoaderTest, SearchSkillAlwaysLoaded) {
+    // always:true means the skill loads regardless of env/binary availability.
+    write_skill("search", R"(---
+name: search
+emoji: "🔍"
+description: Web search with automatic provider fallback (Tavily -> DuckDuckGo)
+always: true
+commands:
+  - name: search
+    description: Search the web for a query
+    toolName: web_search
+    argMode: freeform
+---
+
+Use the `web_search` tool to search the web.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+    EXPECT_EQ(skills[0].name, "search");
+    EXPECT_TRUE(skills[0].always);
+}
+
+TEST_F(SkillLoaderTest, SearchSkillHasSearchCommand) {
+    write_skill("search", R"(---
+name: search
+always: true
+commands:
+  - name: search
+    description: Search the web for a query
+    toolName: web_search
+    argMode: freeform
+---
+
+Use the `web_search` tool.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+
+    const auto& cmds = skills[0].commands;
+    ASSERT_EQ(cmds.size(), 1u);
+    EXPECT_EQ(cmds[0].name, "search");
+    EXPECT_EQ(cmds[0].tool_name, "web_search");
+    EXPECT_EQ(cmds[0].arg_mode, "freeform");
+}
+
+TEST_F(SkillLoaderTest, SearchSkillContentMentionsProviders) {
+    write_skill("search", R"(---
+name: search
+always: true
+---
+
+Use the `web_search` tool to search the web.
+Providers: Tavily (TAVILY_API_KEY), DuckDuckGo (free fallback).
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+    EXPECT_NE(skills[0].content.find("web_search"), std::string::npos);
+    EXPECT_NE(skills[0].content.find("Tavily"), std::string::npos);
+    EXPECT_NE(skills[0].content.find("DuckDuckGo"), std::string::npos);
+}
+
+TEST_F(SkillLoaderTest, SearchSkillNoRequiredBinsOrEnvs) {
+    // DuckDuckGo fallback requires no API key, so no hard gating.
+    write_skill("search", R"(---
+name: search
+always: true
+---
+
+Content.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+    EXPECT_TRUE(skills[0].required_bins.empty());
+    EXPECT_TRUE(skills[0].required_envs.empty());
+}
+
+TEST_F(SkillLoaderTest, SearchSkillGetAllCommandsIncludesSearch) {
+    write_skill("search", R"(---
+name: search
+always: true
+commands:
+  - name: search
+    description: Search the web
+    toolName: web_search
+    argMode: freeform
+---
+
+Content.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    auto all_cmds = skill_loader_->GetAllCommands(skills);
+
+    ASSERT_EQ(all_cmds.size(), 1u);
+    EXPECT_EQ(all_cmds[0].name, "search");
+    EXPECT_EQ(all_cmds[0].tool_name, "web_search");
+}
+
+TEST_F(SkillLoaderTest, SearchSkillContextOutputContainsName) {
+    write_skill("search", R"(---
+name: search
+emoji: "🔍"
+description: Web search
+always: true
+---
+
+Use `web_search` for queries.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    std::string ctx = skill_loader_->GetSkillContext(skills);
+
+    EXPECT_NE(ctx.find("search"), std::string::npos);
+    EXPECT_NE(ctx.find("web_search"), std::string::npos);
+}
+
+// --- Regression: colon-containing scalar strings in arrays (PR #24 review) ---
+// Copilot noted that strings like "https://example.com" or "12:34" could be
+// misclassified as object items because the text before the colon passes the
+// alphanumeric key-character check.  The fix requires a space/tab immediately
+// after the colon; these tests guard against regressions.
+//
+// Observable impact: if a URL in "bins:" is misclassified as an object, the
+// subsequent get<vector<string>>() throws and the entire frontmatter parse
+// is aborted, leaving skill.commands empty even if they were defined first.
+
+TEST_F(SkillLoaderTest, UrlInBinsArrayParsedAsString) {
+    // A URL in the bins: array must remain a plain string.  Without the fix,
+    // "https://example.com" is parsed as object {https: "//example.com"},
+    // causing get<vector<string>>() to throw and aborting the whole parse —
+    // so commands end up empty even though they appeared before bins in the
+    // frontmatter processing.
+    write_skill("url-bins-skill", R"(---
+name: url-bins-skill
+description: Skill whose bins list contains a URL
+always: true
+commands:
+  - name: run-it
+    description: Run the thing
+    toolName: system.run
+    argMode: freeform
+requires:
+  bins:
+    - curl
+    - https://example.com
+---
+
+Content.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+    const auto& s = skills[0];
+    EXPECT_EQ(s.name, "url-bins-skill");
+
+    // If the URL was misclassified and caused a type_error exception, the
+    // parse would be aborted and commands would be empty.
+    ASSERT_EQ(s.commands.size(), 1u)
+        << "Frontmatter parse aborted early — URL in bins likely caused type_error";
+    EXPECT_EQ(s.commands[0].name, "run-it");
+
+    // The URL must be stored as a string bin requirement (not dropped).
+    ASSERT_EQ(s.required_bins.size(), 2u);
+    EXPECT_EQ(s.required_bins[0], "curl");
+    EXPECT_EQ(s.required_bins[1], "https://example.com");
+}
+
+TEST_F(SkillLoaderTest, TimeStringInEnvArrayParsedAsString) {
+    // "09:00" must not be treated as object {09: "00"}.  The character after
+    // the colon is a digit, which is not space/tab, so it stays a plain string.
+    write_skill("time-env-skill", R"(---
+name: time-env-skill
+description: Skill whose env list contains time-like strings
+always: true
+commands:
+  - name: check
+    description: Check env
+    toolName: system.run
+    argMode: none
+requires:
+  env:
+    - REQUIRED_VAR
+    - 09:00
+    - 12:30
+---
+
+Content.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+    const auto& s = skills[0];
+
+    // Same abort-on-exception signal as the URL test.
+    ASSERT_EQ(s.commands.size(), 1u)
+        << "Frontmatter parse aborted — time string in env likely caused type_error";
+    EXPECT_EQ(s.commands[0].name, "check");
+
+    ASSERT_EQ(s.required_envs.size(), 3u);
+    EXPECT_EQ(s.required_envs[1], "09:00");
+    EXPECT_EQ(s.required_envs[2], "12:30");
+}
+
+TEST_F(SkillLoaderTest, CommandsArrayWithMixedColonStrings) {
+    // The commands array may appear alongside URL strings in other arrays.
+    // Verify that only proper "name: value" entries become command objects and
+    // URL-like strings in bins/env do not corrupt the command extraction.
+    write_skill("mixed-colon-skill", R"(---
+name: mixed-colon-skill
+description: Mixed colon scenario
+always: true
+commands:
+  - name: cmd-one
+    description: First command
+    toolName: system.run
+    argMode: none
+  - name: cmd-two
+    description: Second command
+    toolName: system.run
+    argMode: freeform
+requires:
+  bins:
+    - curl
+    - https://api.example.com/v2
+  env:
+    - API_KEY
+---
+
+Content.
+)");
+
+    auto skills = skill_loader_->LoadSkillsFromDirectory(test_dir_);
+    ASSERT_EQ(skills.size(), 1u);
+    const auto& s = skills[0];
+    EXPECT_EQ(s.name, "mixed-colon-skill");
+
+    ASSERT_EQ(s.commands.size(), 2u);
+    EXPECT_EQ(s.commands[0].name, "cmd-one");
+    EXPECT_EQ(s.commands[1].name, "cmd-two");
+
+    ASSERT_EQ(s.required_bins.size(), 2u);
+    EXPECT_EQ(s.required_bins[1], "https://api.example.com/v2");
+
+    ASSERT_EQ(s.required_envs.size(), 1u);
+    EXPECT_EQ(s.required_envs[0], "API_KEY");
+}

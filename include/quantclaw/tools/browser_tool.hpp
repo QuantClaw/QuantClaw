@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -23,7 +24,11 @@ struct BrowserConnection {
   std::string cdp_url;       // Chrome DevTools Protocol WebSocket URL
   std::string pid_or_id;     // Browser PID or container ID
   bool is_remote = false;
-  bool is_running = false;
+  std::atomic<bool> is_running{false};
+
+  BrowserConnection() = default;
+  BrowserConnection(const BrowserConnection&) = delete;
+  BrowserConnection& operator=(const BrowserConnection&) = delete;
 };
 
 // Browser page state
@@ -113,9 +118,10 @@ class BrowserSession {
   // CDP WebSocket connection
   ix::WebSocket cdp_ws_;
   std::atomic<int> cdp_id_{0};
-  std::mutex cdp_mu_;
+  mutable std::mutex cdp_mu_;
   std::condition_variable cdp_cv_;
   std::unordered_map<int, nlohmann::json> cdp_responses_;
+  std::set<int> cdp_pending_ids_;  // IDs awaiting a response
 
   // Launch local browser
   bool launch_local();
