@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <mutex>
+#include <set>
 #include <string>
 
 #ifdef _WIN32
@@ -22,45 +24,60 @@
 namespace quantclaw::test {
 
 // Bind to port 0 and let the OS assign a free port.
-// This avoids port conflicts when CTest runs tests in parallel.
+// A process-wide mutex + allocated-port set prevents the same port being
+// returned to two callers in the same process when CTest runs tests in
+// parallel (the brief window between close() and server bind() is enough
+// for a race under --parallel on a loaded CI runner).
 inline int FindFreePort() {
-  int sock = socket(AF_INET, SOCK_STREAM, 0);
-  if (sock < 0) return 0;
+  static std::mutex port_mutex;
+  static std::set<int> allocated_ports;
 
-  struct sockaddr_in addr;
-  std::memset(&addr, 0, sizeof(addr));
-  addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  addr.sin_port = 0;
+  std::lock_guard<std::mutex> lock(port_mutex);
 
-  if (bind(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
+  for (int attempt = 0; attempt < 100; ++attempt) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return 0;
+
+    struct sockaddr_in addr;
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+
+    if (bind(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
+#ifdef _WIN32
+      closesocket(sock);
+#else
+      close(sock);
+#endif
+      continue;
+    }
+
+    socklen_t len = sizeof(addr);
+    if (getsockname(sock, reinterpret_cast<struct sockaddr*>(&addr), &len) < 0) {
+#ifdef _WIN32
+      closesocket(sock);
+#else
+      close(sock);
+#endif
+      continue;
+    }
+
+    int port = ntohs(addr.sin_port);
+
 #ifdef _WIN32
     closesocket(sock);
 #else
     close(sock);
 #endif
-    return 0;
+
+    if (allocated_ports.find(port) == allocated_ports.end()) {
+      allocated_ports.insert(port);
+      return port;
+    }
+    // Port already reserved by this process — retry for a different one.
   }
-
-  socklen_t len = sizeof(addr);
-  if (getsockname(sock, reinterpret_cast<struct sockaddr*>(&addr), &len) < 0) {
-#ifdef _WIN32
-    closesocket(sock);
-#else
-    close(sock);
-#endif
-    return 0;
-  }
-
-  int port = ntohs(addr.sin_port);
-
-#ifdef _WIN32
-  closesocket(sock);
-#else
-  close(sock);
-#endif
-
-  return port;
+  return 0;
 }
 
 // Create a unique test directory per process to avoid conflicts
