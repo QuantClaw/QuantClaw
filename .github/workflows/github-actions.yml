@@ -79,7 +79,7 @@ jobs:
 
     - name: Upload test results
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: test-results-linux-${{ matrix.compiler }}
         path: build/Testing/
@@ -153,7 +153,7 @@ jobs:
 
     - name: Upload clang-tidy log
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: clang-tidy-log
         path: /tmp/clang-tidy.log
@@ -231,7 +231,7 @@ jobs:
 
     - name: Upload logs on failure
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: smoke-test-logs
         path: /tmp/quantclaw-smoke-ci/
@@ -270,7 +270,7 @@ jobs:
 
     - name: Upload logs on failure
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: onboard-test-logs
         path: /tmp/quantclaw-onboard-*/
@@ -309,7 +309,7 @@ jobs:
 
     - name: Upload logs on failure
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: cli-test-logs
         path: /tmp/quantclaw-cli-*/
@@ -400,7 +400,7 @@ jobs:
 
     - name: Upload results on failure
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: sanitizer-${{ matrix.sanitizer }}-results
         path: build/Testing/
