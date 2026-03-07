@@ -119,6 +119,26 @@ cat > "${TEST_HOME}/.quantclaw/quantclaw.json" <<EOFCFG
 }
 EOFCFG
 
+# Inject real API key into config if available (enables LLM tests in Phase 17)
+CFG_PATH="${TEST_HOME}/.quantclaw/quantclaw.json"
+if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+    python3 - <<PYEOF 2>/dev/null
+import json
+with open("${CFG_PATH}") as f: cfg = json.load(f)
+cfg["models"]["providers"]["openai"]["apiKey"] = "${OPENAI_API_KEY}"
+with open("${CFG_PATH}", "w") as f: json.dump(cfg, f, indent=2)
+PYEOF
+elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+    python3 - <<PYEOF 2>/dev/null
+import json
+with open("${CFG_PATH}") as f: cfg = json.load(f)
+cfg["agent"]["model"] = "anthropic/claude-haiku-4-5-20251001"
+cfg["models"]["defaultModel"] = "anthropic/claude-haiku-4-5-20251001"
+cfg["models"]["providers"]["anthropic"] = {"apiKey": "${ANTHROPIC_API_KEY}"}
+with open("${CFG_PATH}", "w") as f: json.dump(cfg, f, indent=2)
+PYEOF
+fi
+
 pass "C0.1 test environment ready"
 
 # ==========================================================
@@ -524,10 +544,10 @@ else
     fail "C10.1 cron list" "output: $OUT"
 fi
 
-# C10.2 cron add (best-effort — command must not crash; RPC may return error without API key)
-OUT=$(qc_any cron add "test-task" "*/5 * * * *" "echo hello")
-if echo "$OUT" | grep -qi "add\|creat\|schedul\|ok\|gateway\|error\|running\|connect"; then
-    pass "C10.2 cron add (invoked)"
+# C10.2 cron add — form: cron add <name> <schedule> <message>
+OUT=$(qc cron add "test-task" "*/5 * * * *" "echo hello" 2>&1)
+if [[ $? -eq 0 ]] || echo "$OUT" | grep -qi "added\|creat\|schedul\|ok"; then
+    pass "C10.2 cron add"
 else
     fail "C10.2 cron add" "output: $OUT"
 fi
@@ -760,12 +780,12 @@ else
     fail "C15.4 gateway call device.pair.list" "output: $OUT"
 fi
 
-# C15.5 agents.list (requires admin scope; operator token gets permission denied — both are valid)
-OUT=$(qc_any gateway call agents.list)
-if echo "$OUT" | grep -qi "agents\|main\|default\|permission\|scope\|denied\|error"; then
-    pass "C15.5 gateway call agents.list (responded)"
+# C15.5 agents.list
+OUT=$(qc gateway call agents.list 2>&1)
+if [[ $? -eq 0 ]]; then
+    pass "C15.5 gateway call agents.list"
 else
-    fail "C15.5 gateway call agents.list" "no response, output: $OUT"
+    fail "C15.5 gateway call agents.list" "output: $OUT"
 fi
 
 # C15.6 config.schema (RPC)
@@ -812,10 +832,10 @@ if [[ -n "${OPENAI_API_KEY:-}" ]] || [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
 fi
 
 if [[ $HAS_KEY -eq 1 ]]; then
-    # C17.1 agent -m (LLM call may fail with 401 if test API key is invalid; accept gateway contact)
-    OUT=$(timeout 60 bash -c "HOME='$TEST_HOME' '$BINARY' agent -m 'Reply with just: OK' --session cli:agent:$$" 2>&1 || true)
-    if echo "$OUT" | grep -qi "ok\|hello\|sure\|connected\|gateway\|session\|error\|401"; then
-        pass "C17.1 agent -m (gateway reached)"
+    # C17.1 agent -m
+    OUT=$(timeout 60 bash -c "HOME='$TEST_HOME' '$BINARY' agent -m 'Reply with just: OK' --session cli:agent:$$" 2>&1)
+    if [[ $? -eq 0 ]]; then
+        pass "C17.1 agent -m"
     else
         fail "C17.1 agent -m" "output: $OUT"
     fi

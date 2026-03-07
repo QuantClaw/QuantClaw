@@ -705,12 +705,24 @@ int main(int argc, char* argv[]) {
             }
 
             if (args[0] == "add" && args.size() >= 3) {
-                std::string schedule = args[1];
-                std::string message;
-                for (size_t i = 2; i < args.size(); ++i) {
-                    if (!message.empty()) message += " ";
-                    message += args[i];
+                // Supported forms:
+                //   cron add <schedule> <message...>        (2+ args after "add")
+                //   cron add <name> <schedule> <message...> (3+ args — name first)
+                std::string name, schedule, message;
+                if (args.size() >= 4) {
+                    // 3-arg form: name schedule message...
+                    name = args[1];
+                    schedule = args[2];
+                    for (size_t i = 3; i < args.size(); ++i) {
+                        if (!message.empty()) message += " ";
+                        message += args[i];
+                    }
+                } else {
+                    // 2-arg form: schedule message
+                    schedule = args[1];
+                    message = args[2];
                 }
+                if (name.empty()) name = message.substr(0, 30);
                 try {
                     auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                         gateway_url, auth_token, logger);
@@ -718,14 +730,17 @@ int main(int argc, char* argv[]) {
                         auto result = client->Call("cron.add", {
                             {"schedule", schedule},
                             {"message", message},
-                            {"name", message.substr(0, 30)},
+                            {"name", name},
                         });
                         client->Disconnect();
                         std::cout << "Added: " << result.value("id", "") << std::endl;
                         return 0;
                     }
-                } catch (const std::exception&) {}
-                std::cerr << "Gateway not running" << std::endl;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
+                }
+                std::cerr << "Error: Gateway not running" << std::endl;
                 return 1;
             }
 

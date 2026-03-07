@@ -95,7 +95,7 @@ void RBACChecker::init_default_rules() {
         "agent.identity.get", "node.list", "device.pair.list",
         "logs.tail", "usage.cost", "sessions.usage",
         "sessions.usage.timeseries", "sessions.usage.logs",
-        "cron.status", "config.schema"
+        "cron.status", "config.schema", "agents.list"
     }) {
         method_scopes_[method] = read_scopes;
     }
