@@ -177,6 +177,17 @@ a:hover {
   }
 }
 
+/* Hide VitePress attribution in footer */
+.VPFooter a[href*="vitepress.dev"],
+.VPFooter span:has(> a[href*="vitepress.dev"]) {
+  display: none;
+}
+
+/* Also hide the separator dot between copyright lines if only one remains */
+.VPFooter .container:not(:has(.message)) .copyright::before {
+  display: none;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

@@ -29,7 +29,6 @@ Advanced memory management inspired by human cognition:
 ```bash
 quantclaw memory search "user preferences"
 quantclaw memory get workspace/MEMORY.md
-quantclaw memory append "New fact about user behavior"
 ```
 
 ### Automatic Context Pruning
@@ -42,16 +41,7 @@ quantclaw memory append "New fact about user behavior"
 
 Full Chrome DevTools Protocol integration:
 
-```bash
-# Launch browser and navigate
-quantclaw tool browser.launch "https://example.com"
-
-# Execute JavaScript
-quantclaw tool browser.execute "{\"code\": \"document.title\"}"
-
-# Take screenshots
-quantclaw tool browser.screenshot
-```
+Browser tools (`browser.launch`, `browser.execute`, `browser.screenshot`) are built-in agent tools invoked automatically during a session. They are not direct CLI commands.
 
 ### Capabilities
 - **Page Navigation**: Load and control URLs
@@ -66,28 +56,18 @@ quantclaw tool browser.screenshot
 Execute commands and manage system resources:
 
 ### Command Execution
-```bash
-quantclaw tool bash "ls -la /home"
-quantclaw tool bash "npm install package-name"
-```
+The `bash` and `process` tools are built-in agent tools (not direct CLI commands). The agent uses them automatically when executing tasks.
 
 ### File Operations
 ```bash
-quantclaw file list
-quantclaw file read workspace/config.json
-quantclaw file write workspace/data.txt "content"
-```
-
-### Process Management
-```bash
-quantclaw tool process "start" "background_job.sh"
-quantclaw tool process "list"
-quantclaw tool process "kill" "job_id"
+# Workspace files are accessed via the agent or directly from ~/.quantclaw/agents/main/workspace/
+ls ~/.quantclaw/agents/main/workspace/
+cat ~/.quantclaw/agents/main/workspace/MEMORY.md
 ```
 
 ### Environment Access
 ```bash
-quantclaw config get agents.main.env.API_KEY
+quantclaw config get llm.model
 ```
 
 ## 🔌 Plugin Ecosystem
@@ -105,38 +85,32 @@ Extensible architecture with Node.js sidecar:
 
 ### Custom Plugin Development
 ```bash
-quantclaw skill create my-plugin
-quantclaw skill install ./my-plugin
-quantclaw skill status
+quantclaw skills list
+quantclaw skills install ./my-plugin
 ```
 
 ## 🔄 Multi-Provider LLM Support
 
-Support for 7+ language model providers with intelligent failover:
+OpenAI-compatible and Anthropic APIs with automatic failover:
 
 ### Supported Providers
-- **Anthropic**: Claude models (Haiku, Sonnet, Opus)
-- **OpenAI**: GPT-4, GPT-4 Turbo, GPT-3.5
-- **Google**: Gemini, PaLM
-- **Mistral**: Mistral models
-- **Grok**: Xai models
-- **OpenRouter**: 100+ models via single API
-- **Local**: Ollama, LM Studio (experimental)
+- **OpenAI** (and compatible endpoints): qwen-max, GPT-4, DeepSeek, local Ollama, etc.
+- **Anthropic**: Claude Haiku, Sonnet, Opus
+- **Ollama / Gemini**: Registered (stub, not fully implemented)
+
+Any OpenAI-compatible API endpoint can be used by setting `providers.openai.baseUrl`.
 
 ### Provider Selection
 ```json
 {
-  "agents": {
-    "main": {
-      "providers": {
-        "default": "anthropic",
-        "fallback": ["openai", "google", "mistral"]
-      },
-      "models": {
-        "default": "claude-3-5-sonnet-20241022",
-        "reasoning": "claude-3-7-opus-20250219"
-      }
-    }
+  "llm": {
+    "model": "anthropic/claude-sonnet-4-6",
+    "maxIterations": 15,
+    "maxTokens": 4096
+  },
+  "providers": {
+    "anthropic": { "apiKey": "sk-ant-..." },
+    "openai": { "apiKey": "sk-..." }
   }
 }
 ```
@@ -152,10 +126,8 @@ Support for 7+ language model providers with intelligent failover:
 Production-grade security controls:
 
 ### Role-Based Access Control (RBAC)
-```bash
-quantclaw rbac grant user alice operator.read
-quantclaw rbac revoke user alice tool.bash.execute
-```
+RBAC is enforced at the gateway level. Roles include:
+- `agent.admin`, `operator.read`, `operator.write`, `viewer`
 
 ### Tool Permissions
 - Per-tool allow/deny rules
@@ -181,7 +153,7 @@ Comprehensive monitoring and analytics:
 ```bash
 quantclaw usage cost          # Total token costs
 quantclaw sessions usage      # Session-by-session breakdown
-quantclaw sessions usage.timeseries  # Trends over time
+quantclaw sessions list              # List sessions
 quantclaw logs tail          # Real-time logs
 ```
 
@@ -197,25 +169,19 @@ quantclaw logs tail          # Real-time logs
 Connect across communication platforms:
 
 ### Supported Channels
-- **Discord**: Rich embeds, reactions, threads
-- **Slack**: Blocks, threads, interactive elements
-- **Telegram**: Media, inline keyboards
-- **WhatsApp**: Text and media messages
-- **Email**: HTML and plain text
-- **HTTP**: Custom webhooks and APIs
-- **Web**: Built-in dashboard
+- **Discord**: External subprocess adapter
+- **Telegram**: External subprocess adapter
+- **Web dashboard**: Built-in at port 18801
 
 ### Channel Configuration
 ```json
 {
   "channels": {
     "discord": {
-      "token": "YOUR_BOT_TOKEN",
-      "guild_id": "YOUR_GUILD_ID"
+      "token": "YOUR_BOT_TOKEN"
     },
-    "slack": {
-      "token": "xoxb-...",
-      "app_id": "..."
+    "telegram": {
+      "token": "YOUR_BOT_TOKEN"
     }
   }
 }
@@ -227,9 +193,9 @@ Scheduled and triggered automation:
 
 ### Cron Jobs
 ```bash
-quantclaw cron schedule "daily-report" "0 9 * * *" "generate-report"
-quantclaw cron status
-quantclaw cron execute "daily-report"
+quantclaw cron add "daily-report" "0 9 * * *" "Send daily summary"
+quantclaw cron list
+quantclaw cron remove TASK_ID
 ```
 
 ### Hooks and Callbacks

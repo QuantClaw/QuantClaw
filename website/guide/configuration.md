@@ -2,283 +2,248 @@
 
 Configure QuantClaw for your specific use case.
 
-## Configuration File Locations
+## Configuration File
 
-QuantClaw looks for configuration in this order:
+QuantClaw stores its configuration at `~/.quantclaw/quantclaw.json` (JSON5 format — comments and trailing commas are supported).
 
-1. **Environment Variable**: `$QUANTCLAW_CONFIG_DIR/config.json`
-2. **Default Location**: `~/.quantclaw/config.json`
-3. **Custom Path**: Passed via `--config` flag
+A full annotated example is available in `config.example.json` in the repository root.
 
 ## Configuration Structure
 
 ```json
 {
-  "version": "1.0",
-  "agents": {
-    "main": {
-      "providers": {
-        "default": "anthropic",
-        "fallback": ["openai", "google"],
-        "timeout_ms": 60000
-      },
-      "models": {
-        "default": "claude-3-5-sonnet-20241022",
-        "reasoning": "claude-3-7-opus-20250219",
-        "fast": "claude-3-haiku-20240307"
-      },
-      "memory": {
-        "maxTokens": 100000,
-        "compactionThreshold": 80000,
-        "enableSearch": true
-      },
-      "context": {
-        "maxContextTokens": 32000,
-        "windowSize": 10
-      }
+  "system": {
+    "logLevel": "info"
+  },
+  "llm": {
+    "model": "openai/qwen-max",
+    "maxIterations": 15,
+    "temperature": 0.7,
+    "maxTokens": 4096
+  },
+  "providers": {
+    "openai": {
+      "apiKey": "YOUR_OPENAI_API_KEY",
+      "baseUrl": "https://api.openai.com/v1",
+      "timeout": 30
+    },
+    "anthropic": {
+      "apiKey": "YOUR_ANTHROPIC_API_KEY",
+      "baseUrl": "https://api.anthropic.com",
+      "timeout": 30
     }
   },
   "gateway": {
-    "host": "127.0.0.1",
-    "port": 8000,
-    "enableTls": false,
-    "certPath": null,
-    "keyPath": null
+    "port": 18800,
+    "bind": "loopback",
+    "auth": { "mode": "token", "token": "YOUR_SECRET_TOKEN" },
+    "controlUi": { "enabled": true, "port": 18801 }
   },
-  "logging": {
-    "level": "info",
-    "format": "json",
-    "file": "~/.quantclaw/quantclaw.log"
+  "channels": {
+    "discord": { "enabled": false, "token": "YOUR_DISCORD_BOT_TOKEN", "allowedIds": [] },
+    "telegram": { "enabled": false, "token": "YOUR_TELEGRAM_BOT_TOKEN", "allowedIds": [] }
   },
-  "plugins": {
-    "sidecarPort": 0,
-    "autoLoad": true,
-    "pluginDirs": ["~/.quantclaw/plugins"]
-  }
-}
-```
-
-## Agent Configuration
-
-### Provider Configuration
-
-```json
-{
-  "agents": {
-    "main": {
-      "providers": {
-        "default": "anthropic",
-        "fallback": ["openai", "google"],
-        "timeout_ms": 60000
-      }
-    }
-  }
-}
-```
-
-**Options:**
-- `default`: Primary provider to use
-- `fallback`: Providers to try if default fails
-- `timeout_ms`: Request timeout in milliseconds
-
-### Model Configuration
-
-```json
-{
-  "agents": {
-    "main": {
-      "models": {
-        "default": "claude-3-5-sonnet-20241022",
-        "reasoning": "claude-3-7-opus-20250219",
-        "fast": "claude-3-haiku-20240307"
-      }
-    }
-  }
-}
-```
-
-**Predefined Profiles:**
-
-**Anthropic**
-- `claude-3-7-opus-20250219` - Most capable, slowest
-- `claude-3-5-sonnet-20241022` - Best balanced
-- `claude-3-haiku-20240307` - Fast, less capable
-
-**OpenAI**
-- `gpt-4-turbo` - Most capable
-- `gpt-4o` - Fast and capable
-- `gpt-3.5-turbo` - Fast, basic tasks
-
-**Google**
-- `gemini-2.0-flash` - High performance
-- `gemini-pro` - Balanced
-
-### Memory Configuration
-
-```json
-{
-  "agents": {
-    "main": {
-      "memory": {
-        "maxTokens": 100000,
-        "compactionThreshold": 80000,
-        "enableSearch": true,
-        "searchTopK": 5
-      }
-    }
-  }
-}
-```
-
-**Options:**
-- `maxTokens`: Maximum memory size in tokens
-- `compactionThreshold`: Trigger compaction at % full
-- `enableSearch`: Enable BM25 memory search
-- `searchTopK`: Number of results to return
-
-### Context Configuration
-
-```json
-{
-  "agents": {
-    "main": {
-      "context": {
-        "maxContextTokens": 32000,
-        "windowSize": 10,
-        "overflowStrategy": "compaction"
-      }
-    }
-  }
-}
-```
-
-**Options:**
-- `maxContextTokens`: Maximum context size
-- `windowSize`: Recent messages to keep
-- `overflowStrategy`: "compaction", "truncate", or "error"
-
-### Tool Configuration
-
-```json
-{
-  "agents": {
-    "main": {
-      "tools": {
-        "bash": {
-          "enabled": true,
-          "timeout_ms": 30000,
-          "maxOutputSize": 10000,
-          "allowedCommands": ["ls", "pwd", "grep"]
-        },
-        "browser": {
-          "enabled": true,
-          "headless": true,
-          "timeout_ms": 60000
-        }
-      }
-    }
-  }
-}
-```
-
-### Environment Variables
-
-```json
-{
-  "agents": {
-    "main": {
-      "env": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
-      }
-    }
-  }
-}
-```
-
-Variables are automatically replaced from system environment.
-
-## Gateway Configuration
-
-```json
-{
-  "gateway": {
-    "host": "0.0.0.0",
-    "port": 8000,
-    "enableTls": true,
-    "certPath": "/path/to/cert.pem",
-    "keyPath": "/path/to/key.pem",
-    "cors": {
+  "tools": {
+    "allow": ["group:fs", "group:runtime"],
+    "deny": []
+  },
+  "security": {
+    "sandbox": {
       "enabled": true,
-      "allowedOrigins": ["https://example.com"]
+      "allowedPaths": ["~/.quantclaw/agents/main/workspace"],
+      "deniedPaths": ["/etc", "/sys", "/proc"]
+    }
+  },
+  "mcp": {
+    "servers": []
+  }
+}
+```
+
+## LLM Configuration (`llm`)
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `model` | `openai/qwen-max` | Default model in `provider/model-name` format |
+| `maxIterations` | `15` | Maximum agent loop iterations per request |
+| `temperature` | `0.7` | Sampling temperature (0.0–1.0) |
+| `maxTokens` | `4096` | Maximum tokens for each LLM response |
+
+The `model` field uses `provider/model-name` prefix routing. If no prefix is given, it defaults to `openai`. Any OpenAI-compatible API can be used by setting the appropriate `baseUrl` in `providers`:
+
+```json
+{
+  "llm": {
+    "model": "openai/qwen-max"
+  },
+  "providers": {
+    "openai": {
+      "apiKey": "YOUR_KEY",
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1"
     }
   }
 }
 ```
 
-## Logging Configuration
+## Provider Configuration (`providers`)
+
+Each key under `providers` defines a named provider:
 
 ```json
 {
-  "logging": {
-    "level": "info",
-    "format": "json",
-    "file": "~/.quantclaw/quantclaw.log",
-    "maxFileSize": 10485760,
-    "maxFiles": 5,
-    "console": true
-  }
-}
-```
-
-**Log Levels:**
-- `trace`: Most verbose
-- `debug`: Debugging information
-- `info`: General information
-- `warn`: Warnings
-- `error`: Errors only
-- `critical`: Critical errors only
-
-## Plugin Configuration
-
-```json
-{
-  "plugins": {
-    "sidecarPort": 0,
-    "autoLoad": true,
-    "pluginDirs": [
-      "~/.quantclaw/plugins",
-      "/usr/share/quantclaw/plugins"
-    ],
-    "disabled": ["old-plugin"]
+  "providers": {
+    "openai": {
+      "apiKey": "sk-...",
+      "baseUrl": "https://api.openai.com/v1",
+      "timeout": 30
+    },
+    "anthropic": {
+      "apiKey": "sk-ant-...",
+      "baseUrl": "https://api.anthropic.com",
+      "timeout": 30
+    }
   }
 }
 ```
 
 **Options:**
-- `sidecarPort`: Port for Node.js sidecar (0 = auto-select)
-- `autoLoad`: Auto-load plugins on startup
-- `pluginDirs`: Directories to scan for plugins
-- `disabled`: Plugins to skip loading
+- `apiKey`: API authentication key
+- `baseUrl`: API base URL (change to use compatible endpoints like DeepSeek, local Ollama, etc.)
+- `timeout`: Request timeout in seconds (default: `30`)
 
-## Channel Configuration
+## Gateway Configuration (`gateway`)
+
+```json
+{
+  "gateway": {
+    "port": 18800,
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "YOUR_SECRET_TOKEN"
+    },
+    "controlUi": {
+      "enabled": true,
+      "port": 18801
+    }
+  }
+}
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `port` | `18800` | WebSocket RPC gateway port |
+| `bind` | `loopback` | Bind address: `loopback` (127.0.0.1) or `any` (0.0.0.0) |
+| `auth.mode` | `token` | Auth mode: `token` or `none` |
+| `auth.token` | — | Secret token for client authentication |
+| `controlUi.enabled` | `true` | Enable the web dashboard |
+| `controlUi.port` | `18801` | HTTP port for dashboard and REST API |
+
+**Note:** QuantClaw uses ports `18800-18801` (different from OpenClaw's `18789-18790`), so both can run simultaneously.
+
+## Channel Configuration (`channels`)
 
 ```json
 {
   "channels": {
     "discord": {
       "enabled": true,
-      "token": "${DISCORD_BOT_TOKEN}",
-      "guildId": "123456789"
-    },
-    "slack": {
-      "enabled": true,
-      "token": "${SLACK_BOT_TOKEN}",
-      "appId": "A123456789"
+      "token": "YOUR_DISCORD_BOT_TOKEN",
+      "allowedIds": ["123456789"]
     },
     "telegram": {
       "enabled": false,
-      "token": "${TELEGRAM_BOT_TOKEN}"
+      "token": "YOUR_TELEGRAM_BOT_TOKEN",
+      "allowedIds": []
+    }
+  }
+}
+```
+
+| Key | Description |
+|-----|-------------|
+| `enabled` | Enable/disable this channel adapter |
+| `token` | Bot token from Discord/Telegram |
+| `allowedIds` | Allowlist of user/group IDs (empty = allow all) |
+
+## Tool Configuration (`tools`)
+
+```json
+{
+  "tools": {
+    "allow": ["group:fs", "group:runtime"],
+    "deny": ["bash"]
+  }
+}
+```
+
+**Built-in tool groups:**
+- `group:fs` — file read/write/edit/apply_patch
+- `group:runtime` — bash, process, web_search, web_fetch, browser
+- `group:memory` — memory_search, memory_get
+
+## Security Configuration (`security`)
+
+```json
+{
+  "security": {
+    "sandbox": {
+      "enabled": true,
+      "allowedPaths": ["~/.quantclaw/agents/main/workspace"],
+      "deniedPaths": ["/etc", "/sys", "/proc"]
+    }
+  }
+}
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `sandbox.enabled` | `true` | Enable filesystem sandbox |
+| `sandbox.allowedPaths` | `["~/.quantclaw/agents/main/workspace"]` | Paths the agent may read/write |
+| `sandbox.deniedPaths` | `["/etc", "/sys", "/proc"]` | Paths always blocked |
+
+## MCP Configuration (`mcp`)
+
+```json
+{
+  "mcp": {
+    "servers": [
+      {
+        "name": "my-server",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+      }
+    ]
+  }
+}
+```
+
+## System / Logging (`system`)
+
+```json
+{
+  "system": {
+    "logLevel": "info"
+  }
+}
+```
+
+**Log levels:** `trace`, `debug`, `info`, `warn`, `error`
+
+Log files are stored at `~/.quantclaw/logs/`. The main log (`quantclaw.log`) is size-rotated automatically; the gateway service log (`gateway.log`) is time-pruned at startup.
+
+## Environment Variable Substitution
+
+Configuration supports `${VAR}` substitution from the shell environment:
+
+```json
+{
+  "providers": {
+    "openai": {
+      "apiKey": "${OPENAI_API_KEY}"
+    },
+    "anthropic": {
+      "apiKey": "${ANTHROPIC_API_KEY}"
     }
   }
 }
@@ -286,154 +251,80 @@ Variables are automatically replaced from system environment.
 
 ## Configuration Commands
 
-### View Configuration
-
 ```bash
-# Show full configuration
+# View full config
 quantclaw config get
 
-# Get specific value
-quantclaw config get agents.main.models.default
+# Get a specific value (dot-path)
+quantclaw config get llm.model
 
-# Get agent config
-quantclaw config get agents.main
-```
+# Change a value
+quantclaw config set llm.model "anthropic/claude-sonnet-4-6"
 
-### Validate Configuration
+# Remove a key
+quantclaw config unset llm.temperature
 
-```bash
 # Validate syntax and structure
 quantclaw config validate
 
 # Show configuration schema
 quantclaw config schema
+
+# Hot-reload config (no gateway restart needed)
+quantclaw config reload
 ```
 
-### Set Configuration
+## Common Setups
 
-```bash
-# Set value
-quantclaw config set agents.main.models.default gpt-4
-
-# Merge configuration
-quantclaw config merge path/to/additional.json
-```
-
-## Environment Variable Substitution
-
-Configuration supports `${VAR}` substitution:
+### Minimal (OpenAI-compatible)
 
 ```json
 {
-  "agents": {
-    "main": {
-      "env": {
-        "API_KEY": "${API_KEY}",
-        "HOME": "${HOME}"
-      }
+  "llm": { "model": "openai/gpt-4o" },
+  "providers": {
+    "openai": { "apiKey": "sk-..." }
+  }
+}
+```
+
+### Anthropic Claude
+
+```json
+{
+  "llm": { "model": "anthropic/claude-sonnet-4-6" },
+  "providers": {
+    "anthropic": { "apiKey": "sk-ant-..." }
+  }
+}
+```
+
+### Local Ollama
+
+```json
+{
+  "llm": { "model": "openai/llama3" },
+  "providers": {
+    "openai": {
+      "apiKey": "ollama",
+      "baseUrl": "http://localhost:11434/v1"
     }
   }
 }
 ```
 
-Set environment before running:
-```bash
-export API_KEY=your-secret-key
-quantclaw agent --id=main
-```
-
-## Configuration Examples
-
-### Minimal Setup
+### DeepSeek / Qwen / Custom Endpoint
 
 ```json
 {
-  "agents": {
-    "main": {
-      "providers": {
-        "default": "anthropic"
-      },
-      "models": {
-        "default": "claude-3-5-sonnet-20241022"
-      }
+  "llm": { "model": "openai/deepseek-chat" },
+  "providers": {
+    "openai": {
+      "apiKey": "YOUR_DEEPSEEK_KEY",
+      "baseUrl": "https://api.deepseek.com/v1"
     }
   }
 }
 ```
-
-### Multi-Provider Setup
-
-```json
-{
-  "agents": {
-    "main": {
-      "providers": {
-        "default": "anthropic",
-        "fallback": ["openai", "google", "mistral"]
-      },
-      "models": {
-        "default": "claude-3-5-sonnet-20241022",
-        "reasoning": "claude-3-7-opus-20250219",
-        "fast": "gpt-3.5-turbo"
-      }
-    }
-  }
-}
-```
-
-### High-Memory Setup
-
-```json
-{
-  "agents": {
-    "main": {
-      "memory": {
-        "maxTokens": 200000,
-        "compactionThreshold": 160000,
-        "enableSearch": true,
-        "searchTopK": 10
-      },
-      "context": {
-        "maxContextTokens": 64000,
-        "windowSize": 20
-      }
-    }
-  }
-}
-```
-
-### Production Setup
-
-```json
-{
-  "gateway": {
-    "host": "0.0.0.0",
-    "port": 8000,
-    "enableTls": true,
-    "certPath": "/etc/certs/cert.pem",
-    "keyPath": "/etc/certs/key.pem"
-  },
-  "logging": {
-    "level": "warn",
-    "format": "json",
-    "file": "/var/log/quantclaw/quantclaw.log"
-  },
-  "plugins": {
-    "autoLoad": true,
-    "pluginDirs": ["/usr/share/quantclaw/plugins"]
-  }
-}
-```
-
-## Tips and Best Practices
-
-- **Use environment variables** for secrets (API keys, tokens)
-- **Start with minimal config**, add features as needed
-- **Validate after changes**: `quantclaw config validate`
-- **Monitor logs** during initial setup
-- **Use different agents** for different use cases
-- **Test model fallbacks** before production
-- **Set reasonable timeouts** to prevent hanging
 
 ---
 

@@ -23,7 +23,7 @@ Detailed installation instructions for different platforms and use cases.
 #### Using Pre-built Binary
 ```bash
 # Download the latest binary
-wget https://github.com/QuantClaw/quantclaw/releases/download/v1.0.0/quantclaw-linux-x64.tar.gz
+wget https://github.com/QuantClaw/QuantClaw/releases/download/v1.0.0/quantclaw-linux-x64.tar.gz
 
 # Extract
 tar xzf quantclaw-linux-x64.tar.gz
@@ -49,7 +49,7 @@ sudo apt-get install -y \
   libspdlog-dev
 
 # Clone repository
-git clone https://github.com/QuantClaw/quantclaw.git
+git clone https://github.com/QuantClaw/QuantClaw.git
 cd quantclaw
 
 # Build
@@ -67,14 +67,15 @@ sudo cmake --install .
 #### Using Docker
 ```bash
 # Pull image
-docker pull ghcr.io/quantclaw/quantclaw:latest
+docker pull quantclaw:latest
 
 # Run container
 docker run -d \
   --name quantclaw \
-  -p 8000:8000 \
-  -v ~/.quantclaw:/root/.quantclaw \
-  ghcr.io/quantclaw/quantclaw:latest
+  -p 18800:18800 \
+  -p 18801:18801 \
+  -v quantclaw_data:/home/quantclaw/.quantclaw \
+  quantclaw:latest
 
 # View logs
 docker logs quantclaw
@@ -88,7 +89,7 @@ sudo dnf groupinstall "Development Tools" -y
 sudo dnf install cmake openssl-devel nlohmann_json-devel spdlog-devel -y
 
 # Build from source
-git clone https://github.com/QuantClaw/quantclaw.git
+git clone https://github.com/QuantClaw/QuantClaw.git
 cd quantclaw
 mkdir build && cd build
 cmake ..
@@ -103,7 +104,7 @@ sudo cmake --install .
 yay -S quantclaw
 
 # Or build from source
-git clone https://github.com/QuantClaw/quantclaw.git
+git clone https://github.com/QuantClaw/QuantClaw.git
 cd quantclaw
 mkdir build && cd build
 cmake ..
@@ -129,7 +130,7 @@ Follow the Ubuntu/Linux instructions above within WSL2:
 ```bash
 wsl
 cd ~
-git clone https://github.com/QuantClaw/quantclaw.git
+git clone https://github.com/QuantClaw/QuantClaw.git
 # ... follow Linux build steps
 ```
 
@@ -137,10 +138,10 @@ git clone https://github.com/QuantClaw/quantclaw.git
 ```powershell
 # Forward WSL2 port to Windows
 # In WSL2 terminal:
-quantclaw gateway run
+quantclaw gateway
 
 # In PowerShell (Windows):
-# Open http://localhost:8000
+# open http://localhost:18801
 ```
 
 ### Native Windows (MSVC)
@@ -153,7 +154,7 @@ quantclaw gateway run
 #### Build Process
 ```batch
 REM Clone repository
-git clone https://github.com/QuantClaw/quantclaw.git
+git clone https://github.com/QuantClaw/QuantClaw.git
 cd quantclaw
 
 REM Create build directory
@@ -182,13 +183,14 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=C:\path\to\vcpkg\scripts\buildsystems\vcpkg.cmak
 ### Docker on Windows
 ```powershell
 # Pull and run Docker container
-docker pull ghcr.io/quantclaw/quantclaw:latest
+docker pull quantclaw:latest
 
 docker run -d `
   --name quantclaw `
-  -p 8000:8000 `
-  -v $env:USERPROFILE\.quantclaw:/root/.quantclaw `
-  ghcr.io/quantclaw/quantclaw:latest
+  -p 18800:18800 `
+  -p 18801:18801 `
+  -v quantclaw_data:/home/quantclaw/.quantclaw `
+  quantclaw:latest
 
 # View logs
 docker logs quantclaw
@@ -218,7 +220,7 @@ sudo port install cmake openssl nlohmann_json spdlog
 
 #### Build
 ```bash
-git clone https://github.com/QuantClaw/quantclaw.git
+git clone https://github.com/QuantClaw/QuantClaw.git
 cd quantclaw
 
 mkdir build && cd build
@@ -276,7 +278,7 @@ export QUANTCLAW_CONFIG_DIR=~/.quantclaw
 export QUANTCLAW_LOG_LEVEL=debug
 
 # Set gateway port
-export QUANTCLAW_GATEWAY_PORT=8000
+export QUANTCLAW_GATEWAY_PORT=18800
 ```
 
 ## Updating QuantClaw
@@ -284,7 +286,7 @@ export QUANTCLAW_GATEWAY_PORT=8000
 ### From Binary
 ```bash
 # Download new version
-wget https://github.com/QuantClaw/quantclaw/releases/download/v1.1.0/quantclaw-linux-x64.tar.gz
+wget https://github.com/QuantClaw/QuantClaw/releases/download/v1.1.0/quantclaw-linux-x64.tar.gz
 
 # Backup old binary
 cp /usr/local/bin/quantclaw /usr/local/bin/quantclaw.backup
@@ -314,16 +316,17 @@ brew upgrade quantclaw
 
 ### Docker
 ```bash
-docker pull ghcr.io/quantclaw/quantclaw:latest
+docker pull quantclaw:latest
 docker stop quantclaw
 docker rm quantclaw
 
 # Re-run with new image
 docker run -d \
   --name quantclaw \
-  -p 8000:8000 \
-  -v ~/.quantclaw:/root/.quantclaw \
-  ghcr.io/quantclaw/quantclaw:latest
+  -p 18800:18800 \
+  -p 18801:18801 \
+  -v quantclaw_data:/home/quantclaw/.quantclaw \
+  quantclaw:latest
 ```
 
 ## Troubleshooting
@@ -363,10 +366,10 @@ brew install gcc                       # macOS
 **Port already in use**
 ```bash
 # Change gateway port
-quantclaw gateway run --port 9000
+quantclaw gateway --port 9000
 
-# Or find and kill process using port 8000
-lsof -i :8000
+# Or find and kill process using port 18800
+lsof -i :18800
 kill -9 <PID>
 ```
 
@@ -404,7 +407,7 @@ rm -rf ~/.quantclaw
 ```bash
 docker stop quantclaw
 docker rm quantclaw
-docker rmi ghcr.io/quantclaw/quantclaw:latest
+docker rmi quantclaw:latest
 ```
 
 ### From Source

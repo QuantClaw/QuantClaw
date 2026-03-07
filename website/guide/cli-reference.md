@@ -8,94 +8,53 @@ Complete command reference for QuantClaw.
 quantclaw [OPTIONS] COMMAND [ARGS]
 ```
 
-### Options
-
-- `--help, -h` - Show help message
-- `--version, -v` - Show version
-- `--config PATH` - Configuration file path
-- `--log-level LEVEL` - Log level (trace, debug, info, warn, error)
-- `--quiet, -q` - Suppress output
+- `--help, -h` — Show help message
+- `--version, -v` — Show version
+- `--config PATH` — Configuration file path
+- `--log-level LEVEL` — Log level: `trace`, `debug`, `info`, `warn`, `error`
 
 ## Commands
 
 ### agent
 
-Start a QuantClaw agent.
+Send a message to the agent.
 
 ```bash
-quantclaw agent [OPTIONS]
+quantclaw agent [OPTIONS] MESSAGE
 ```
 
 **Options:**
-- `--id ID` - Agent ID (default: main)
-- `--port PORT` - Port to listen on (default: 8000)
-- `--config PATH` - Config file path
-- `--foreground` - Run in foreground
-- `--detach, -d` - Run in background
+- `--session SESSION` — Session key to use (default: auto-generated)
 
 **Examples:**
 ```bash
-# Start main agent
-quantclaw agent --id=main
+# Send a message (creates a new session automatically)
+quantclaw agent "Hello, introduce yourself"
 
-# Start with custom port
-quantclaw agent --id=main --port=9000
-
-# Run in background
-quantclaw agent --id=main --detach
+# Use a specific session key
+quantclaw agent --session my:project "What's the status?"
 ```
 
 ### run
 
-Execute a command through the agent.
+Send a message to the agent (alias for `agent`).
 
 ```bash
-quantclaw run [OPTIONS] MESSAGE
-```
-
-**Options:**
-- `--session SESSION` - Session ID to use
-- `--agent AGENT` - Agent ID to use
-- `--no-session` - Run without session (eval mode)
-- `--timeout SECONDS` - Request timeout
-- `--json` - Output JSON format
-
-**Examples:**
-```bash
-# Simple question
-quantclaw run "What is 2+2?"
-
-# With specific session
-quantclaw run --session sess-123 "Continue our conversation"
-
-# Eval without session
-quantclaw run --no-session "Generate random number"
-
-# With timeout
-quantclaw run --timeout 30 "Analyze this data"
-
-# JSON output
-quantclaw run --json "What's the weather?" | jq .result
+quantclaw run MESSAGE
 ```
 
 ### eval
 
-Evaluate a prompt without session history.
+One-shot prompt evaluation — no session history is created or used.
 
 ```bash
-quantclaw eval [OPTIONS] PROMPT
+quantclaw eval PROMPT
 ```
-
-**Options:**
-- `--agent AGENT` - Agent ID
-- `--timeout SECONDS` - Request timeout
-- `--model MODEL` - Use specific model
-- `--json` - Output JSON format
 
 **Examples:**
 ```bash
-quantclaw eval "2+2"
-quantclaw eval "Generate a poem" --model=reasoning
+quantclaw eval "What is 2 + 2?"
+quantclaw eval "Generate a random UUID"
 ```
 
 ### gateway
@@ -103,47 +62,59 @@ quantclaw eval "Generate a poem" --model=reasoning
 Manage the RPC gateway.
 
 ```bash
-quantclaw gateway COMMAND [OPTIONS]
+quantclaw gateway [SUBCOMMAND] [OPTIONS]
 ```
 
-**Commands:**
+**Subcommands:**
 
-#### gateway run
-Start the gateway server.
+#### gateway (no subcommand)
+Run the gateway in the foreground.
 
 ```bash
-quantclaw gateway run [OPTIONS]
+quantclaw gateway
 ```
 
-**Options:**
-- `--host HOST` - Bind address (default: 127.0.0.1)
-- `--port PORT` - Port (default: 8000)
-- `--tls` - Enable TLS
-- `--cert PATH` - Certificate file
-- `--key PATH` - Private key file
-- `--foreground` - Run in foreground
+#### gateway install
+Install as a system service (systemd on Linux, launchd on macOS).
+
+```bash
+quantclaw gateway install
+```
+
+#### gateway uninstall
+Remove the system service.
+
+```bash
+quantclaw gateway uninstall
+```
+
+#### gateway start / stop / restart
+Control the background daemon.
+
+```bash
+quantclaw gateway start
+quantclaw gateway stop
+quantclaw gateway restart
+```
 
 #### gateway status
-Check gateway status.
+Check whether the gateway daemon is running.
 
 ```bash
 quantclaw gateway status
 ```
 
-**Example Output:**
-```
-Gateway Status:
-  Host: 127.0.0.1:8000
-  TLS: Disabled
-  Agents: 1
-  Uptime: 2h 34m
-```
-
-#### gateway stop
-Stop the gateway.
+#### gateway call
+Call any RPC method directly.
 
 ```bash
-quantclaw gateway stop
+quantclaw gateway call METHOD [JSON_PARAMS]
+```
+
+**Examples:**
+```bash
+quantclaw gateway call gateway.health
+quantclaw gateway call config.get '{"path":"llm.model"}'
 ```
 
 ### sessions
@@ -151,74 +122,31 @@ quantclaw gateway stop
 Manage conversation sessions.
 
 ```bash
-quantclaw sessions COMMAND [OPTIONS]
+quantclaw sessions SUBCOMMAND [OPTIONS]
 ```
-
-**Commands:**
 
 #### sessions list
-List all sessions.
 
-```bash
-quantclaw sessions list [OPTIONS]
-```
-
-**Options:**
-- `--user USER` - Filter by user
-- `--agent AGENT` - Filter by agent
-- `--limit N` - Limit results
-- `--json` - JSON output
-
-**Example:**
 ```bash
 quantclaw sessions list
-quantclaw sessions list --user=alice --limit=10
 ```
 
 #### sessions history
-View session history.
 
 ```bash
-quantclaw sessions history SESSION_ID [OPTIONS]
+quantclaw sessions history SESSION_KEY
 ```
-
-**Options:**
-- `--format FORMAT` - Output format (json, text)
-- `--limit N` - Limit messages
-
-**Example:**
-```bash
-quantclaw sessions history sess-123
-quantclaw sessions history sess-123 --limit=20
-```
-
-#### sessions send
-Send message to session.
-
-```bash
-quantclaw sessions send SESSION_ID MESSAGE [OPTIONS]
-```
-
-**Example:**
-```bash
-quantclaw sessions send sess-123 "Continue the conversation"
-```
-
-#### sessions compact
-Compact session history.
-
-```bash
-quantclaw sessions compact SESSION_ID [OPTIONS]
-```
-
-**Options:**
-- `--keep-recent N` - Keep recent N messages
 
 #### sessions delete
-Delete a session.
 
 ```bash
-quantclaw sessions delete SESSION_ID
+quantclaw sessions delete SESSION_KEY
+```
+
+#### sessions reset
+
+```bash
+quantclaw sessions reset SESSION_KEY
 ```
 
 ### config
@@ -226,278 +154,160 @@ quantclaw sessions delete SESSION_ID
 Manage configuration.
 
 ```bash
-quantclaw config COMMAND [OPTIONS]
+quantclaw config SUBCOMMAND [OPTIONS]
 ```
-
-**Commands:**
 
 #### config get
-Get configuration values.
 
 ```bash
-quantclaw config get [PATH] [OPTIONS]
-```
-
-**Options:**
-- `--format FORMAT` - Output format (json, yaml)
-
-**Examples:**
-```bash
-quantclaw config get                                    # Full config
-quantclaw config get agents.main.models.default        # Specific value
-quantclaw config get agents.main                       # Agent config
+quantclaw config get                    # Full config
+quantclaw config get llm.model         # Specific value (dot-path)
 ```
 
 #### config set
-Set configuration value.
 
 ```bash
-quantclaw config set PATH VALUE
+quantclaw config set llm.model "anthropic/claude-sonnet-4-6"
 ```
 
-**Example:**
+#### config unset
+
 ```bash
-quantclaw config set agents.main.models.default gpt-4
+quantclaw config unset llm.temperature
+```
+
+#### config reload
+Hot-reload config without restarting the gateway.
+
+```bash
+quantclaw config reload
 ```
 
 #### config validate
-Validate configuration.
 
-```bash
-quantclaw config validate [PATH]
-```
-
-**Example:**
 ```bash
 quantclaw config validate
-quantclaw config validate ~/.quantclaw/config.json
 ```
 
 #### config schema
-Show configuration schema.
 
 ```bash
-quantclaw config schema [PATH]
+quantclaw config schema
 ```
 
-#### config merge
-Merge additional configuration.
+### skills
+
+Manage skills.
 
 ```bash
-quantclaw config merge PATH [OPTIONS]
+quantclaw skills SUBCOMMAND
 ```
 
-**Options:**
-- `--backup` - Create backup before merge
-
-### file
-
-Manage workspace files.
+#### skills list
 
 ```bash
-quantclaw file COMMAND [OPTIONS]
+quantclaw skills list
 ```
 
-**Commands:**
+#### skills install
 
-#### file list
-List workspace files.
-
-```bash
-quantclaw file list [PATH] [OPTIONS]
-```
-
-**Options:**
-- `--recursive, -r` - Recursive listing
-- `--json` - JSON output
-
-**Examples:**
-```bash
-quantclaw file list
-quantclaw file list WORKSPACE/ -r
-```
-
-#### file read
-Read workspace file.
+Install a skill's dependencies.
 
 ```bash
-quantclaw file read PATH
-```
-
-**Example:**
-```bash
-quantclaw file read WORKSPACE/MEMORY.md
-```
-
-#### file write
-Write workspace file.
-
-```bash
-quantclaw file write PATH CONTENT [OPTIONS]
-```
-
-**Options:**
-- `--append` - Append to file
-- `--overwrite` - Overwrite file
-
-**Example:**
-```bash
-quantclaw file write WORKSPACE/notes.txt "New note"
-quantclaw file write WORKSPACE/data.json '{"key": "value"}'
-```
-
-#### file delete
-Delete workspace file.
-
-```bash
-quantclaw file delete PATH
+quantclaw skills install SKILL_NAME
 ```
 
 ### memory
 
-Manage agent memory.
+Search and inspect agent memory.
 
 ```bash
-quantclaw memory COMMAND [OPTIONS]
+quantclaw memory SUBCOMMAND [OPTIONS]
 ```
-
-**Commands:**
 
 #### memory search
-Search memory using BM25.
 
 ```bash
-quantclaw memory search QUERY [OPTIONS]
+quantclaw memory search "query string"
+quantclaw memory search "recent events" --limit 10
 ```
 
 **Options:**
-- `--limit N` - Result limit (default: 5)
-- `--threshold F` - Score threshold
-- `--json` - JSON output
+- `--limit N` — Result limit (default: 5)
 
-**Example:**
-```bash
-quantclaw memory search "user preferences"
-quantclaw memory search "recent events" --limit=10
-```
-
-#### memory get
-Get memory by key.
+#### memory status
 
 ```bash
-quantclaw memory get KEY
+quantclaw memory status
 ```
 
-#### memory set
-Set memory value.
+### cron
+
+Manage scheduled tasks.
 
 ```bash
-quantclaw memory set KEY VALUE
+quantclaw cron SUBCOMMAND
 ```
 
-#### memory delete
-Delete memory entry.
+#### cron list
 
 ```bash
-quantclaw memory delete KEY
+quantclaw cron list
 ```
 
-### skill
-
-Manage skills and plugins.
+#### cron add
 
 ```bash
-quantclaw skill COMMAND [OPTIONS]
+quantclaw cron add NAME "0 9 * * *" "Send daily summary"
 ```
 
-**Commands:**
-
-#### skill create
-Create new skill project.
+#### cron remove
 
 ```bash
-quantclaw skill create NAME [OPTIONS]
+quantclaw cron remove TASK_ID
 ```
 
-**Options:**
-- `--template TEMPLATE` - Use template
-- `--typescript` - Use TypeScript
+### health
 
-**Example:**
-```bash
-quantclaw skill create my-plugin
-```
-
-#### skill install
-Install a plugin.
+Quick health check — confirms the gateway is reachable.
 
 ```bash
-quantclaw skill install PATH [OPTIONS]
+quantclaw health
 ```
 
-**Options:**
-- `--global, -g` - Install globally
-- `--link` - Create symlink (for development)
+### status
 
-**Example:**
-```bash
-quantclaw skill install ./my-plugin
-quantclaw skill install ./my-plugin --link
-```
-
-#### skill uninstall
-Uninstall a plugin.
+Show connection and session counts.
 
 ```bash
-quantclaw skill uninstall NAME
+quantclaw status
 ```
 
-#### skill list
-List installed skills.
+### logs
+
+Stream gateway logs.
 
 ```bash
-quantclaw skill list [OPTIONS]
+quantclaw logs
 ```
 
-**Options:**
-- `--json` - JSON output
+### doctor
 
-#### skill status
-Show skill status.
+Run a full diagnostic check.
 
 ```bash
-quantclaw skill status [NAME]
+quantclaw doctor
 ```
 
-#### skill publish
-Publish skill to registry.
+### dashboard
+
+Open the web dashboard in the browser.
 
 ```bash
-quantclaw skill publish [OPTIONS]
+quantclaw dashboard
 ```
 
-### tool
-
-Execute tools directly.
-
-```bash
-quantclaw tool NAME [PARAMS] [OPTIONS]
-```
-
-**Examples:**
-```bash
-# Bash execution
-quantclaw tool bash '{"command": "ls -la"}'
-
-# Browser control
-quantclaw tool browser '{"action": "launch", "url": "https://example.com"}'
-
-# Web search
-quantclaw tool web_search '{"query": "latest AI news"}'
-
-# Memory search
-quantclaw tool memory_search '{"query": "user preferences"}'
-```
+Opens `http://127.0.0.1:18801`.
 
 ### onboard
 
@@ -508,174 +318,72 @@ quantclaw onboard [OPTIONS]
 ```
 
 **Options:**
-- `--quick` - Quick setup with defaults
-- `--reset` - Reset to defaults
-- `--api-key KEY` - Provide API key
-
-**Example:**
-```bash
-quantclaw onboard                # Interactive
-quantclaw onboard --quick        # Quick setup
-quantclaw onboard --reset        # Reset config
-```
-
-### status
-
-Check system status.
-
-```bash
-quantclaw status [OPTIONS]
-```
-
-**Options:**
-- `--json` - JSON output
-- `--verbose, -v` - Verbose output
-
-**Example Output:**
-```
-QuantClaw Status:
-  Version: 1.0.0
-  Agent (main): Running
-  Gateway: Running on 127.0.0.1:8000
-  Memory: 2.4 MB used / 100 MB available
-  Sessions: 3 active
-  Plugins: 5 installed
-```
-
-### logs
-
-View system logs.
-
-```bash
-quantclaw logs COMMAND [OPTIONS]
-```
-
-**Commands:**
-
-#### logs tail
-Show live logs.
-
-```bash
-quantclaw logs tail [OPTIONS]
-```
-
-**Options:**
-- `--lines N` - Number of lines
-- `--level LEVEL` - Filter by level
-- `--component COMP` - Filter by component
-- `--follow, -f` - Follow logs
+- `--quick` — Quick setup with defaults (non-interactive)
+- `--install-daemon` — Also install the gateway as a system service
 
 **Examples:**
 ```bash
-quantclaw logs tail
-quantclaw logs tail --lines=100 --level=error
-quantclaw logs tail -f --component=agent
+quantclaw onboard                     # Interactive
+quantclaw onboard --quick             # Non-interactive
+quantclaw onboard --install-daemon    # Interactive + install daemon
 ```
 
-#### logs search
-Search logs.
+## In-Conversation Message Commands
 
-```bash
-quantclaw logs search PATTERN [OPTIONS]
-```
+While chatting, prefix a message with a slash command to control the session:
 
-**Options:**
-- `--limit N` - Result limit
-
-### usage
-
-View usage statistics.
-
-```bash
-quantclaw usage COMMAND [OPTIONS]
-```
-
-**Commands:**
-
-#### usage cost
-Show token costs.
-
-```bash
-quantclaw usage cost [OPTIONS]
-```
-
-**Options:**
-- `--period PERIOD` - Period (day, week, month)
-- `--by FIELD` - Group by (provider, model, agent)
-
-**Example:**
-```bash
-quantclaw usage cost
-quantclaw usage cost --period=month --by=provider
-```
-
-#### usage stats
-Show usage statistics.
-
-```bash
-quantclaw usage stats [OPTIONS]
-```
-
-### help
-
-Show help.
-
-```bash
-quantclaw help [COMMAND]
-```
-
-**Examples:**
-```bash
-quantclaw help                # Main help
-quantclaw help agent          # Agent command help
-quantclaw help run            # Run command help
-```
-
-## Exit Codes
-
-- `0` - Success
-- `1` - General error
-- `2` - Command line error
-- `3` - Configuration error
-- `4` - Connection error
-- `5` - Permission error
+| Command | Effect |
+|---------|--------|
+| `/new` | Start a new session |
+| `/reset` | Clear current session history |
+| `/compact` | Manually trigger context compaction |
+| `/status` | Show current session and queue status |
+| `/commands` | List all available slash commands |
+| `/help` | Show help text |
 
 ## Environment Variables
 
-- `QUANTCLAW_CONFIG_DIR` - Configuration directory
-- `QUANTCLAW_AGENT_ID` - Default agent ID
-- `QUANTCLAW_LOG_LEVEL` - Log level
-- `QUANTCLAW_GATEWAY_PORT` - Gateway port
-- `QUANTCLAW_PORT` - Sidecar IPC port (internal)
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI / compatible provider API key |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `QUANTCLAW_LOG_LEVEL` | Log level override (`debug`, `info`, `warn`, `error`) |
+| `QUANTCLAW_PORT` | Sidecar IPC port (internal use, set automatically) |
 
-## Examples
+## Ports
 
-### Complete Workflow
+| Service | Port | Purpose |
+|---------|------|---------|
+| WebSocket RPC Gateway | `18800` | Main gateway for client connections |
+| HTTP REST API / Dashboard | `18801` | Web UI and REST API |
+
+## Complete Workflow Example
 
 ```bash
 # 1. Initial setup
 quantclaw onboard --quick
 
-# 2. Start gateway
-quantclaw gateway run &
+# 2. Start gateway in background
+quantclaw gateway start
 
-# 3. Start agent
-quantclaw agent --id=main &
+# 3. Send a message
+quantclaw agent "Hello!"
 
-# 4. Send message
-quantclaw run "What is 2+2?"
-
-# 5. View session history
+# 4. View session history
 quantclaw sessions list
-quantclaw sessions history SESS-ID
+quantclaw sessions history SESSION_KEY
 
-# 6. Check usage
-quantclaw usage cost
+# 5. Search memory
+quantclaw memory search "project notes"
 
-# 7. View logs
-quantclaw logs tail -f
+# 6. Check status
+quantclaw health
+quantclaw status
+
+# 7. Stream logs
+quantclaw logs
 ```
 
 ---
 
-**Need help with a specific command?** Use `quantclaw help COMMAND`.
+**Need help?** Run `quantclaw --help` or `quantclaw COMMAND --help`.

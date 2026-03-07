@@ -4,17 +4,17 @@ Welcome to QuantClaw! This guide will help you get up and running in just a few 
 
 ## What is QuantClaw?
 
-QuantClaw is a high-performance C++17 implementation of OpenClaw, an AI agent framework designed to run locally on your machine. It can execute commands, control browsers, manage files, and integrate with various chat platforms.
+QuantClaw is a high-performance C++17 implementation of OpenClaw, an AI agent framework designed to run locally on your machine. It can execute commands, control browsers, manage files, and integrate with various chat platforms — with minimal memory footprint and no runtime dependencies.
 
 ## Prerequisites
 
 Before you start, make sure you have:
 
 - **Linux (Ubuntu 20.04+)** or **Windows 10+ (WSL2)**
-- **C++17 compatible compiler** (GCC 7+, Clang 6+, MSVC 2017+)
+- **C++17 compatible compiler** (GCC 7+, Clang 5+)
 - **CMake 3.15+**
 - **Node.js 16+** (for plugin support)
-- **Docker** (optional, for containerized deployment)
+- **An LLM API key** (OpenAI, Anthropic, or any compatible provider)
 
 ## Installation Methods
 
@@ -25,9 +25,11 @@ The fastest way to get started:
 ```bash
 docker run -d \
   --name quantclaw \
-  -p 8000:8000 \
-  -v ~/.quantclaw:/root/.quantclaw \
-  ghcr.io/quantclaw/quantclaw:latest
+  -p 18800:18800 \
+  -p 18801:18801 \
+  -e OPENAI_API_KEY=sk-... \
+  -v quantclaw_data:/home/quantclaw/.quantclaw \
+  quantclaw:latest
 ```
 
 ### Method 2: Build from Source
@@ -36,186 +38,165 @@ Clone and build QuantClaw:
 
 ```bash
 # Clone the repository
-git clone https://github.com/QuantClaw/quantclaw.git
-cd quantclaw
+git clone https://github.com/QuantClaw/QuantClaw.git
+cd QuantClaw
+
+# Install system dependencies (Ubuntu/Debian)
+sudo apt install build-essential cmake libssl-dev \
+  libcurl4-openssl-dev nlohmann-json3-dev libspdlog-dev zlib1g-dev
 
 # Create build directory
 mkdir build && cd build
 
 # Configure and build
 cmake ..
-cmake --build . -j$(nproc)
+make -j$(nproc)
 
-# Verify installation
+# Verify the build
 ./quantclaw_tests
+
+# Install (optional)
+sudo make install
 ```
 
-### Method 3: Pre-built Binaries
-
-Download pre-built binaries for your platform from [GitHub Releases](https://github.com/QuantClaw/quantclaw/releases).
+### Method 3: Install Script
 
 ```bash
-# Linux
-wget https://github.com/QuantClaw/quantclaw/releases/download/v1.0.0/quantclaw-linux-x64.tar.gz
-tar xzf quantclaw-linux-x64.tar.gz
-./quantclaw --version
-
-# Windows
-# Download and extract the .zip from releases
+sudo bash scripts/install.sh
 ```
+
+The script auto-detects your OS, installs dependencies, builds from source, and creates your workspace.
 
 ## Initial Setup
 
-Once installed, initialize QuantClaw:
+Once installed, run the onboarding wizard:
 
 ```bash
-# Onboard configuration
+# Interactive setup wizard (recommended)
+quantclaw onboard
+
+# Or quick setup with defaults (no prompts)
 quantclaw onboard --quick
-
-# This will:
-# - Create configuration directory (~/.quantclaw)
-# - Initialize workspace structure
-# - Prompt for API keys (OpenAI, Anthropic, etc.)
 ```
 
-You'll be asked for:
-- **LLM Provider**: OpenAI, Anthropic, or other providers
-- **API Key**: Your authentication credentials
-- **Model Selection**: Default model to use (e.g., GPT-4, Claude 3)
+The wizard will:
+- Create `~/.quantclaw/quantclaw.json` (configuration)
+- Create `~/.quantclaw/agents/main/workspace/` with all 8 workspace files
+- Prompt for your LLM provider and API key
+- Optionally install as a system daemon
 
-## Your First Agent
+## Your First Session
 
-Start your first QuantClaw agent:
+### Start the Gateway
 
 ```bash
-# Start the agent in foreground
-quantclaw agent --id=main
+# Run in foreground
+quantclaw gateway
 
-# Or start the gateway daemon
-quantclaw gateway run
+# Or install and start as a background service
+quantclaw gateway install
+quantclaw gateway start
 ```
 
-The agent will:
-- Load your configuration
-- Initialize memory and context
-- Start listening for commands
-- Display a prompt or web interface
-
-## Using the Web Interface
-
-QuantClaw includes a built-in web dashboard:
+### Send a Message
 
 ```bash
-# Start the gateway (if not already running)
-quantclaw gateway run &
-
-# Open in browser
-open http://localhost:8000
+quantclaw agent "Hello! Introduce yourself."
 ```
 
-Features:
-- 💬 Chat interface
-- 📊 Memory and context viewer
-- ⚙️ Configuration management
-- 📈 Usage and token tracking
-- 🔧 Plugin management
+### Open the Web Dashboard
+
+```bash
+quantclaw dashboard
+```
+
+This opens `http://127.0.0.1:18801` in your browser — a full web interface for chatting, managing sessions, and viewing configuration.
 
 ## Command Line Usage
 
-Try your first commands:
-
 ```bash
-# Simple question
-quantclaw run "What is the weather today?"
+# Send a message (creates a new session automatically)
+quantclaw agent "What is the weather today?"
 
-# Run without session (eval mode)
-quantclaw run --no-session "2 + 2"
+# Use a specific session
+quantclaw agent --session my:project "Continue our discussion"
 
-# Access your workspace files
-quantclaw file list
+# One-shot query without session history
+quantclaw eval "What is 2 + 2?"
 
-# Check status
+# Check gateway status
+quantclaw health
 quantclaw status
 ```
 
 ## Configuration
 
-The main configuration file is `~/.quantclaw/config.json`:
+The main configuration file is `~/.quantclaw/quantclaw.json`:
 
 ```json
 {
-  "agents": {
-    "main": {
-      "models": {
-        "default": "claude-3-5-sonnet-20241022",
-        "reasoning": "claude-3-7-opus-20250219"
-      },
-      "providers": {
-        "default": "anthropic"
-      },
-      "memory": {
-        "maxTokens": 100000,
-        "compactionThreshold": 80000
-      }
+  "llm": {
+    "model": "openai/qwen-max",
+    "maxIterations": 15,
+    "maxTokens": 4096
+  },
+  "providers": {
+    "openai": {
+      "apiKey": "YOUR_API_KEY",
+      "baseUrl": "https://api.openai.com/v1"
     }
+  },
+  "gateway": {
+    "port": 18800,
+    "controlUi": { "port": 18801 }
   }
 }
 ```
 
+See the [Configuration Guide](/guide/configuration) for all options.
+
 ## Next Steps
 
-- 📖 [Read the full documentation](/guide/documentation)
-- 🏗️ [Learn the architecture](/guide/architecture)
-- 🔌 [Create your first plugin](/guide/plugins)
-- 🛠️ [CLI reference](/guide/cli-reference)
+- 📖 [Configuration Guide](/guide/configuration)
+- 🏗️ [Architecture Overview](/guide/architecture)
+- 🔌 [Plugin Development](/guide/plugins)
+- 🛠️ [CLI Reference](/guide/cli-reference)
 
 ## Getting Help
 
 - **Documentation**: [Full docs](/guide/documentation)
-- **GitHub Issues**: [Report bugs](https://github.com/QuantClaw/quantclaw/issues)
-- **Discussions**: [Community support](https://github.com/QuantClaw/quantclaw/discussions)
+- **GitHub Issues**: [Report bugs](https://github.com/QuantClaw/QuantClaw/issues)
+- **Discussions**: [Community support](https://github.com/QuantClaw/QuantClaw/discussions)
 
 ## Troubleshooting
 
 ### Build Errors
 
-If you encounter build errors:
-
 ```bash
-# Clean build directory
-rm -rf build
-mkdir build && cd build
+# Check system dependencies
+sudo apt install build-essential cmake libssl-dev \
+  libcurl4-openssl-dev nlohmann-json3-dev libspdlog-dev
 
-# Try with verbose output
+# Rebuild with verbose output
+cd build
 cmake .. -DCMAKE_VERBOSE_MAKEFILE=ON
-cmake --build .
+make -j$(nproc)
 ```
 
-### Configuration Issues
-
-Validate your configuration:
+### Gateway Won't Start
 
 ```bash
-quantclaw config validate
-quantclaw config schema
+quantclaw config get gateway.port   # Check configured port
+quantclaw doctor                    # Run full diagnostics
 ```
 
 ### API Key Problems
 
-Check your API key configuration:
-
 ```bash
-quantclaw status
-quantclaw config get agents.main.providers.default
+quantclaw health                    # Check gateway connectivity
+quantclaw config get llm.model      # Verify model/provider config
 ```
-
-## Performance Tips
-
-- **Memory Management**: Enable context compaction for long conversations
-- **Token Budgeting**: Set `maxContextTokens` to prevent overflow
-- **Model Selection**: Use faster models for quick tasks, reasoning models for complex ones
-- **Plugin Optimization**: Load only necessary plugins
 
 ---
 
-🎉 **Congratulations!** You're ready to start building with QuantClaw. Check out the [feature guide](/guide/features) to explore more capabilities.
+🎉 **You're ready!** Check out the [feature guide](/guide/features) to explore more capabilities.

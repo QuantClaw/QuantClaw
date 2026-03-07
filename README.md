@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml"><img src="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus&logoColor=white" alt="C++17">
-  <img src="https://img.shields.io/badge/tests-923%20passing-brightgreen.svg" alt="923 tests passing">
+  <img src="https://img.shields.io/badge/tests-886%20passing-brightgreen.svg" alt="886 tests passing">
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey.svg" alt="Linux | Windows">
   <a href="https://github.com/openclaw/openclaw"><img src="https://img.shields.io/badge/OpenClaw-compatible-orange.svg" alt="OpenClaw Compatible"></a>
 </p>
@@ -139,16 +139,19 @@ To use custom ports, edit `~/.quantclaw/quantclaw.json`:
 ```
 ~/.quantclaw/
 ├── quantclaw.json              # Configuration (OpenClaw format)
-└── agents/default/
+├── skills/                     # Installed skills (OpenClaw compatible)
+│   └── weather/
+│       └── SKILL.md
+└── agents/main/
     ├── workspace/
-    │   ├── SOUL.md             # Assistant identity
-    │   ├── USER.md             # User information
+    │   ├── SOUL.md             # Assistant identity and values
+    │   ├── IDENTITY.md         # Self-description and capabilities
     │   ├── MEMORY.md           # Long-term memory
-    │   ├── memory/             # Daily memory logs
-    │   │   └── YYYY-MM-DD.md
-    │   └── skills/             # Skills (OpenClaw compatible)
-    │       └── weather/
-    │           └── SKILL.md
+    │   ├── SKILL.md            # Available skills declaration
+    │   ├── HEARTBEAT.md        # Periodic status / cron log
+    │   ├── USER.md             # User profile and preferences
+    │   ├── AGENTS.md           # Known agent roster
+    │   └── TOOLS.md            # Tool usage guidelines
     └── sessions/
         ├── sessions.json       # Session index
         └── <session-id>.jsonl  # Per-session transcript
@@ -160,25 +163,26 @@ QuantClaw uses JSON configuration (`~/.quantclaw/quantclaw.json`):
 
 ```json
 {
-  "agent": {
+  "system": {
+    "logLevel": "info"
+  },
+  "llm": {
     "model": "openai/qwen-max",
     "maxIterations": 15,
     "temperature": 0.7,
-    "maxTokens": 8192,
-    "fallbacks": ["anthropic/claude-sonnet-4-6"],
-    "autoCompact": true,
-    "compactMaxMessages": 100
+    "maxTokens": 4096
   },
   "providers": {
     "openai": {
-      "apiKey": "YOUR_API_KEY",
-      "baseUrl": "https://api.openai.com/v1"
+      "apiKey": "YOUR_OPENAI_API_KEY",
+      "baseUrl": "https://api.openai.com/v1",
+      "timeout": 30
+    },
+    "anthropic": {
+      "apiKey": "YOUR_ANTHROPIC_API_KEY",
+      "baseUrl": "https://api.anthropic.com",
+      "timeout": 30
     }
-  },
-  "queue": {
-    "maxConcurrent": 4,
-    "debounceMs": 1000,
-    "defaultMode": "collect"
   },
   "gateway": {
     "port": 18800,
@@ -187,20 +191,22 @@ QuantClaw uses JSON configuration (`~/.quantclaw/quantclaw.json`):
     "controlUi": { "enabled": true, "port": 18801 }
   },
   "channels": {
-    "discord": { "enabled": false, "token": "YOUR_DISCORD_TOKEN" },
-    "telegram": { "enabled": false, "token": "YOUR_TELEGRAM_TOKEN" }
+    "discord": { "enabled": false, "token": "YOUR_DISCORD_BOT_TOKEN", "allowedIds": [] },
+    "telegram": { "enabled": false, "token": "YOUR_TELEGRAM_BOT_TOKEN", "allowedIds": [] }
   },
   "tools": {
     "allow": ["group:fs", "group:runtime"],
     "deny": []
   },
-  "system": {
-    "logLevel": "info",
-    "logRetentionDays": 7,
-    "logMaxSizeMb": 50
-  },
   "security": {
-    "sandbox": { "enabled": true }
+    "sandbox": {
+      "enabled": true,
+      "allowedPaths": ["~/.quantclaw/agents/main/workspace"],
+      "deniedPaths": ["/etc", "/sys", "/proc"]
+    }
+  },
+  "mcp": {
+    "servers": []
   }
 }
 ```
@@ -309,9 +315,9 @@ quantclaw sessions reset <session-key>
 
 ```bash
 quantclaw config get                    # View full config
-quantclaw config get agent.model        # View a specific value (dot-path)
-quantclaw config set agent.model "anthropic/claude-sonnet-4-6"  # Change a value
-quantclaw config unset agent.temperature                        # Remove a key
+quantclaw config get llm.model          # View a specific value (dot-path)
+quantclaw config set llm.model "anthropic/claude-sonnet-4-6"    # Change a value
+quantclaw config unset llm.temperature                          # Remove a key
 quantclaw config reload                 # Hot-reload config (no restart needed)
 ```
 
@@ -375,7 +381,7 @@ Skills extend the agent's capabilities by injecting contextual instructions and 
 
 ### Creating Custom Skills
 
-Place a skill directory in `~/.quantclaw/agents/main/workspace/skills/` or a global skills path:
+Place a skill directory in `~/.quantclaw/skills/` (global) or in the workspace:
 
 ```yaml
 # skills/my-skill/SKILL.md
@@ -734,7 +740,7 @@ QuantClaw aims for full compatibility with [OpenClaw](https://github.com/opencla
 
 | Module | Status | Notes |
 |--------|--------|-------|
-| Workspace files | **Full** | All 7 files auto-created on onboard: `SOUL.md`, `MEMORY.md`, `SKILL.md`, `IDENTITY.md`, `HEARTBEAT.md`, `USER.md`, `AGENTS.md` + `TOOLS.md` |
+| Workspace files | **Full** | All 8 files auto-created on onboard: `SOUL.md`, `MEMORY.md`, `SKILL.md`, `IDENTITY.md`, `HEARTBEAT.md`, `USER.md`, `AGENTS.md`, `TOOLS.md` |
 | Skills format | **Full** | Both `metadata.openclaw` and flat formats |
 | Plugin hooks (24 types) | **Full** | All 24 hook names and modes (void/modifying/sync) aligned |
 | Plugin Sidecar IPC | **Full** | Tools, hooks, services, providers, commands, HTTP routes, gateway methods |
@@ -758,7 +764,7 @@ QuantClaw aims for full compatibility with [OpenClaw](https://github.com/opencla
 | Default gateway port | `18789` (WebSocket + HTTP) | `18800` (WebSocket), `18801` (HTTP) |
 | Config format | JSON5 + `${VAR}` + `$include` | JSON5 + `${VAR}` (no `$include` yet) |
 | Default model | `anthropic/claude-sonnet-4-6` | `anthropic/claude-sonnet-4-6` |
-| Default maxTokens | `8192` | `8192` |
+| Default maxTokens | `8192` | `4096` |
 | Auth profiles | Multi-profile, OAuth + key rotation | Single API key per provider |
 | Memory search | Hybrid (vector 0.7 + BM25 0.3) | BM25 only |
 | Plugin execution | In-process (Node.js VM) | Out-of-process (TCP sidecar) |

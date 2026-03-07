@@ -121,13 +121,16 @@ class ProviderRegistry {
 ```
 
 ### Provider Support
-1. **Anthropic** (Claude)
-2. **OpenAI** (GPT)
-3. **Google** (Gemini)
-4. **Mistral**
-5. **Grok**
-6. **OpenRouter**
-7. **Local Providers** (Ollama)
+
+| Provider | Status |
+|----------|--------|
+| OpenAI (and compatible APIs) | ✅ Full |
+| Anthropic (Claude) | ✅ Full |
+| Ollama | ⚠️ Registered (stub) |
+| Gemini | ⚠️ Registered (stub) |
+| Mistral, Bedrock, Azure, Grok, etc. | ❌ Not yet implemented |
+
+Any OpenAI-compatible endpoint can be used via the `providers.openai.baseUrl` setting (DeepSeek, Qwen, local models, etc.).
 
 ### Failover & Resilience
 - Health monitoring per provider
@@ -301,30 +304,35 @@ struct ToolResult {
 
 ## Deployment Patterns
 
-### Single Agent
+### Single Agent (Foreground)
 ```bash
-quantclaw agent --id=main
+quantclaw onboard --quick      # First-time setup
+quantclaw gateway              # Run gateway in foreground
+quantclaw agent "Hello!"       # Send a message
 ```
 
-### Gateway + Multiple Agents
+### Gateway Daemon
 ```bash
-quantclaw gateway run          # Start gateway
-quantclaw agent --id=main &    # Background agent
-quantclaw agent --id=reasoning & # Another agent
+quantclaw gateway install      # Install as system service
+quantclaw gateway start        # Start the daemon
+quantclaw agent "Hello!"       # Connect via gateway
 ```
 
 ### Containerized (Docker)
-```dockerfile
-FROM ubuntu:22.04
-COPY quantclaw /usr/local/bin/
-ENTRYPOINT ["quantclaw"]
+```bash
+docker run -d \
+  --name quantclaw \
+  -p 18800:18800 \
+  -p 18801:18801 \
+  -e OPENAI_API_KEY=sk-... \
+  -v quantclaw_data:/home/quantclaw/.quantclaw \
+  quantclaw:latest
 ```
 
-### Distributed
-- One gateway per deployment
-- Multiple agents per machine
-- Shared session storage
-- Centralized logging
+### Production (Docker Compose)
+```bash
+docker compose -f scripts/docker-compose.yml up -d quantclaw
+```
 
 ---
 

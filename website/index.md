@@ -4,9 +4,9 @@ layout: home
 hero:
   name: "QuantClaw"
   text: "High-Performance AI Agent Framework"
-  tagline: "C++17 implementation of OpenClaw with persistent memory, browser control, and plugin ecosystem"
+  tagline: "C++17 native implementation of OpenClaw with persistent memory, browser control, and plugin ecosystem"
   image:
-    src: /logo.svg
+    src: /logo.png
     alt: QuantClaw
   actions:
     - theme: brand
@@ -14,151 +14,125 @@ hero:
       link: /guide/getting-started
     - theme: alt
       text: View on GitHub
-      link: https://github.com/QuantClaw/quantclaw
+      link: https://github.com/QuantClaw/QuantClaw
 
 features:
   - icon: ⚡
     title: "High Performance"
-    details: "C++17 native implementation delivering exceptional speed and low resource footprint for AI agent operations"
+    details: "C++17 native binary with minimal overhead — no interpreter, no GC pauses, tiny memory footprint"
 
   - icon: 🧠
-    title: "Persistent Memory"
-    details: "Advanced context management with automatic compaction, memory search, and intelligent context pruning"
+    title: "Context Management"
+    details: "Automatic compaction, BM25 memory search, budget-based pruning, and overflow compaction retry"
 
   - icon: 🌐
     title: "Browser Control"
-    details: "Full Chrome DevTools Protocol support for web automation, scraping, and intelligent interaction"
+    details: "Real Chrome DevTools Protocol over WebSocket — navigation, JS execution, screenshots, and more"
 
   - icon: 🔌
     title: "Plugin Ecosystem"
-    details: "Extensible architecture with Node.js sidecar runtime for custom skills, hooks, and integrations"
+    details: "Full OpenClaw plugin compatibility via Node.js sidecar — tools, hooks, services, HTTP routes, gateway methods"
 
   - icon: 🛡️
-    title: "Enterprise Security"
-    details: "Comprehensive RBAC, sandboxed execution, tool permissions, and multi-level authorization controls"
+    title: "Sandboxed Execution"
+    details: "RBAC authorization, setrlimit sandbox, exec approval, path allowlist/denylist, and rate limiting"
 
   - icon: 📱
     title: "Multi-Platform"
-    details: "Unified codebase running seamlessly on Ubuntu and Windows with Docker containerization support"
+    details: "Runs natively on Ubuntu and Windows, with Docker Compose support for production deployments"
 
   - icon: 🔄
-    title: "Model Agnostic"
-    details: "Support for 7+ LLM providers with automatic failover, fallback chains, and profile-based selection"
+    title: "Multi-Provider LLM"
+    details: "OpenAI and Anthropic fully supported; provider/model prefix routing; exponential backoff failover"
 
   - icon: 💬
-    title: "Multi-Channel"
-    details: "Native integration with Discord, Slack, Telegram, WhatsApp, Email, and custom HTTP endpoints"
+    title: "Channel Adapters"
+    details: "Connect Discord and Telegram bots via external subprocess adapters using the WebSocket RPC protocol"
 
   - icon: 🎯
     title: "OpenClaw Compatible"
-    details: "100% compatible CLI, RPC protocols, and configuration format with the TypeScript original"
+    details: "Works with OpenClaw workspace files, skill format, JSONL sessions, and the WebSocket RPC protocol"
 ---
-
-<script setup>
-import { ref } from 'vue'
-
-const testimonials = [
-  {
-    text: "QuantClaw brings the power of OpenClaw to production environments with C++ performance.",
-    author: "AI Developer",
-    role: "Tech Lead"
-  },
-  {
-    text: "The memory management and context optimization features are industry-leading.",
-    author: "Research Engineer",
-    role: "AI/ML"
-  },
-  {
-    text: "Seamless integration with existing OpenClaw skills and plugins.",
-    author: "DevOps Engineer",
-    role: "Platform Team"
-  }
-]
-</script>
 
 ## Why QuantClaw?
 
-**QuantClaw** is a high-performance C++17 reimplement of OpenClaw, the AI agent framework that actually does things. It combines the full feature set of OpenClaw with native performance benefits:
+**QuantClaw** is a C++17 reimplementation of the [OpenClaw](https://github.com/openclaw/openclaw) AI agent ecosystem — built for performance and low memory footprint while staying compatible with OpenClaw workspace files, skills, and the RPC protocol.
 
-- **Production Ready**: Industry-grade error handling, monitoring, and resilience
-- **Scalable**: Optimized for high-throughput, multi-agent deployments
-- **Compatible**: 100% CLI and RPC compatibility with OpenClaw
-- **Extensible**: Plugin ecosystem with Node.js sidecar for custom capabilities
+- **Native Performance**: C++17 binary, no Node.js runtime overhead
+- **OpenClaw Compatible**: Workspace files, SKILL.md format, JSONL sessions, and WebSocket RPC
+- **Plugin Ecosystem**: Run OpenClaw TypeScript plugins via Node.js sidecar (TCP loopback IPC)
+- **Production Ready**: Daemon mode, Docker support, RBAC, sandbox, failover
 
 ## Quick Comparison
 
 | Feature | QuantClaw | OpenClaw |
 |---------|-----------|----------|
-| Language | C++17 | TypeScript |
-| Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| Memory Usage | Low | Medium |
-| Startup Time | Fast | Standard |
-| Deployment | Docker/Binary | Node.js |
-| Plugin Support | ✅ Sidecar | ✅ Native |
-| CLI Compatibility | 100% | - |
+| Language | C++17 | TypeScript/Node.js |
+| Runtime Overhead | Minimal | Node.js VM |
+| Memory Footprint | Low | Medium |
+| Plugin Support | ✅ Sidecar (TCP IPC) | ✅ Native (in-process) |
+| CLI Compatibility | Core commands | Full |
+| Workspace Files | ✅ All 8 | ✅ All 8 |
+| Config Format | JSON5 + `${VAR}` | JSON5 + `${VAR}` + `$include` |
 
 ## Key Capabilities
 
 ### Intelligent Conversation
-- Context-aware multi-turn dialogue
-- Automatic memory compaction for efficiency
-- Thinking mode for complex reasoning
-- Session management with history
+- Multi-turn dialogue with automatic context management
+- Dynamic iterations (32–160) based on task complexity
+- Context compaction with 3-attempt overflow retry
+- Session persistence in JSONL format
 
 ### Persistent Memory
-- Automatic memory search and retrieval
-- User-specific knowledge bases
-- Workspace file management
-- Smart context pruning
+- 8 workspace files: SOUL.md, MEMORY.md, SKILL.md, IDENTITY.md, HEARTBEAT.md, USER.md, AGENTS.md, TOOLS.md
+- BM25 memory search across all workspace files
+- Budget-based context pruning
 
 ### Browser Automation
-- Full Chrome DevTools Protocol support
-- Page scraping and interaction
-- Visual understanding
-- Cookie and session management
+- Real Chrome DevTools Protocol (WebSocket)
+- Page navigation, DOM interaction, JS execution, screenshots
+- Graceful fallback when no browser is available
 
 ### System Integration
-- Command execution with safety controls
-- File system access with sandboxing
-- Process management
-- Environment variable support
+- `bash` tool with sandboxed execution
+- `apply_patch` for code patching (*** Begin Patch format)
+- `process` for background job management
+- `web_search` (Tavily → DuckDuckGo cascade) and `web_fetch`
 
-### Extensible Architecture
-- Custom skill development
-- Hook system for lifecycle events
-- Multi-provider LLM support
-- Custom channel integration
+### Plugin Ecosystem
+- 24 lifecycle hook types (void/modifying/sync)
+- Custom tools, services, providers, commands, HTTP routes, gateway methods
+- TCP loopback IPC — works identically on Linux and Windows
 
 ## Getting Started
 
-The fastest way to get started with QuantClaw:
-
 ```bash
-# Clone the repository
-git clone https://github.com/QuantClaw/quantclaw.git
-cd quantclaw
-
-# Build from source
+# Clone and build
+git clone https://github.com/QuantClaw/QuantClaw.git
+cd QuantClaw
 mkdir build && cd build
-cmake ..
-cmake --build . -j$(nproc)
+cmake .. && make -j$(nproc)
 
-# Run the agent
-./quantclaw agent --id=main
+# Initialize
+quantclaw onboard --quick
+
+# Start gateway and chat
+quantclaw gateway start
+quantclaw agent "Hello, introduce yourself"
 ```
 
-For detailed installation instructions, see [Getting Started](/guide/getting-started).
+For detailed instructions, see [Getting Started](/guide/getting-started).
 
 ## Community & Support
 
-- **GitHub**: [QuantClaw/quantclaw](https://github.com/QuantClaw/quantclaw)
-- **Issues**: [Report bugs and request features](https://github.com/QuantClaw/quantclaw/issues)
-- **Discussions**: [Community discussions](https://github.com/QuantClaw/quantclaw/discussions)
+- **GitHub**: [QuantClaw/QuantClaw](https://github.com/QuantClaw/QuantClaw)
+- **Issues**: [Report bugs and request features](https://github.com/QuantClaw/QuantClaw/issues)
+- **Discussions**: [Community discussions](https://github.com/QuantClaw/QuantClaw/discussions)
 
 ## License
 
-QuantClaw is released under the [MIT License](https://github.com/QuantClaw/quantclaw/blob/main/LICENSE). The original OpenClaw project is also MIT licensed, allowing free commercial and open-source use.
+QuantClaw is released under the [Apache 2.0 License](https://github.com/QuantClaw/QuantClaw/blob/main/LICENSE).
 
 ---
 
-**Made with ❤️ by the QuantClaw team. Inspired by [OpenClaw](https://openclaw.ai).**
+**Built with ❤️ in C++17. Inspired by [OpenClaw](https://github.com/openclaw/openclaw).**

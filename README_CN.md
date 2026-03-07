@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/协议-Apache%202.0-blue.svg" alt="Apache 2.0 协议"></a>
   <a href="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml"><img src="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml/badge.svg" alt="CI 构建"></a>
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus&logoColor=white" alt="C++17">
-  <img src="https://img.shields.io/badge/单测-923%20通过-brightgreen.svg" alt="923 项单测通过">
+  <img src="https://img.shields.io/badge/单测-886%20通过-brightgreen.svg" alt="886 项单测通过">
   <img src="https://img.shields.io/badge/平台-Linux%20%7C%20Windows-lightgrey.svg" alt="Linux | Windows">
   <a href="https://github.com/openclaw/openclaw"><img src="https://img.shields.io/badge/OpenClaw-兼容-orange.svg" alt="OpenClaw 兼容"></a>
 </p>
@@ -139,16 +139,19 @@ QuantClaw 使用专属端口范围以避免与 OpenClaw 和其他服务冲突：
 ```
 ~/.quantclaw/
 ├── quantclaw.json              # 配置文件（OpenClaw 格式）
-└── agents/default/
+├── skills/                     # 已安装的技能（OpenClaw 兼容）
+│   └── weather/
+│       └── SKILL.md
+└── agents/main/
     ├── workspace/
-    │   ├── SOUL.md             # 助手身份定义
-    │   ├── USER.md             # 用户信息
+    │   ├── SOUL.md             # 助手身份与价值观
+    │   ├── IDENTITY.md         # 能力自述
     │   ├── MEMORY.md           # 长期记忆
-    │   ├── memory/             # 每日记忆日志
-    │   │   └── YYYY-MM-DD.md
-    │   └── skills/             # 技能目录（OpenClaw 兼容）
-    │       └── weather/
-    │           └── SKILL.md
+    │   ├── SKILL.md            # 可用技能声明
+    │   ├── HEARTBEAT.md        # 定时状态 / Cron 日志
+    │   ├── USER.md             # 用户画像与偏好
+    │   ├── AGENTS.md           # 已知 Agent 列表
+    │   └── TOOLS.md            # 工具使用指引
     └── sessions/
         ├── sessions.json       # 会话索引
         └── <session-id>.jsonl  # 单会话记录
@@ -160,25 +163,26 @@ QuantClaw 使用专属端口范围以避免与 OpenClaw 和其他服务冲突：
 
 ```json
 {
-  "agent": {
+  "system": {
+    "logLevel": "info"
+  },
+  "llm": {
     "model": "openai/qwen-max",
     "maxIterations": 15,
     "temperature": 0.7,
-    "maxTokens": 8192,
-    "fallbacks": ["anthropic/claude-sonnet-4-6"],
-    "autoCompact": true,
-    "compactMaxMessages": 100
+    "maxTokens": 4096
   },
   "providers": {
     "openai": {
-      "apiKey": "YOUR_API_KEY",
-      "baseUrl": "https://api.openai.com/v1"
+      "apiKey": "YOUR_OPENAI_API_KEY",
+      "baseUrl": "https://api.openai.com/v1",
+      "timeout": 30
+    },
+    "anthropic": {
+      "apiKey": "YOUR_ANTHROPIC_API_KEY",
+      "baseUrl": "https://api.anthropic.com",
+      "timeout": 30
     }
-  },
-  "queue": {
-    "maxConcurrent": 4,
-    "debounceMs": 1000,
-    "defaultMode": "collect"
   },
   "gateway": {
     "port": 18800,
@@ -187,20 +191,22 @@ QuantClaw 使用专属端口范围以避免与 OpenClaw 和其他服务冲突：
     "controlUi": { "enabled": true, "port": 18801 }
   },
   "channels": {
-    "discord": { "enabled": false, "token": "YOUR_DISCORD_TOKEN" },
-    "telegram": { "enabled": false, "token": "YOUR_TELEGRAM_TOKEN" }
+    "discord": { "enabled": false, "token": "YOUR_DISCORD_BOT_TOKEN", "allowedIds": [] },
+    "telegram": { "enabled": false, "token": "YOUR_TELEGRAM_BOT_TOKEN", "allowedIds": [] }
   },
   "tools": {
     "allow": ["group:fs", "group:runtime"],
     "deny": []
   },
-  "system": {
-    "logLevel": "info",
-    "logRetentionDays": 7,
-    "logMaxSizeMb": 50
-  },
   "security": {
-    "sandbox": { "enabled": true }
+    "sandbox": {
+      "enabled": true,
+      "allowedPaths": ["~/.quantclaw/agents/main/workspace"],
+      "deniedPaths": ["/etc", "/sys", "/proc"]
+    }
+  },
+  "mcp": {
+    "servers": []
   }
 }
 ```
@@ -311,9 +317,9 @@ quantclaw sessions reset <session-key>
 
 ```bash
 quantclaw config get                    # 查看完整配置
-quantclaw config get agent.model        # 查看指定配置项（点路径）
-quantclaw config set agent.model "anthropic/claude-sonnet-4-6"  # 修改配置值
-quantclaw config unset agent.temperature                        # 删除某个配置键
+quantclaw config get llm.model          # 查看指定配置项（点路径）
+quantclaw config set llm.model "anthropic/claude-sonnet-4-6"    # 修改配置值
+quantclaw config unset llm.temperature                          # 删除某个配置键
 quantclaw config reload                 # 热重载配置（无需重启网关）
 ```
 
@@ -377,7 +383,7 @@ quantclaw dashboard       # 在浏览器中打开 Web UI
 
 ### 创建自定义技能
 
-将技能目录放在 `~/.quantclaw/agents/main/workspace/skills/` 或全局技能路径下：
+将技能目录放在 `~/.quantclaw/skills/`（全局）或工作空间目录下：
 
 ```yaml
 # skills/my-skill/SKILL.md
@@ -733,7 +739,7 @@ QuantClaw 目标是完全兼容 [OpenClaw](https://github.com/openclaw/openclaw)
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| 工作空间文件 | **完全** | 全部 7 个文件在 onboard 时自动创建：`SOUL.md`、`MEMORY.md`、`SKILL.md`、`IDENTITY.md`、`HEARTBEAT.md`、`USER.md`、`AGENTS.md` + `TOOLS.md` |
+| 工作空间文件 | **完全** | 全部 8 个文件在 onboard 时自动创建：`SOUL.md`、`MEMORY.md`、`SKILL.md`、`IDENTITY.md`、`HEARTBEAT.md`、`USER.md`、`AGENTS.md`、`TOOLS.md` |
 | 技能格式 | **完全** | 支持 `metadata.openclaw` 嵌套格式和扁平格式 |
 | 插件钩子（24 种） | **完全** | 全部 24 种 hook name 和 mode（void/modifying/sync）对齐 |
 | 插件 Sidecar IPC | **完全** | 工具、钩子、服务、Provider、命令、HTTP 路由、网关方法 |
@@ -757,7 +763,7 @@ QuantClaw 目标是完全兼容 [OpenClaw](https://github.com/openclaw/openclaw)
 | 默认网关端口 | `18789`（WebSocket + HTTP） | `18800`（WebSocket）、`18801`（HTTP） |
 | 配置格式 | JSON5 + `${VAR}` + `$include` | JSON5 + `${VAR}`（暂无 `$include`） |
 | 默认模型 | `anthropic/claude-sonnet-4-6` | `anthropic/claude-sonnet-4-6` |
-| 默认 maxTokens | `8192` | `8192` |
+| 默认 maxTokens | `8192` | `4096` |
 | 认证 profile | 多 profile、OAuth + key 轮换 | 每 provider 单个 API Key |
 | 记忆搜索 | Hybrid（向量 0.7 + BM25 0.3） | 仅 BM25 |
 | 插件执行 | 进程内（Node.js VM） | 进程外（TCP sidecar） |
