@@ -39,3 +39,4 @@ sidecar/dist/
 # Reference code (local only, not committed)
 refs/
 .claude/
+_build/

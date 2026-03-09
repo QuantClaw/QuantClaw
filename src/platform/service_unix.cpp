@@ -3,13 +3,13 @@
 
 #ifndef _WIN32
 
-#include "quantclaw/platform/service.hpp"
-#include "quantclaw/platform/process.hpp"
-
-#include <cstdlib>
-#include <fstream>
-#include <filesystem>
 #include <csignal>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+
+#include "quantclaw/platform/process.hpp"
+#include "quantclaw/platform/service.hpp"
 
 namespace quantclaw::platform {
 
@@ -24,19 +24,17 @@ ServiceManager::ServiceManager(std::shared_ptr<spdlog::logger> logger)
 }
 
 std::string ServiceManager::service_path() const {
-  return home_directory() +
-         "/.config/systemd/user/quantclaw-gateway.service";
+  return home_directory() + "/.config/systemd/user/quantclaw-gateway.service";
 }
 
 int ServiceManager::install(int port) {
   auto svc = service_path();
-  std::filesystem::create_directories(
-      std::filesystem::path(svc).parent_path());
+  std::filesystem::create_directories(std::filesystem::path(svc).parent_path());
 
   std::string exe = executable_path();
   std::ofstream out(svc);
   if (!out) {
-    logger_->error("Cannot write service file: {}", svc);
+    SPDLOG_ERROR("Cannot write service file: {}", svc);
     return 1;
   }
 
@@ -57,12 +55,13 @@ int ServiceManager::install(int port) {
   out.close();
 
   int r = std::system("systemctl --user daemon-reload");
-  if (r != 0) logger_->warn("systemctl daemon-reload returned {}", r);
+  if (r != 0)
+    SPDLOG_WARN("systemctl daemon-reload returned {}", r);
 
-  [[maybe_unused]] int enable_ret =
-      std::system(("systemctl --user enable " +
-                   std::string(kServiceName) + " 2>/dev/null").c_str());
-  logger_->info("Service installed at {}", svc);
+  [[maybe_unused]] int enable_ret = std::system(
+      ("systemctl --user enable " + std::string(kServiceName) + " 2>/dev/null")
+          .c_str());
+  SPDLOG_INFO("Service installed at {}", svc);
   return 0;
 }
 
@@ -70,16 +69,16 @@ int ServiceManager::uninstall() {
   stop();
   auto svc = service_path();
   if (!std::filesystem::exists(svc)) {
-    logger_->info("Service not installed");
+    SPDLOG_INFO("Service not installed");
     return 0;
   }
-  [[maybe_unused]] int disable_ret =
-      std::system(("systemctl --user disable " +
-                   std::string(kServiceName) + " 2>/dev/null").c_str());
+  [[maybe_unused]] int disable_ret = std::system(
+      ("systemctl --user disable " + std::string(kServiceName) + " 2>/dev/null")
+          .c_str());
   std::filesystem::remove(svc);
   [[maybe_unused]] int reload_ret =
       std::system("systemctl --user daemon-reload 2>/dev/null");
-  logger_->info("Service uninstalled");
+  SPDLOG_INFO("Service uninstalled");
   return 0;
 }
 
@@ -87,9 +86,9 @@ int ServiceManager::start() {
   std::string cmd = "systemctl --user start " + std::string(kServiceName);
   int ret = std::system(cmd.c_str());
   if (ret == 0) {
-    logger_->info("Gateway started");
+    SPDLOG_INFO("Gateway started");
   } else {
-    logger_->error("Failed to start gateway (exit {})", ret);
+    SPDLOG_ERROR("Failed to start gateway (exit {})", ret);
   }
   return ret;
 }
@@ -98,7 +97,7 @@ int ServiceManager::stop() {
   std::string cmd = "systemctl --user stop " + std::string(kServiceName);
   int ret = std::system(cmd.c_str());
   if (ret == 0) {
-    logger_->info("Gateway stopped");
+    SPDLOG_INFO("Gateway stopped");
     remove_pid();
   }
   return ret;
@@ -108,27 +107,29 @@ int ServiceManager::restart() {
   std::string cmd = "systemctl --user restart " + std::string(kServiceName);
   int ret = std::system(cmd.c_str());
   if (ret == 0) {
-    logger_->info("Gateway restarted");
+    SPDLOG_INFO("Gateway restarted");
   } else {
-    logger_->error("Failed to restart gateway (exit {})", ret);
+    SPDLOG_ERROR("Failed to restart gateway (exit {})", ret);
   }
   return ret;
 }
 
 int ServiceManager::status() {
-  return std::system(
-      ("systemctl --user status " +
-       std::string(kServiceName) + " --no-pager 2>/dev/null").c_str());
+  return std::system(("systemctl --user status " + std::string(kServiceName) +
+                      " --no-pager 2>/dev/null")
+                         .c_str());
 }
 
 bool ServiceManager::is_running() const {
   int pid = get_pid();
-  if (pid <= 0) return false;
+  if (pid <= 0)
+    return false;
   return kill(pid, 0) == 0;
 }
 
 int ServiceManager::get_pid() const {
-  if (!std::filesystem::exists(pid_file_)) return -1;
+  if (!std::filesystem::exists(pid_file_))
+    return -1;
   std::ifstream f(pid_file_);
   int pid = -1;
   f >> pid;

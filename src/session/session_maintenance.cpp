@@ -12,14 +12,15 @@ namespace quantclaw {
 // --- MaintenanceMode ---
 
 MaintenanceMode MaintenanceModeFromString(const std::string& s) {
-  if (s == "warn") return MaintenanceMode::kWarn;
+  if (s == "warn")
+    return MaintenanceMode::kWarn;
   return MaintenanceMode::kEnforce;
 }
 
 // --- SessionMaintenanceConfig ---
 
-SessionMaintenanceConfig SessionMaintenanceConfig::FromJson(
-    const nlohmann::json& j) {
+SessionMaintenanceConfig
+SessionMaintenanceConfig::FromJson(const nlohmann::json& j) {
   SessionMaintenanceConfig c;
   if (j.contains("mode") && j["mode"].is_string()) {
     c.mode = MaintenanceModeFromString(j["mode"].get<std::string>());
@@ -72,8 +73,8 @@ MaintenanceResult SessionMaintenance::Sweep(bool force) {
   // Check sweep interval
   auto now = std::chrono::steady_clock::now();
   if (!force) {
-    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-        now - last_sweep_);
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::seconds>(now - last_sweep_);
     if (elapsed.count() < config_.sweep_interval_seconds) {
       return result;  // Too soon
     }
@@ -101,16 +102,16 @@ MaintenanceResult SessionMaintenance::Sweep(bool force) {
   }
 
   if (result.pruned_count > 0 || result.rotated_count > 0) {
-    logger_->info("Maintenance: pruned={}, rotated={}, freed={}B",
-                  result.pruned_count, result.rotated_count,
-                  result.bytes_freed);
+    SPDLOG_INFO("Maintenance: pruned={}, rotated={}, freed={}B",
+                result.pruned_count, result.rotated_count, result.bytes_freed);
   }
 
   return result;
 }
 
 int SessionMaintenance::ParseDurationSeconds(const std::string& s) {
-  if (s.empty()) return 0;
+  if (s.empty())
+    return 0;
 
   std::regex re(R"((\d+)\s*(s|m|h|d|w))");
   std::smatch match;
@@ -125,16 +126,22 @@ int SessionMaintenance::ParseDurationSeconds(const std::string& s) {
 
   int value = std::stoi(match[1].str());
   std::string unit = match[2].str();
-  if (unit == "s") return value;
-  if (unit == "m") return value * 60;
-  if (unit == "h") return value * 3600;
-  if (unit == "d") return value * 86400;
-  if (unit == "w") return value * 604800;
+  if (unit == "s")
+    return value;
+  if (unit == "m")
+    return value * 60;
+  if (unit == "h")
+    return value * 3600;
+  if (unit == "d")
+    return value * 86400;
+  if (unit == "w")
+    return value * 604800;
   return value;
 }
 
 int64_t SessionMaintenance::ParseSizeBytes(const std::string& s) {
-  if (s.empty()) return 0;
+  if (s.empty())
+    return 0;
 
   std::regex re(R"((\d+)\s*(B|KB|MB|GB|TB)?)", std::regex::icase);
   std::smatch match;
@@ -151,11 +158,16 @@ int64_t SessionMaintenance::ParseSizeBytes(const std::string& s) {
   // Normalize to uppercase
   std::transform(unit.begin(), unit.end(), unit.begin(), ::toupper);
 
-  if (unit.empty() || unit == "B") return value;
-  if (unit == "KB") return value * 1024;
-  if (unit == "MB") return value * 1024 * 1024;
-  if (unit == "GB") return value * 1024LL * 1024 * 1024;
-  if (unit == "TB") return value * 1024LL * 1024 * 1024 * 1024;
+  if (unit.empty() || unit == "B")
+    return value;
+  if (unit == "KB")
+    return value * 1024;
+  if (unit == "MB")
+    return value * 1024 * 1024;
+  if (unit == "GB")
+    return value * 1024LL * 1024 * 1024;
+  if (unit == "TB")
+    return value * 1024LL * 1024 * 1024 * 1024;
   return value;
 }
 
@@ -168,8 +180,8 @@ int SessionMaintenance::prune_old_sessions(MaintenanceResult& result) {
   for (const auto& info : files) {
     if (info.mtime < cutoff) {
       if (config_.mode == MaintenanceMode::kWarn) {
-        result.warnings.push_back(
-            "Would prune: " + info.path.filename().string());
+        result.warnings.push_back("Would prune: " +
+                                  info.path.filename().string());
         continue;
       }
       try {
@@ -177,7 +189,7 @@ int SessionMaintenance::prune_old_sessions(MaintenanceResult& result) {
         std::filesystem::remove(info.path);
         ++count;
       } catch (const std::exception& e) {
-        logger_->warn("Failed to prune {}: {}", info.path.string(), e.what());
+        SPDLOG_WARN("Failed to prune {}: {}", info.path.string(), e.what());
       }
     }
   }
@@ -189,7 +201,8 @@ int SessionMaintenance::prune_old_sessions(MaintenanceResult& result) {
 int SessionMaintenance::enforce_max_entries(MaintenanceResult& result) {
   auto files = get_session_files();
   int total = static_cast<int>(files.size());
-  if (total <= config_.max_entries) return 0;
+  if (total <= config_.max_entries)
+    return 0;
 
   int to_remove = total - config_.max_entries;
   int count = 0;
@@ -197,8 +210,8 @@ int SessionMaintenance::enforce_max_entries(MaintenanceResult& result) {
   // Remove oldest first (files are sorted oldest-first)
   for (int i = 0; i < to_remove && i < static_cast<int>(files.size()); ++i) {
     if (config_.mode == MaintenanceMode::kWarn) {
-      result.warnings.push_back(
-          "Would prune (max entries): " + files[i].path.filename().string());
+      result.warnings.push_back("Would prune (max entries): " +
+                                files[i].path.filename().string());
       continue;
     }
     try {
@@ -206,8 +219,7 @@ int SessionMaintenance::enforce_max_entries(MaintenanceResult& result) {
       std::filesystem::remove(files[i].path);
       ++count;
     } catch (const std::exception& e) {
-      logger_->warn("Failed to remove {}: {}", files[i].path.string(),
-                    e.what());
+      SPDLOG_WARN("Failed to remove {}: {}", files[i].path.string(), e.what());
     }
   }
 
@@ -218,18 +230,20 @@ int SessionMaintenance::enforce_max_entries(MaintenanceResult& result) {
 int SessionMaintenance::rotate_large_files(MaintenanceResult& result) {
   int count = 0;
 
-  for (const auto& entry :
-       std::filesystem::directory_iterator(sessions_dir_)) {
-    if (!entry.is_regular_file()) continue;
-    if (entry.path().extension() != ".jsonl") continue;
+  for (const auto& entry : std::filesystem::directory_iterator(sessions_dir_)) {
+    if (!entry.is_regular_file())
+      continue;
+    if (entry.path().extension() != ".jsonl")
+      continue;
 
     auto size = static_cast<int64_t>(entry.file_size());
-    if (size <= config_.rotate_bytes) continue;
+    if (size <= config_.rotate_bytes)
+      continue;
 
     if (config_.mode == MaintenanceMode::kWarn) {
       result.warnings.push_back(
-          "Would rotate: " + entry.path().filename().string() +
-          " (" + std::to_string(size) + " bytes)");
+          "Would rotate: " + entry.path().filename().string() + " (" +
+          std::to_string(size) + " bytes)");
       continue;
     }
 
@@ -248,16 +262,18 @@ int SessionMaintenance::rotate_large_files(MaintenanceResult& result) {
 
 void SessionMaintenance::enforce_disk_limit(MaintenanceResult& result) {
   int64_t total = total_session_size();
-  if (total <= config_.max_disk_bytes) return;
+  if (total <= config_.max_disk_bytes)
+    return;
 
   auto files = get_session_files();
   // Remove oldest until under limit
   for (const auto& info : files) {
-    if (total <= config_.max_disk_bytes) break;
+    if (total <= config_.max_disk_bytes)
+      break;
 
     if (config_.mode == MaintenanceMode::kWarn) {
-      result.warnings.push_back(
-          "Would prune (disk limit): " + info.path.filename().string());
+      result.warnings.push_back("Would prune (disk limit): " +
+                                info.path.filename().string());
       total -= info.size;
       continue;
     }
@@ -268,7 +284,7 @@ void SessionMaintenance::enforce_disk_limit(MaintenanceResult& result) {
       std::filesystem::remove(info.path);
       ++result.pruned_count;
     } catch (const std::exception& e) {
-      logger_->warn("Failed to remove {}: {}", info.path.string(), e.what());
+      SPDLOG_WARN("Failed to remove {}: {}", info.path.string(), e.what());
     }
   }
 }
@@ -276,7 +292,7 @@ void SessionMaintenance::enforce_disk_limit(MaintenanceResult& result) {
 void SessionMaintenance::archive_file(const std::filesystem::path& path) {
   auto now = std::chrono::system_clock::now();
   auto time_t = std::chrono::system_clock::to_time_t(now);
-  struct tm tm {};
+  struct tm tm{};
 #ifdef _WIN32
   localtime_s(&tm, &time_t);
 #else
@@ -291,18 +307,17 @@ void SessionMaintenance::archive_file(const std::filesystem::path& path) {
 
   try {
     std::filesystem::rename(path, archive_path);
-    logger_->info("Archived {} -> {}", path.filename().string(),
-                  archive_name);
+    SPDLOG_INFO("Archived {} -> {}", path.filename().string(), archive_name);
   } catch (const std::exception& e) {
-    logger_->warn("Failed to archive {}: {}", path.string(), e.what());
+    SPDLOG_WARN("Failed to archive {}: {}", path.string(), e.what());
   }
 }
 
 int64_t SessionMaintenance::total_session_size() const {
   int64_t total = 0;
-  if (!std::filesystem::exists(sessions_dir_)) return 0;
-  for (const auto& entry :
-       std::filesystem::directory_iterator(sessions_dir_)) {
+  if (!std::filesystem::exists(sessions_dir_))
+    return 0;
+  for (const auto& entry : std::filesystem::directory_iterator(sessions_dir_)) {
     if (entry.is_regular_file()) {
       total += static_cast<int64_t>(entry.file_size());
     }
@@ -313,11 +328,12 @@ int64_t SessionMaintenance::total_session_size() const {
 std::vector<SessionMaintenance::SessionFileInfo>
 SessionMaintenance::get_session_files() const {
   std::vector<SessionFileInfo> files;
-  if (!std::filesystem::exists(sessions_dir_)) return files;
+  if (!std::filesystem::exists(sessions_dir_))
+    return files;
 
-  for (const auto& entry :
-       std::filesystem::directory_iterator(sessions_dir_)) {
-    if (!entry.is_regular_file()) continue;
+  for (const auto& entry : std::filesystem::directory_iterator(sessions_dir_)) {
+    if (!entry.is_regular_file())
+      continue;
     if (entry.path().extension() != ".jsonl" &&
         entry.path().extension() != ".json") {
       continue;
@@ -328,9 +344,10 @@ SessionMaintenance::get_session_files() const {
     info.session_key = entry.path().stem().string();
     auto ftime = entry.last_write_time();
     // Convert file_time to system_clock
-    auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-        ftime - std::filesystem::file_time_type::clock::now() +
-        std::chrono::system_clock::now());
+    auto sctp =
+        std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+            ftime - std::filesystem::file_time_type::clock::now() +
+            std::chrono::system_clock::now());
     info.mtime = sctp;
     info.size = static_cast<int64_t>(entry.file_size());
     files.push_back(info);

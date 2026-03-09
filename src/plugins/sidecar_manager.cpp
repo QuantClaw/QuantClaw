@@ -47,7 +47,7 @@ SidecarManager::~SidecarManager() {
 
 bool SidecarManager::Start(const Options& opts) {
   if (running_) {
-    logger_->warn("Sidecar already running (pid={})", pid_.load());
+    SPDLOG_WARN("Sidecar already running (pid={})", pid_.load());
     return true;
   }
 
@@ -72,7 +72,8 @@ bool SidecarManager::Start(const Options& opts) {
 }
 
 void SidecarManager::Stop() {
-  if (!running_) return;
+  if (!running_)
+    return;
 
   stopping_ = true;
   running_ = false;
@@ -96,11 +97,12 @@ void SidecarManager::Stop() {
 }
 
 bool SidecarManager::Reload() {
-  if (!IsRunning()) return false;
+  if (!IsRunning())
+    return false;
 
   auto p = pid_.load();
   if (p != platform::kInvalidPid) {
-    logger_->info("Sending reload signal to sidecar (pid={})", p);
+    SPDLOG_INFO("Sending reload signal to sidecar (pid={})", p);
     platform::reload_process(p);
     return true;
   }
@@ -166,7 +168,8 @@ SidecarResponse SidecarManager::Call(const std::string& method,
 
 bool SidecarManager::IsRunning() const {
   auto p = pid_.load();
-  if (p == platform::kInvalidPid) return false;
+  if (p == platform::kInvalidPid)
+    return false;
   return platform::is_process_alive(p);
 }
 
@@ -175,27 +178,30 @@ void SidecarManager::monitor_loop() {
     std::this_thread::sleep_for(
         std::chrono::milliseconds(opts_.heartbeat_interval_ms));
 
-    if (stopping_) break;
+    if (stopping_)
+      break;
 
     if (!IsRunning()) {
-      if (stopping_) break;
+      if (stopping_)
+        break;
 
-      logger_->warn("Sidecar process died unexpectedly");
+      SPDLOG_WARN("Sidecar process died unexpectedly");
       pid_ = platform::kInvalidPid;
 
       if (restart_count_ >= opts_.max_restarts) {
-        logger_->error("Sidecar max restarts ({}) exceeded, giving up",
-                       opts_.max_restarts);
+        SPDLOG_ERROR("Sidecar max restarts ({}) exceeded, giving up",
+                     opts_.max_restarts);
         running_ = false;
         break;
       }
 
       int backoff = next_backoff_ms();
-      logger_->info("Restarting sidecar in {}ms (attempt {}/{})",
-                    backoff, restart_count_ + 1, opts_.max_restarts);
+      SPDLOG_INFO("Restarting sidecar in {}ms (attempt {}/{})", backoff,
+                  restart_count_ + 1, opts_.max_restarts);
       std::this_thread::sleep_for(std::chrono::milliseconds(backoff));
 
-      if (stopping_) break;
+      if (stopping_)
+        break;
 
       {
         std::lock_guard<std::mutex> lock(ipc_mu_);
@@ -210,7 +216,7 @@ void SidecarManager::monitor_loop() {
         restart_count_++;
         last_restart_ = std::chrono::steady_clock::now();
       } else {
-        logger_->error("Failed to restart sidecar");
+        SPDLOG_ERROR("Failed to restart sidecar");
       }
       continue;
     }
@@ -218,25 +224,25 @@ void SidecarManager::monitor_loop() {
     // Heartbeat check via RPC ping
     auto resp = Call("ping", {}, 5000);
     if (!resp.ok) {
-      logger_->warn("Sidecar heartbeat failed: {}", resp.error);
+      SPDLOG_WARN("Sidecar heartbeat failed: {}", resp.error);
     }
   }
 }
 
 bool SidecarManager::spawn_sidecar() {
   if (opts_.sidecar_script.empty()) {
-    logger_->error("No sidecar script configured");
+    SPDLOG_ERROR("No sidecar script configured");
     return false;
   }
 
   // Create TCP IPC server — OS assigns a free loopback port.
   platform::IpcServer server;
   if (!server.listen()) {
-    logger_->error("Failed to create TCP IPC server");
+    SPDLOG_ERROR("Failed to create TCP IPC server");
     return false;
   }
   int port = server.port();
-  logger_->debug("IPC TCP server listening on 127.0.0.1:{}", port);
+  SPDLOG_DEBUG("IPC TCP server listening on 127.0.0.1:{}", port);
 
   // Build env vars — pass port instead of socket path.
   std::vector<std::string> env;
@@ -249,21 +255,21 @@ bool SidecarManager::spawn_sidecar() {
   std::vector<std::string> args = {opts_.node_binary, opts_.sidecar_script};
   auto child = platform::spawn_process(args, env);
   if (child == platform::kInvalidPid) {
-    logger_->error("Failed to spawn sidecar process");
+    SPDLOG_ERROR("Failed to spawn sidecar process");
     server.close();
     return false;
   }
 
   pid_ = child;
   write_pid_file();
-  logger_->info("Sidecar started (pid={})", child);
+  SPDLOG_INFO("Sidecar started (pid={})", child);
 
   // Accept connection from sidecar with timeout
   auto connected = server.accept(10000);
   server.close();
 
   if (connected == platform::kInvalidIpc) {
-    logger_->error("Sidecar did not connect within 10 seconds");
+    SPDLOG_ERROR("Sidecar did not connect within 10 seconds");
     platform::kill_process(child);
     platform::wait_process(child, 5000);
     pid_ = platform::kInvalidPid;
@@ -281,22 +287,23 @@ bool SidecarManager::spawn_sidecar() {
 
 void SidecarManager::kill_sidecar(bool force) {
   auto p = pid_.load();
-  if (p == platform::kInvalidPid) return;
+  if (p == platform::kInvalidPid)
+    return;
 
   if (force) {
-    logger_->info("Force killing sidecar (pid={})", p);
+    SPDLOG_INFO("Force killing sidecar (pid={})", p);
     platform::kill_process(p);
     platform::wait_process(p, 5000);
   } else {
-    logger_->info("Gracefully stopping sidecar (pid={})", p);
+    SPDLOG_INFO("Gracefully stopping sidecar (pid={})", p);
     platform::terminate_process(p);
 
     int exit_code = platform::wait_process(p, opts_.graceful_stop_timeout_ms);
     if (exit_code >= 0) {
-      logger_->info("Sidecar exited (status={})", exit_code);
+      SPDLOG_INFO("Sidecar exited (status={})", exit_code);
     } else {
-      logger_->warn("Sidecar did not exit within {}ms, force killing",
-                    opts_.graceful_stop_timeout_ms);
+      SPDLOG_WARN("Sidecar did not exit within {}ms, force killing",
+                  opts_.graceful_stop_timeout_ms);
       platform::kill_process(p);
       platform::wait_process(p, 5000);
     }
@@ -305,15 +312,18 @@ void SidecarManager::kill_sidecar(bool force) {
 }
 
 bool SidecarManager::connect_ipc() {
-  if (ipc_port_ <= 0) return false;
+  if (ipc_port_ <= 0)
+    return false;
   platform::IpcClient client("127.0.0.1", ipc_port_);
-  if (!client.connect()) return false;
+  if (!client.connect())
+    return false;
   ipc_handle_ = client.handle();
   return true;
 }
 
 void SidecarManager::write_pid_file() {
-  if (opts_.pid_file.empty()) return;
+  if (opts_.pid_file.empty())
+    return;
   auto parent = std::filesystem::path(opts_.pid_file).parent_path();
   if (!parent.empty()) {
     std::filesystem::create_directories(parent);
