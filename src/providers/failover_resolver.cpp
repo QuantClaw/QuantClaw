@@ -9,9 +9,8 @@
 
 namespace quantclaw {
 
-FailoverResolver::FailoverResolver(ProviderRegistry* registry,
-                                   std::shared_ptr<spdlog::logger> logger)
-    : registry_(registry), logger_(std::move(logger)) {}
+FailoverResolver::FailoverResolver(ProviderRegistry* registry)
+    : registry_(registry) {}
 
 void FailoverResolver::SetFallbackChain(
     const std::vector<std::string>& models) {

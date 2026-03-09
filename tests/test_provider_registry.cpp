@@ -1,17 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/providers/provider_registry.hpp"
 
-namespace quantclaw {
+#include <gtest/gtest.h>
 
-static std::shared_ptr<spdlog::logger> make_logger(const std::string& name) {
-  auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
-  return std::make_shared<spdlog::logger>(name, null_sink);
-}
+namespace quantclaw {
 
 // --- ModelRef tests ---
 
@@ -43,7 +40,7 @@ TEST(ModelRefTest, ParseWithDefaultProvider) {
 // --- ProviderRegistry tests ---
 
 TEST(ProviderRegistryTest, RegisterBuiltinFactories) {
-  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  auto reg = std::make_unique<ProviderRegistry>();
   reg->RegisterBuiltinFactories();
 
   // Should have factories but no entries yet
@@ -51,7 +48,7 @@ TEST(ProviderRegistryTest, RegisterBuiltinFactories) {
 }
 
 TEST(ProviderRegistryTest, AddProviderEntry) {
-  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  auto reg = std::make_unique<ProviderRegistry>();
   reg->RegisterBuiltinFactories();
 
   ProviderEntry entry;
@@ -67,7 +64,7 @@ TEST(ProviderRegistryTest, AddProviderEntry) {
 }
 
 TEST(ProviderRegistryTest, LoadFromConfig) {
-  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  auto reg = std::make_unique<ProviderRegistry>();
   reg->RegisterBuiltinFactories();
 
   nlohmann::json config = {
@@ -75,9 +72,7 @@ TEST(ProviderRegistryTest, LoadFromConfig) {
        {{"apiKey", "sk-test"},
         {"baseUrl", "https://api.openai.com/v1"},
         {"timeout", 60}}},
-      {"anthropic",
-       {{"apiKey", "ak-test"},
-        {"timeout", 45}}},
+      {"anthropic", {{"apiKey", "ak-test"}, {"timeout", 45}}},
   };
   reg->LoadFromConfig(config);
 
@@ -89,7 +84,7 @@ TEST(ProviderRegistryTest, LoadFromConfig) {
 }
 
 TEST(ProviderRegistryTest, ModelAliases) {
-  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  auto reg = std::make_unique<ProviderRegistry>();
 
   reg->AddAlias("opus", "anthropic/claude-opus-4-6");
   reg->AddAlias("gpt4", "openai/gpt-4o");
@@ -109,7 +104,7 @@ TEST(ProviderRegistryTest, ModelAliases) {
 }
 
 TEST(ProviderRegistryTest, LoadAliasesFromJson) {
-  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  auto reg = std::make_unique<ProviderRegistry>();
 
   nlohmann::json aliases = {
       {"anthropic/claude-opus-4-6", {{"alias", "opus"}}},
@@ -125,7 +120,7 @@ TEST(ProviderRegistryTest, LoadAliasesFromJson) {
 }
 
 TEST(ProviderRegistryTest, GetProviderCreatesInstance) {
-  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  auto reg = std::make_unique<ProviderRegistry>();
   reg->RegisterBuiltinFactories();
 
   ProviderEntry entry;
@@ -143,7 +138,7 @@ TEST(ProviderRegistryTest, GetProviderCreatesInstance) {
 }
 
 TEST(ProviderRegistryTest, GetProviderForModel) {
-  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  auto reg = std::make_unique<ProviderRegistry>();
   reg->RegisterBuiltinFactories();
 
   ProviderEntry entry;
@@ -157,13 +152,13 @@ TEST(ProviderRegistryTest, GetProviderForModel) {
 }
 
 TEST(ProviderRegistryTest, NullForUnknownProvider) {
-  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  auto reg = std::make_unique<ProviderRegistry>();
   auto provider = reg->GetProvider("nonexistent");
   EXPECT_EQ(provider, nullptr);
 }
 
 TEST(ProviderRegistryTest, ProviderEntryInspection) {
-  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  auto reg = std::make_unique<ProviderRegistry>();
 
   ProviderEntry entry;
   entry.id = "ollama";

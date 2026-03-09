@@ -5,7 +5,9 @@
 
 #include <memory>
 #include <string>
+
 #include <spdlog/spdlog.h>
+
 #include "quantclaw/constants.hpp"
 
 namespace quantclaw::platform {
@@ -15,7 +17,7 @@ namespace quantclaw::platform {
 // Windows: background process with PID file (no Windows Service for now).
 class ServiceManager {
  public:
-  explicit ServiceManager(std::shared_ptr<spdlog::logger> logger);
+  explicit ServiceManager();
   ~ServiceManager() = default;
 
   // Install the service (systemd unit file on Linux, no-op on Windows).
@@ -49,7 +51,6 @@ class ServiceManager {
   void remove_pid();
 
  private:
-  std::shared_ptr<spdlog::logger> logger_;
   std::string state_dir_;
   std::string pid_file_;
   std::string log_file_;

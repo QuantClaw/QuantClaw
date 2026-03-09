@@ -10,8 +10,7 @@
 
 namespace quantclaw::gateway {
 
-GatewayServer::GatewayServer(int port, std::shared_ptr<spdlog::logger> logger)
-    : port_(port), logger_(logger) {
+GatewayServer::GatewayServer(int port) : port_(port) {
   SPDLOG_INFO("GatewayServer created on port {}", port_);
 }
 

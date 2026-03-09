@@ -1,17 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/security/exec_approval.hpp"
 
-namespace quantclaw {
+#include <gtest/gtest.h>
 
-static std::shared_ptr<spdlog::logger> make_logger(const std::string& name) {
-  auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
-  return std::make_shared<spdlog::logger>(name, null_sink);
-}
+namespace quantclaw {
 
 // --- AskMode tests ---
 
@@ -101,7 +98,7 @@ TEST(ExecApprovalConfigTest, Defaults) {
 // --- ExecApprovalManager tests ---
 
 TEST(ExecApprovalManagerTest, AskOffAutoApproves) {
-  auto mgr = std::make_unique<ExecApprovalManager>(make_logger("approval"));
+  auto mgr = std::make_unique<ExecApprovalManager>();
   ExecApprovalConfig config;
   config.ask = AskMode::kOff;
   mgr->Configure(config);
@@ -111,7 +108,7 @@ TEST(ExecApprovalManagerTest, AskOffAutoApproves) {
 }
 
 TEST(ExecApprovalManagerTest, OnMissAllowlistApproves) {
-  auto mgr = std::make_unique<ExecApprovalManager>(make_logger("approval"));
+  auto mgr = std::make_unique<ExecApprovalManager>();
   ExecApprovalConfig config;
   config.ask = AskMode::kOnMiss;
   config.allowlist = {"git *", "ls"};
@@ -122,7 +119,7 @@ TEST(ExecApprovalManagerTest, OnMissAllowlistApproves) {
 }
 
 TEST(ExecApprovalManagerTest, OnMissNotInAllowlistDenied) {
-  auto mgr = std::make_unique<ExecApprovalManager>(make_logger("approval"));
+  auto mgr = std::make_unique<ExecApprovalManager>();
   ExecApprovalConfig config;
   config.ask = AskMode::kOnMiss;
   config.allowlist = {"git *"};
@@ -134,7 +131,7 @@ TEST(ExecApprovalManagerTest, OnMissNotInAllowlistDenied) {
 }
 
 TEST(ExecApprovalManagerTest, AlwaysRequiresApproval) {
-  auto mgr = std::make_unique<ExecApprovalManager>(make_logger("approval"));
+  auto mgr = std::make_unique<ExecApprovalManager>();
   ExecApprovalConfig config;
   config.ask = AskMode::kAlways;
   config.timeout_fallback = ApprovalDecision::kDenied;
@@ -146,21 +143,20 @@ TEST(ExecApprovalManagerTest, AlwaysRequiresApproval) {
 }
 
 TEST(ExecApprovalManagerTest, HandlerApproves) {
-  auto mgr = std::make_unique<ExecApprovalManager>(make_logger("approval"));
+  auto mgr = std::make_unique<ExecApprovalManager>();
   ExecApprovalConfig config;
   config.ask = AskMode::kAlways;
   mgr->Configure(config);
 
-  mgr->SetApprovalHandler([](const ApprovalRequest&) {
-    return ApprovalDecision::kApproved;
-  });
+  mgr->SetApprovalHandler(
+      [](const ApprovalRequest&) { return ApprovalDecision::kApproved; });
 
   auto decision = mgr->RequestApproval("rm -rf /");
   EXPECT_EQ(decision, ApprovalDecision::kApproved);
 }
 
 TEST(ExecApprovalManagerTest, HandlerDenies) {
-  auto mgr = std::make_unique<ExecApprovalManager>(make_logger("approval"));
+  auto mgr = std::make_unique<ExecApprovalManager>();
   ExecApprovalConfig config;
   config.ask = AskMode::kAlways;
   mgr->Configure(config);
@@ -177,7 +173,7 @@ TEST(ExecApprovalManagerTest, HandlerDenies) {
 }
 
 TEST(ExecApprovalManagerTest, ResolvedHistory) {
-  auto mgr = std::make_unique<ExecApprovalManager>(make_logger("approval"));
+  auto mgr = std::make_unique<ExecApprovalManager>();
   ExecApprovalConfig config;
   config.ask = AskMode::kOff;
   mgr->Configure(config);
@@ -189,9 +185,8 @@ TEST(ExecApprovalManagerTest, ResolvedHistory) {
   // Let's test with always mode and handler
   config.ask = AskMode::kAlways;
   mgr->Configure(config);
-  mgr->SetApprovalHandler([](const ApprovalRequest&) {
-    return ApprovalDecision::kApproved;
-  });
+  mgr->SetApprovalHandler(
+      [](const ApprovalRequest&) { return ApprovalDecision::kApproved; });
 
   mgr->RequestApproval("cmd3");
   auto history = mgr->ResolvedHistory();
@@ -199,7 +194,7 @@ TEST(ExecApprovalManagerTest, ResolvedHistory) {
 }
 
 TEST(ExecApprovalManagerTest, PruneExpired) {
-  auto mgr = std::make_unique<ExecApprovalManager>(make_logger("approval"));
+  auto mgr = std::make_unique<ExecApprovalManager>();
   mgr->PruneExpired();  // Should not crash on empty
   EXPECT_TRUE(mgr->PendingRequests().empty());
 }

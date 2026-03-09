@@ -38,8 +38,7 @@ SidecarResponse SidecarResponse::FromJson(const nlohmann::json& j) {
   return r;
 }
 
-SidecarManager::SidecarManager(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+SidecarManager::SidecarManager() {}
 
 SidecarManager::~SidecarManager() {
   Stop();

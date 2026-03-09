@@ -15,9 +15,8 @@
 
 namespace quantclaw {
 
-MemoryManager::MemoryManager(const std::filesystem::path& workspace_path,
-                             std::shared_ptr<spdlog::logger> logger)
-    : workspace_path_(workspace_path), logger_(logger) {
+MemoryManager::MemoryManager(const std::filesystem::path& workspace_path)
+    : workspace_path_(workspace_path) {
   // Determine base dir from workspace path
   // Expected: ~/.quantclaw/agents/{agentId}/workspace
   // Or legacy: ~/.quantclaw/workspace

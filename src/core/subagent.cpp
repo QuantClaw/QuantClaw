@@ -44,8 +44,7 @@ SubagentConfig SubagentConfig::FromJson(const nlohmann::json& j) {
 
 // --- SubagentManager ---
 
-SubagentManager::SubagentManager(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+SubagentManager::SubagentManager() {}
 
 void SubagentManager::Configure(const SubagentConfig& config) {
   config_ = config;

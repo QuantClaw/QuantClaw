@@ -8,8 +8,7 @@
 
 namespace quantclaw::web {
 
-WebServer::WebServer(int port, std::shared_ptr<spdlog::logger> logger)
-    : port_(port), logger_(std::move(logger)), running_(false) {
+WebServer::WebServer(int port) : port_(port), running_(false) {
   SPDLOG_INFO("WebServer initialized on port {}", port_);
 }
 

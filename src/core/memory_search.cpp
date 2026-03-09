@@ -13,8 +13,7 @@
 
 namespace quantclaw {
 
-MemorySearch::MemorySearch(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+MemorySearch::MemorySearch() {}
 
 void MemorySearch::IndexDirectory(const std::filesystem::path& dir) {
   if (!std::filesystem::exists(dir))

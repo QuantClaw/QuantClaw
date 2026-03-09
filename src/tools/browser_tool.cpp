@@ -97,8 +97,7 @@ BrowserToolConfig BrowserToolConfig::FromJson(const nlohmann::json& j) {
 
 // --- BrowserSession ---
 
-BrowserSession::BrowserSession(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+BrowserSession::BrowserSession() {}
 
 BrowserSession::~BrowserSession() {
   close();

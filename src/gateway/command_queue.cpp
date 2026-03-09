@@ -271,13 +271,11 @@ static std::string generate_uuid() {
 
 CommandQueue::CommandQueue(const QueueConfig& config, AgentExecutor executor,
                            ResponseSender response_sender,
-                           EventSender event_sender,
-                           std::shared_ptr<spdlog::logger> logger)
+                           EventSender event_sender)
     : config_(config),
       executor_(std::move(executor)),
       response_sender_(std::move(response_sender)),
-      event_sender_(std::move(event_sender)),
-      logger_(std::move(logger)) {}
+      event_sender_(std::move(event_sender)) {}
 
 CommandQueue::~CommandQueue() {
   Stop();

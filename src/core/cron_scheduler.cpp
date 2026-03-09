@@ -153,8 +153,7 @@ CronExpression::NextAfter(std::chrono::system_clock::time_point after) const {
 
 // --- CronScheduler ---
 
-CronScheduler::CronScheduler(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+CronScheduler::CronScheduler() {}
 
 CronScheduler::~CronScheduler() {
   Stop();

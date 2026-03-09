@@ -96,13 +96,11 @@ AgentLoop::AgentLoop(std::shared_ptr<MemoryManager> memory_manager,
                      std::shared_ptr<SkillLoader> skill_loader,
                      std::shared_ptr<ToolRegistry> tool_registry,
                      std::shared_ptr<LLMProvider> llm_provider,
-                     const AgentConfig& agent_config,
-                     std::shared_ptr<spdlog::logger> logger)
+                     const AgentConfig& agent_config)
     : memory_manager_(memory_manager),
       skill_loader_(skill_loader),
       tool_registry_(tool_registry),
       llm_provider_(llm_provider),
-      logger_(logger),
       agent_config_(agent_config) {
   // Use dynamic max iterations based on context window
   max_iterations_ = agent_config_.DynamicMaxIterations();

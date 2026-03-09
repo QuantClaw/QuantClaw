@@ -129,8 +129,7 @@ ExecApprovalConfig ExecApprovalConfig::FromJson(const nlohmann::json& j) {
 
 // --- ExecApprovalManager ---
 
-ExecApprovalManager::ExecApprovalManager(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+ExecApprovalManager::ExecApprovalManager() {}
 
 void ExecApprovalManager::Configure(const ExecApprovalConfig& config) {
   std::lock_guard<std::mutex> lock(mu_);

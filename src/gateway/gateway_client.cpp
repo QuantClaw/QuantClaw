@@ -8,9 +8,8 @@
 
 namespace quantclaw::gateway {
 
-GatewayClient::GatewayClient(const std::string& url, const std::string& token,
-                             std::shared_ptr<spdlog::logger> logger)
-    : url_(url), token_(token), logger_(logger) {}
+GatewayClient::GatewayClient(const std::string& url, const std::string& token)
+    : url_(url), token_(token) {}
 
 GatewayClient::~GatewayClient() {
   Disconnect();

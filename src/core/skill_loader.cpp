@@ -16,8 +16,7 @@
 
 namespace quantclaw {
 
-SkillLoader::SkillLoader(std::shared_ptr<spdlog::logger> logger)
-    : logger_(logger) {
+SkillLoader::SkillLoader() {
   SPDLOG_INFO("SkillLoader initialized");
 }
 

@@ -89,8 +89,7 @@ static std::string generate_id(const std::string& prefix = "bg") {
 // Constructor
 // ---------------------------------------------------------------------------
 
-ToolRegistry::ToolRegistry(std::shared_ptr<spdlog::logger> logger)
-    : logger_(logger) {
+ToolRegistry::ToolRegistry() {
   SPDLOG_INFO("ToolRegistry initialized");
 }
 
@@ -227,7 +226,7 @@ void ToolRegistry::RegisterChainTool() {
                                      const nlohmann::json& args) {
       return ExecuteTool(name, args);
     };
-    ToolChainExecutor chain_executor(executor, logger_);
+    ToolChainExecutor chain_executor(executor);
     auto result = chain_executor.Execute(chain_def);
     return ToolChainExecutor::ResultToJson(result).dump();
   };
@@ -1412,7 +1411,7 @@ std::string ToolRegistry::memory_search_tool(const nlohmann::json& params) {
   auto workspace =
       std::filesystem::path(home_str) / ".quantclaw/agents/main/workspace";
 
-  MemorySearch search(logger_);
+  MemorySearch search;
   search.IndexDirectory(workspace);
   auto results = search.Search(query, max_results);
 

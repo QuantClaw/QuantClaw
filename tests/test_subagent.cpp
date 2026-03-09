@@ -1,17 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/core/subagent.hpp"
 
-namespace quantclaw {
+#include <gtest/gtest.h>
 
-static std::shared_ptr<spdlog::logger> make_logger(const std::string& name) {
-  auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
-  return std::make_shared<spdlog::logger>(name, null_sink);
-}
+namespace quantclaw {
 
 // --- SpawnMode ---
 
@@ -51,7 +48,7 @@ class SubagentManagerTest : public ::testing::Test {
   std::unique_ptr<SubagentManager> mgr_;
 
   void SetUp() override {
-    mgr_ = std::make_unique<SubagentManager>(make_logger("subagent"));
+    mgr_ = std::make_unique<SubagentManager>();
     SubagentConfig config;
     config.max_depth = 3;
     config.max_children = 2;
@@ -190,12 +187,12 @@ TEST_F(SubagentManagerTest, CleanupCompleted) {
 
 TEST_F(SubagentManagerTest, AgentRunner) {
   std::string received_task;
-  mgr_->SetAgentRunner(
-      [&](const std::string&, const std::string& task,
-          const std::string&, const std::string&) -> std::string {
-        received_task = task;
-        return "result from agent";
-      });
+  mgr_->SetAgentRunner([&](const std::string&, const std::string& task,
+                           const std::string&,
+                           const std::string&) -> std::string {
+    received_task = task;
+    return "result from agent";
+  });
 
   SpawnParams params;
   params.task = "Do the thing";

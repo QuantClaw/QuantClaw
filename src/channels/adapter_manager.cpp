@@ -14,12 +14,10 @@ namespace quantclaw {
 
 ChannelAdapterManager::ChannelAdapterManager(
     int gateway_port, const std::string& auth_token,
-    const std::unordered_map<std::string, ChannelConfig>& channels,
-    std::shared_ptr<spdlog::logger> logger)
+    const std::unordered_map<std::string, ChannelConfig>& channels)
     : gateway_port_(gateway_port),
       auth_token_(auth_token),
-      channels_(channels),
-      logger_(logger) {}
+      channels_(channels) {}
 
 ChannelAdapterManager::~ChannelAdapterManager() {
   Stop();

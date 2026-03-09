@@ -1,18 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/tools/browser_tool.hpp"
 
+#include <gtest/gtest.h>
+
 namespace quantclaw {
-
-static std::shared_ptr<spdlog::logger> make_logger(const std::string& name) {
-  auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
-  return std::make_shared<spdlog::logger>(name, null_sink);
-}
-
 // --- SsrfPolicy tests ---
 
 TEST(SsrfPolicyTest, DefaultBlocksLocalhost) {
@@ -56,12 +52,9 @@ TEST(SsrfPolicyTest, EmptyPolicyAllowsAll) {
 
 TEST(BrowserToolConfigTest, FromJson) {
   nlohmann::json j = {
-      {"mode", "remote"},
-      {"cdpUrl", "ws://localhost:9222"},
-      {"headless", false},
-      {"viewportWidth", 1920},
-      {"viewportHeight", 1080},
-      {"navigationTimeoutMs", 60000},
+      {"mode", "remote"},       {"cdpUrl", "ws://localhost:9222"},
+      {"headless", false},      {"viewportWidth", 1920},
+      {"viewportHeight", 1080}, {"navigationTimeoutMs", 60000},
   };
   auto c = BrowserToolConfig::FromJson(j);
   EXPECT_EQ(c.mode, BrowserToolConfig::Mode::kRemote);
@@ -94,20 +87,20 @@ TEST(BrowserToolConfigTest, SsrfConfig) {
 // --- BrowserSession tests ---
 
 TEST(BrowserSessionTest, CreateAndClose) {
-  auto session = std::make_shared<BrowserSession>(make_logger("browser"));
+  auto session = std::make_shared<BrowserSession>();
   EXPECT_FALSE(session->is_connected());
   session->close();  // Should not crash
 }
 
 TEST(BrowserSessionTest, RemoteConnectionUnreachable) {
   // A fake/unreachable CDP URL should fail to connect (graceful failure)
-  auto session = std::make_shared<BrowserSession>(make_logger("browser"));
+  auto session = std::make_shared<BrowserSession>();
   BrowserToolConfig config;
   config.mode = BrowserToolConfig::Mode::kRemote;
   config.remote_cdp_url = "ws://127.0.0.1:9999/devtools/browser/fake-id";
 
   bool ok = session->initialize(config);
-  EXPECT_FALSE(ok);            // real connect attempt fails for unreachable URL
+  EXPECT_FALSE(ok);  // real connect attempt fails for unreachable URL
   EXPECT_FALSE(session->is_connected());
   EXPECT_TRUE(session->connection().is_remote);  // set before connect attempt
 
@@ -117,26 +110,27 @@ TEST(BrowserSessionTest, RemoteConnectionUnreachable) {
 TEST(BrowserSessionTest, NavigateGracefulWhenUnconnected) {
   // Verify navigate does not crash when the session is unconnected.
   // We only verify no crash occurs; we do not assert the return value.
-  auto session = std::make_shared<BrowserSession>(make_logger("browser"));
+  auto session = std::make_shared<BrowserSession>();
   BrowserToolConfig config;
   config.mode = BrowserToolConfig::Mode::kRemote;
   config.remote_cdp_url = "ws://127.0.0.1:9999/fake";
   session->initialize(config);  // returns false — session not connected
 
   // With default (empty) SSRF policy, public URLs pass the SSRF check.
-  // cdp_send returns "{}" gracefully when not connected. We only verify no crash.
+  // cdp_send returns "{}" gracefully when not connected. We only verify no
+  // crash.
   (void)session->navigate("https://example.com");
 
   // SSRF-blocked URLs still require the SSRF policy to be set explicitly.
   config.ssrf_policy = SsrfPolicy::default_policy();
-  auto session2 = std::make_shared<BrowserSession>(make_logger("browser2"));
+  auto session2 = std::make_shared<BrowserSession>();
   session2->initialize(config);
   EXPECT_FALSE(session2->navigate("http://localhost:8080/admin"));
   EXPECT_TRUE(session2->navigate("https://example.com"));
 }
 
 TEST(BrowserSessionTest, RemoteRequiresUrl) {
-  auto session = std::make_shared<BrowserSession>(make_logger("browser"));
+  auto session = std::make_shared<BrowserSession>();
   BrowserToolConfig config;
   config.mode = BrowserToolConfig::Mode::kRemote;
   // No URL set
@@ -146,18 +140,21 @@ TEST(BrowserSessionTest, RemoteRequiresUrl) {
 }
 
 TEST(BrowserSessionTest, NavigationSsrfBlock) {
-  auto session = std::make_shared<BrowserSession>(make_logger("browser"));
+  auto session = std::make_shared<BrowserSession>();
   BrowserToolConfig config;
   config.mode = BrowserToolConfig::Mode::kRemote;
   config.remote_cdp_url = "ws://127.0.0.1:9999/fake";
   config.ssrf_policy = SsrfPolicy::default_policy();
-  session->initialize(config);  // will fail for unreachable URL; that's OK for SSRF testing
+  session->initialize(
+      config);  // will fail for unreachable URL; that's OK for SSRF testing
 
-  // SSRF-blocked URLs are rejected before CDP is called, regardless of connection state
+  // SSRF-blocked URLs are rejected before CDP is called, regardless of
+  // connection state
   EXPECT_FALSE(session->navigate("http://localhost:8080/admin"));
   EXPECT_FALSE(session->navigate("http://127.0.0.1/api"));
 
-  // Public URLs pass the SSRF check; cdp_send gracefully returns "{}" when not connected
+  // Public URLs pass the SSRF check; cdp_send gracefully returns "{}" when not
+  // connected
   EXPECT_TRUE(session->navigate("https://example.com"));
 }
 
@@ -169,7 +166,7 @@ TEST(BrowserToolSchemaTest, HasAllTools) {
 
   std::vector<std::string> expected_names = {
       "browser_navigate", "browser_screenshot", "browser_click",
-      "browser_type", "browser_evaluate",
+      "browser_type",     "browser_evaluate",
   };
   for (const auto& schema : schemas) {
     auto name = schema["function"]["name"].get<std::string>();
@@ -180,7 +177,7 @@ TEST(BrowserToolSchemaTest, HasAllTools) {
 }
 
 TEST(BrowserToolSchemaTest, ExecutorCreation) {
-  auto session = std::make_shared<BrowserSession>(make_logger("browser"));
+  auto session = std::make_shared<BrowserSession>();
   BrowserToolConfig config;
   config.mode = BrowserToolConfig::Mode::kRemote;
   config.remote_cdp_url = "ws://127.0.0.1:9999/fake";
@@ -190,7 +187,8 @@ TEST(BrowserToolSchemaTest, ExecutorCreation) {
   ASSERT_TRUE(executor);
 
   // Test navigate action
-  nlohmann::json params = {{"action", "navigate"}, {"url", "https://example.com"}};
+  nlohmann::json params = {{"action", "navigate"},
+                           {"url", "https://example.com"}};
   auto result = executor(params);
   EXPECT_FALSE(result.empty());
 
@@ -206,7 +204,7 @@ TEST(BrowserToolSchemaTest, ExecutorCreation) {
 }
 
 TEST(BrowserSessionTest, PageState) {
-  auto session = std::make_shared<BrowserSession>(make_logger("browser"));
+  auto session = std::make_shared<BrowserSession>();
   auto state = session->get_state();
   EXPECT_TRUE(state.url.empty());
   EXPECT_TRUE(state.title.empty());

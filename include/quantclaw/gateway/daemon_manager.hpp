@@ -5,9 +5,11 @@
 
 #include <memory>
 #include <string>
+
 #include <spdlog/spdlog.h>
-#include "quantclaw/platform/service.hpp"
+
 #include "quantclaw/constants.hpp"
+#include "quantclaw/platform/service.hpp"
 
 namespace quantclaw::gateway {
 
@@ -16,7 +18,7 @@ namespace quantclaw::gateway {
 // Thin wrapper around platform::ServiceManager.
 class DaemonManager {
  public:
-  explicit DaemonManager(std::shared_ptr<spdlog::logger> logger);
+  explicit DaemonManager();
 
   int Install(int port = kLegacyGatewayPort);
   int Uninstall();

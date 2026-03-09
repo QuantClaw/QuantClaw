@@ -154,12 +154,8 @@ convert_tools_to_anthropic(const std::vector<nlohmann::json>& tools) {
 }
 
 AnthropicProvider::AnthropicProvider(const std::string& api_key,
-                                     const std::string& base_url, int timeout,
-                                     std::shared_ptr<spdlog::logger> logger)
-    : api_key_(api_key),
-      base_url_(base_url),
-      timeout_(timeout),
-      logger_(logger) {
+                                     const std::string& base_url, int timeout)
+    : api_key_(api_key), base_url_(base_url), timeout_(timeout) {
   if (base_url_.empty()) {
     base_url_ = "https://api.anthropic.com";
   }
@@ -312,7 +308,6 @@ struct AnthropicStreamContext {
   std::function<void(const ChatCompletionResponse&)> callback;
   std::string buffer;      // incomplete line across chunks
   std::string event_type;  // current SSE event type
-  std::shared_ptr<spdlog::logger> logger;
 
   // Accumulated tool calls
   struct PendingToolCall {
@@ -462,7 +457,6 @@ void AnthropicProvider::ChatCompletionStream(
 
   AnthropicStreamContext stream_ctx;
   stream_ctx.callback = callback;
-  stream_ctx.logger = logger_;
 
   RetryAfterCapture retry_capture;
 

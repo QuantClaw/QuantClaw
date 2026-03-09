@@ -32,8 +32,7 @@ std::string OnboardCommands::GenerateToken() {
   return token;
 }
 
-OnboardCommands::OnboardCommands(std::shared_ptr<spdlog::logger> logger)
-    : logger_(logger) {}
+OnboardCommands::OnboardCommands() {}
 
 int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
   bool install_daemon = false;
@@ -757,7 +756,7 @@ bool OnboardCommands::CreateToolsFile() {
 }
 
 bool OnboardCommands::InstallDaemon(int port) {
-  platform::ServiceManager service(logger_);
+  platform::ServiceManager service;
   int ret = service.install(port);
   return ret == 0;
 }
@@ -765,7 +764,7 @@ bool OnboardCommands::InstallDaemon(int port) {
 bool OnboardCommands::TestGatewayConnection(int port) {
   try {
     std::string url = "ws://127.0.0.1:" + std::to_string(port);
-    auto client = std::make_shared<gateway::GatewayClient>(url, "", logger_);
+    auto client = std::make_shared<gateway::GatewayClient>(url, "");
     if (client->Connect(3000)) {
       client->Disconnect();
       return true;

@@ -10,10 +10,12 @@
 #include <mutex>
 #include <string>
 #include <thread>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
-#include "quantclaw/platform/process.hpp"
+
 #include "quantclaw/platform/ipc.hpp"
+#include "quantclaw/platform/process.hpp"
 
 namespace quantclaw {
 
@@ -39,7 +41,7 @@ struct SidecarResponse {
 // nginx-style: fork/exec, heartbeat, graceful reload/stop, crash restart.
 class SidecarManager {
  public:
-  explicit SidecarManager(std::shared_ptr<spdlog::logger> logger);
+  explicit SidecarManager();
   ~SidecarManager();
 
   SidecarManager(const SidecarManager&) = delete;
@@ -70,15 +72,16 @@ class SidecarManager {
   bool Reload();
 
   // Send a JSON-RPC request and wait for response
-  SidecarResponse Call(const std::string& method,
-                       const nlohmann::json& params,
+  SidecarResponse Call(const std::string& method, const nlohmann::json& params,
                        int timeout_ms = 30000);
 
   // Check if sidecar is alive
   bool IsRunning() const;
 
   // Get sidecar PID
-  platform::ProcessId pid() const { return pid_; }
+  platform::ProcessId pid() const {
+    return pid_;
+  }
 
  private:
   void monitor_loop();
@@ -89,7 +92,6 @@ class SidecarManager {
   void remove_pid_file();
   int next_backoff_ms();
 
-  std::shared_ptr<spdlog::logger> logger_;
   Options opts_;
 
   std::atomic<platform::ProcessId> pid_{platform::kInvalidPid};

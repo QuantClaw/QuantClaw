@@ -38,8 +38,7 @@ std::string plugin_status_to_string(PluginStatus s) {
   return "unknown";
 }
 
-PluginRegistry::PluginRegistry(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+PluginRegistry::PluginRegistry() {}
 
 void PluginRegistry::Discover(const QuantClawConfig& config,
                               const std::filesystem::path& workspace_dir) {

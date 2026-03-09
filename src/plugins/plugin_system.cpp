@@ -30,8 +30,7 @@ std::string find_sidecar_script() {
 
 }  // namespace
 
-PluginSystem::PluginSystem(std::shared_ptr<spdlog::logger> logger)
-    : logger_(logger), registry_(logger), hooks_(logger) {}
+PluginSystem::PluginSystem() : registry_(), hooks_() {}
 
 PluginSystem::~PluginSystem() {
   Shutdown();
@@ -56,7 +55,7 @@ bool PluginSystem::Initialize(const QuantClawConfig& config,
     return true;
   }
 
-  sidecar_ = std::make_shared<SidecarManager>(logger_);
+  sidecar_ = std::make_shared<SidecarManager>();
   hooks_.SetSidecar(sidecar_);
 
   SidecarManager::Options opts;

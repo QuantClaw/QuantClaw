@@ -57,10 +57,8 @@ SessionMaintenanceConfig::FromJson(const nlohmann::json& j) {
 // --- SessionMaintenance ---
 
 SessionMaintenance::SessionMaintenance(
-    const std::filesystem::path& sessions_dir,
-    std::shared_ptr<spdlog::logger> logger)
+    const std::filesystem::path& sessions_dir)
     : sessions_dir_(sessions_dir),
-      logger_(std::move(logger)),
       last_sweep_(std::chrono::steady_clock::time_point{}) {}
 
 void SessionMaintenance::Configure(const SessionMaintenanceConfig& config) {

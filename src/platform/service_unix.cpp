@@ -15,8 +15,7 @@ namespace quantclaw::platform {
 
 static const char* kServiceName = "quantclaw-gateway";
 
-ServiceManager::ServiceManager(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {
+ServiceManager::ServiceManager() {
   state_dir_ = home_directory() + "/.quantclaw";
   pid_file_ = state_dir_ + "/gateway.pid";
   log_file_ = state_dir_ + "/logs/gateway.log";

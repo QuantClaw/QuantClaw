@@ -1,20 +1,18 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/null_sink.h>
-#include <fstream>
 #include <filesystem>
+#include <fstream>
+
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/session/session_maintenance.hpp"
+
 #include "test_helpers.hpp"
+#include <gtest/gtest.h>
 
 namespace quantclaw {
-
-static std::shared_ptr<spdlog::logger> make_logger(const std::string& name) {
-  auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
-  return std::make_shared<spdlog::logger>(name, null_sink);
-}
 
 class SessionMaintenanceTest : public ::testing::Test {
  protected:
@@ -28,7 +26,8 @@ class SessionMaintenanceTest : public ::testing::Test {
     std::filesystem::remove_all(test_dir_);
   }
 
-  void create_session_file(const std::string& name, const std::string& content) {
+  void create_session_file(const std::string& name,
+                           const std::string& content) {
     std::ofstream ofs(test_dir_ / name);
     ofs << content;
   }
@@ -100,12 +99,8 @@ TEST(SizeParseTest, CaseInsensitive) {
 
 TEST(SessionMaintenanceConfigTest, FromJson) {
   nlohmann::json j = {
-      {"mode", "enforce"},
-      {"pruneAfter", "7d"},
-      {"maxEntries", 100},
-      {"rotateBytes", "10MB"},
-      {"maxDiskBytes", "1GB"},
-      {"sweepInterval", 600},
+      {"mode", "enforce"},     {"pruneAfter", "7d"},    {"maxEntries", 100},
+      {"rotateBytes", "10MB"}, {"maxDiskBytes", "1GB"}, {"sweepInterval", 600},
   };
   auto c = SessionMaintenanceConfig::FromJson(j);
   EXPECT_EQ(c.mode, MaintenanceMode::kEnforce);
@@ -135,7 +130,7 @@ TEST(SessionMaintenanceConfigTest, NumericValues) {
 // --- Maintenance operations ---
 
 TEST_F(SessionMaintenanceTest, SweepEmptyDir) {
-  SessionMaintenance maint(test_dir_, make_logger("maint"));
+  SessionMaintenance maint(test_dir_);
   SessionMaintenanceConfig config;
   config.max_entries = 10;
   maint.Configure(config);
@@ -152,7 +147,7 @@ TEST_F(SessionMaintenanceTest, MaxEntriesEnforced) {
                         R"({"role":"user","content":"test"})");
   }
 
-  SessionMaintenance maint(test_dir_, make_logger("maint"));
+  SessionMaintenance maint(test_dir_);
   SessionMaintenanceConfig config;
   config.max_entries = 3;
   maint.Configure(config);
@@ -164,7 +159,8 @@ TEST_F(SessionMaintenanceTest, MaxEntriesEnforced) {
   // Should have 3 files left
   int count = 0;
   for (auto& entry : std::filesystem::directory_iterator(test_dir_)) {
-    if (entry.is_regular_file()) ++count;
+    if (entry.is_regular_file())
+      ++count;
   }
   EXPECT_EQ(count, 3);
 }
@@ -174,7 +170,7 @@ TEST_F(SessionMaintenanceTest, RotateLargeFiles) {
   create_session_file_with_size("large.jsonl", 2000);
   create_session_file_with_size("small.jsonl", 100);
 
-  SessionMaintenance maint(test_dir_, make_logger("maint"));
+  SessionMaintenance maint(test_dir_);
   SessionMaintenanceConfig config;
   config.rotate_bytes = 1000;  // Rotate files > 1000 bytes
   maint.Configure(config);
@@ -190,7 +186,7 @@ TEST_F(SessionMaintenanceTest, WarnModeNoAction) {
                         R"({"test": true})");
   }
 
-  SessionMaintenance maint(test_dir_, make_logger("maint"));
+  SessionMaintenance maint(test_dir_);
   SessionMaintenanceConfig config;
   config.mode = MaintenanceMode::kWarn;
   config.max_entries = 2;
@@ -204,13 +200,14 @@ TEST_F(SessionMaintenanceTest, WarnModeNoAction) {
   // All files should still exist
   int count = 0;
   for (auto& entry : std::filesystem::directory_iterator(test_dir_)) {
-    if (entry.is_regular_file()) ++count;
+    if (entry.is_regular_file())
+      ++count;
   }
   EXPECT_EQ(count, 5);
 }
 
 TEST_F(SessionMaintenanceTest, SweepIntervalThrottling) {
-  SessionMaintenance maint(test_dir_, make_logger("maint"));
+  SessionMaintenance maint(test_dir_);
   SessionMaintenanceConfig config;
   config.sweep_interval_seconds = 3600;  // 1 hour
   config.max_entries = 100;
@@ -232,11 +229,11 @@ TEST_F(SessionMaintenanceTest, SweepIntervalThrottling) {
 TEST_F(SessionMaintenanceTest, DiskLimitEnforced) {
   // Create files totaling ~5000 bytes
   for (int i = 0; i < 5; ++i) {
-    create_session_file_with_size(
-        "session" + std::to_string(i) + ".jsonl", 1000);
+    create_session_file_with_size("session" + std::to_string(i) + ".jsonl",
+                                  1000);
   }
 
-  SessionMaintenance maint(test_dir_, make_logger("maint"));
+  SessionMaintenance maint(test_dir_);
   SessionMaintenanceConfig config;
   config.max_disk_bytes = 3000;  // Only allow 3KB
   maint.Configure(config);

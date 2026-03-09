@@ -205,9 +205,8 @@ SessionMessage SessionMessage::FromJsonl(const nlohmann::json& j) {
 
 // --- SessionManager ---
 
-SessionManager::SessionManager(const std::filesystem::path& sessions_dir,
-                               std::shared_ptr<spdlog::logger> logger)
-    : sessions_dir_(sessions_dir), logger_(logger) {
+SessionManager::SessionManager(const std::filesystem::path& sessions_dir)
+    : sessions_dir_(sessions_dir) {
   std::filesystem::create_directories(sessions_dir_);
   LoadStore();
   SPDLOG_INFO("SessionManager initialized at: {}", sessions_dir_.string());

@@ -71,9 +71,8 @@ nlohmann::json ChainTemplateEngine::resolve(
 
 // --- ToolChainExecutor ---
 
-ToolChainExecutor::ToolChainExecutor(ToolExecutorFn executor,
-                                     std::shared_ptr<spdlog::logger> logger)
-    : executor_(std::move(executor)), logger_(std::move(logger)) {}
+ToolChainExecutor::ToolChainExecutor(ToolExecutorFn executor)
+    : executor_(std::move(executor)) {}
 
 ChainResult ToolChainExecutor::Execute(const ToolChainDef& chain) {
   ChainResult result;

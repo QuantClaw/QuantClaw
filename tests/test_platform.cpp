@@ -1,12 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include "quantclaw/platform/process.hpp"
-#include "quantclaw/platform/ipc.hpp"
-#include "quantclaw/platform/service.hpp"
 #include <filesystem>
 #include <thread>
+
+#include "quantclaw/platform/ipc.hpp"
+#include "quantclaw/platform/process.hpp"
+#include "quantclaw/platform/service.hpp"
+
+#include <gtest/gtest.h>
 
 using namespace quantclaw::platform;
 
@@ -162,16 +164,14 @@ TEST(PlatformIpc, SetPermissionsIsNoOp) {
 // --- ServiceManager tests ---
 
 TEST(PlatformService, ConstructAndQuery) {
-  auto logger = spdlog::default_logger();
-  ServiceManager svc(logger);
+  ServiceManager svc;
 
   // Should not crash, PID should be -1 when not running
   EXPECT_EQ(svc.get_pid(), -1);
 }
 
 TEST(PlatformService, WritePidFile) {
-  auto logger = spdlog::default_logger();
-  ServiceManager svc(logger);
+  ServiceManager svc;
 
   svc.write_pid(12345);
   EXPECT_EQ(svc.get_pid(), 12345);

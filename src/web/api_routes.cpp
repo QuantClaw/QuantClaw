@@ -58,7 +58,6 @@ void register_api_routes(
     const std::shared_ptr<quantclaw::ToolRegistry>& /*tool_registry*/,
     const quantclaw::QuantClawConfig& config,
     quantclaw::gateway::GatewayServer& gateway_server,
-    const std::shared_ptr<spdlog::logger>& logger,
     const std::function<void()>& reload_fn,
     quantclaw::PluginSystem* plugin_system) {
   // --- GET /api/health ---
@@ -128,8 +127,8 @@ void register_api_routes(
   // --- POST /api/agent/request ---
   server.AddRawRoute(
       "/api/agent/request", "POST",
-      [session_manager, agent_loop, prompt_builder,
-       logger](const httplib::Request& req, httplib::Response& res) {
+      [session_manager, agent_loop, prompt_builder](const httplib::Request& req,
+                                                    httplib::Response& res) {
         try {
           auto params = nlohmann::json::parse(req.body);
           std::string session_key =
@@ -219,8 +218,8 @@ void register_api_routes(
   //   data: {"sessionKey": "...", "response": "..."}
   server.AddRawRoute(
       "/api/agent/stream", "POST",
-      [session_manager, agent_loop, prompt_builder,
-       logger](const httplib::Request& req, httplib::Response& res) {
+      [session_manager, agent_loop, prompt_builder](const httplib::Request& req,
+                                                    httplib::Response& res) {
         nlohmann::json params;
         try {
           params = nlohmann::json::parse(req.body);
@@ -277,7 +276,7 @@ void register_api_routes(
         // Start agent processing in a background thread
         std::thread worker([state, session_manager, agent_loop, message,
                             llm_history = std::move(llm_history), system_prompt,
-                            session_key, logger]() {
+                            session_key]() {
           try {
             auto new_messages = agent_loop->ProcessMessageStream(
                 message, llm_history, system_prompt,
@@ -478,7 +477,7 @@ void register_api_routes(
   if (reload_fn) {
     server.AddRawRoute(
         "/api/config/reload", "POST",
-        [reload_fn, logger](const httplib::Request&, httplib::Response& res) {
+        [reload_fn](const httplib::Request&, httplib::Response& res) {
           try {
             reload_fn();
             json_ok(res, {{"ok", true}});
@@ -491,8 +490,8 @@ void register_api_routes(
   // --- POST /v1/chat/completions (OpenAI-compatible endpoint) ---
   server.AddRawRoute(
       "/v1/chat/completions", "POST",
-      [agent_loop, session_manager, logger](const httplib::Request& req,
-                                            httplib::Response& res) {
+      [agent_loop, session_manager](const httplib::Request& req,
+                                    httplib::Response& res) {
         try {
           auto body = nlohmann::json::parse(req.body);
 
@@ -563,8 +562,7 @@ void register_api_routes(
 
             std::thread worker([state, agent_loop, user_message,
                                 llm_history = std::move(llm_history),
-                                system_prompt, model, resp_id, session_key,
-                                logger]() {
+                                system_prompt, model, resp_id, session_key]() {
               try {
                 agent_loop->ProcessMessageStream(
                     user_message, llm_history, system_prompt,
@@ -720,8 +718,8 @@ void register_api_routes(
   // "sessionKey": "..."}
   server.AddRawRoute(
       "/api/channel/message", "POST",
-      [session_manager, agent_loop, prompt_builder,
-       logger](const httplib::Request& req, httplib::Response& res) {
+      [session_manager, agent_loop, prompt_builder](const httplib::Request& req,
+                                                    httplib::Response& res) {
         try {
           auto params = nlohmann::json::parse(req.body);
           std::string channel = params.value("channel", "webhook");

@@ -5,8 +5,7 @@
 
 namespace quantclaw {
 
-SessionCompaction::SessionCompaction(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+SessionCompaction::SessionCompaction() {}
 
 bool SessionCompaction::NeedsCompaction(
     const std::vector<nlohmann::json>& messages, const Options& opts) const {

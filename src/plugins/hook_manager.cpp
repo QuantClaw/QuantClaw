@@ -54,8 +54,7 @@ HookMode GetHookMode(const std::string& hook_name) {
 
 // HookManager
 
-HookManager::HookManager(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+HookManager::HookManager() {}
 
 void HookManager::RegisterHook(const std::string& hook_name,
                                const std::string& plugin_id,
@@ -103,8 +102,7 @@ nlohmann::json HookManager::Fire(const std::string& hook_name,
 
 void HookManager::FireAsync(const std::string& hook_name,
                             const nlohmann::json& event) {
-  auto logger = logger_;
-  auto self_hooks = [this, hook_name, event, logger]() {
+  auto self_hooks = [this, hook_name, event]() {
     try {
       Fire(hook_name, event);
     } catch (const std::exception& e) {

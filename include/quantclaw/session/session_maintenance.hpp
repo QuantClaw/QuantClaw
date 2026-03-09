@@ -3,10 +3,11 @@
 
 #pragma once
 
+#include <chrono>
+#include <filesystem>
 #include <string>
 #include <vector>
-#include <filesystem>
-#include <chrono>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -56,8 +57,7 @@ struct MaintenanceResult {
 // Performs session file maintenance: pruning, rotation, and disk management
 class SessionMaintenance {
  public:
-  SessionMaintenance(const std::filesystem::path& sessions_dir,
-                     std::shared_ptr<spdlog::logger> logger);
+  SessionMaintenance(const std::filesystem::path& sessions_dir);
 
   // Configure maintenance settings
   void Configure(const SessionMaintenanceConfig& config);
@@ -73,11 +73,12 @@ class SessionMaintenance {
   static int64_t ParseSizeBytes(const std::string& s);
 
   // Get current config
-  const SessionMaintenanceConfig& GetConfig() const { return config_; }
+  const SessionMaintenanceConfig& GetConfig() const {
+    return config_;
+  }
 
  private:
   std::filesystem::path sessions_dir_;
-  std::shared_ptr<spdlog::logger> logger_;
   SessionMaintenanceConfig config_;
   std::chrono::steady_clock::time_point last_sweep_;
 

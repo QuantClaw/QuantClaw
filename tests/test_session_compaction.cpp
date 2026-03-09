@@ -1,10 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/core/session_compaction.hpp"
+
+#include <gtest/gtest.h>
 
 using namespace quantclaw;
 using json = nlohmann::json;
@@ -16,11 +18,8 @@ static json make_msg(const std::string& role, const std::string& content) {
 class SessionCompactionTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
-    logger_ = std::make_shared<spdlog::logger>("test", null_sink);
-    compaction_ = std::make_unique<SessionCompaction>(logger_);
+    compaction_ = std::make_unique<SessionCompaction>();
   }
-  std::shared_ptr<spdlog::logger> logger_;
   std::unique_ptr<SessionCompaction> compaction_;
 };
 
@@ -141,9 +140,7 @@ TEST_F(SessionCompactionTest, Compact_FallbackWhenSummaryEmpty) {
   opts.max_messages = 10;
   opts.keep_recent = 5;
 
-  auto empty_fn = [](const std::vector<json>&) -> std::string {
-    return "";
-  };
+  auto empty_fn = [](const std::vector<json>&) -> std::string { return ""; };
 
   auto result = compaction_->Compact(messages, opts, empty_fn);
   // Falls back to truncation
@@ -167,8 +164,7 @@ TEST_F(SessionCompactionTest, Truncate_KeepsRecentMessages) {
   EXPECT_EQ(result.size(), 6u);
   // The 5 recent messages should be messages 15-19
   for (int i = 1; i <= 5; ++i) {
-    EXPECT_EQ(result[i]["content"],
-              "Message " + std::to_string(15 + i - 1));
+    EXPECT_EQ(result[i]["content"], "Message " + std::to_string(15 + i - 1));
   }
 }
 
@@ -236,8 +232,7 @@ TEST_F(SessionCompactionTest, Compact_PreservesMessageOrder) {
   // result[0] is summary, result[1..5] are messages 25-29
   for (int i = 1; i < static_cast<int>(result.size()); ++i) {
     int expected_idx = 25 + i - 1;
-    EXPECT_EQ(result[i]["content"],
-              "Ordered_" + std::to_string(expected_idx));
+    EXPECT_EQ(result[i]["content"], "Ordered_" + std::to_string(expected_idx));
   }
 }
 

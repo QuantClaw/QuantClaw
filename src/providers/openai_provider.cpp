@@ -111,12 +111,8 @@ serialize_messages_to_openai(const std::vector<Message>& messages) {
 }
 
 OpenAIProvider::OpenAIProvider(const std::string& api_key,
-                               const std::string& base_url, int timeout,
-                               std::shared_ptr<spdlog::logger> logger)
-    : api_key_(api_key),
-      base_url_(base_url),
-      timeout_(timeout),
-      logger_(logger) {
+                               const std::string& base_url, int timeout)
+    : api_key_(api_key), base_url_(base_url), timeout_(timeout) {
   if (base_url_.empty()) {
     base_url_ = "https://api.openai.com/v1";
   }
@@ -260,7 +256,6 @@ CurlSlist OpenAIProvider::CreateHeaders() const {
 struct StreamContext {
   std::function<void(const ChatCompletionResponse&)> callback;
   std::string buffer;  // incomplete line across chunks
-  std::shared_ptr<spdlog::logger> logger;
 
   // Accumulated tool calls (SSE delivers them in fragments)
   struct PendingToolCall {
@@ -409,7 +404,6 @@ void OpenAIProvider::ChatCompletionStream(
 
   StreamContext stream_ctx;
   stream_ctx.callback = callback;
-  stream_ctx.logger = logger_;
 
   RetryAfterCapture retry_capture;
 

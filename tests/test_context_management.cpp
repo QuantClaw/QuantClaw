@@ -1,18 +1,20 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <nlohmann/json.hpp>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/null_sink.h>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <cstdlib>
 
+#include <nlohmann/json.hpp>
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
+#include "quantclaw/config.hpp"
 #include "quantclaw/core/context_pruner.hpp"
 #include "quantclaw/core/memory_search.hpp"
 #include "quantclaw/gateway/command_queue.hpp"
-#include "quantclaw/config.hpp"
+
+#include <gtest/gtest.h>
 
 namespace quantclaw {
 
@@ -118,7 +120,8 @@ TEST_F(ContextPrunerTest, HardPruneOldResults) {
         break;
       }
     }
-    if (found_hard_pruned) break;
+    if (found_hard_pruned)
+      break;
   }
   EXPECT_TRUE(found_hard_pruned);
 }
@@ -137,8 +140,8 @@ TEST_F(ContextPrunerTest, SoftPruneKeepsHeadAndTail) {
 
     Message assistant;
     assistant.role = "assistant";
-    assistant.content.push_back(ContentBlock::MakeToolUse(
-        "t" + std::to_string(i), "tool", {}));
+    assistant.content.push_back(
+        ContentBlock::MakeToolUse("t" + std::to_string(i), "tool", {}));
     history.push_back(assistant);
 
     Message tool_msg;
@@ -191,9 +194,7 @@ TEST_F(ContextPrunerTest, NoToolResultsPassthrough) {
 class BM25SearchTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
-    auto logger = std::make_shared<spdlog::logger>("test", null_sink);
-    search_ = std::make_unique<MemorySearch>(logger);
+    search_ = std::make_unique<MemorySearch>();
 
     // Create a unique temp directory to avoid conflicts when ctest --parallel
     // runs each GTest case as a separate process sharing the same /tmp path.
@@ -320,10 +321,8 @@ TEST(CompactionConfigTest, DefaultValues) {
 
 TEST(CompactionConfigTest, ParseFromJson) {
   nlohmann::json j = {
-      {"model", "test-model"},
-      {"autoCompact", false},
-      {"compactMaxMessages", 50},
-      {"compactKeepRecent", 10},
+      {"model", "test-model"},     {"autoCompact", false},
+      {"compactMaxMessages", 50},  {"compactKeepRecent", 10},
       {"compactMaxTokens", 50000},
   };
 
@@ -336,10 +335,8 @@ TEST(CompactionConfigTest, ParseFromJson) {
 
 TEST(CompactionConfigTest, ParseSnakeCase) {
   nlohmann::json j = {
-      {"model", "test-model"},
-      {"auto_compact", false},
-      {"compact_max_messages", 75},
-      {"compact_keep_recent", 15},
+      {"model", "test-model"},       {"auto_compact", false},
+      {"compact_max_messages", 75},  {"compact_keep_recent", 15},
       {"compact_max_tokens", 80000},
   };
 
@@ -397,12 +394,11 @@ TEST_F(ContextPrunerTest, BootstrapProtection) {
 
   // The setup_tool result (index 4, before first user message at index 2)
   // should NOT be pruned due to bootstrap protection.
-  // However, since setup_result is at index 4 (AFTER first user message at index 2),
-  // it's outside bootstrap protection. Let me fix the test:
-  // Bootstrap boundary is at first user message (index 2).
-  // Messages AT OR BEFORE index 2 are protected.
-  // The system and "Ready to help!" messages are at indices 0 and 1 — both protected.
-  // The first user message at index 2 is protected.
+  // However, since setup_result is at index 4 (AFTER first user message at
+  // index 2), it's outside bootstrap protection. Let me fix the test: Bootstrap
+  // boundary is at first user message (index 2). Messages AT OR BEFORE index 2
+  // are protected. The system and "Ready to help!" messages are at indices 0
+  // and 1 — both protected. The first user message at index 2 is protected.
   // Index 3+ can be pruned (they're after bootstrap).
 
   // Verify the system message survived (index 0, within bootstrap)
@@ -444,7 +440,7 @@ TEST(QueueOverflowTest, SummarizePolicyMergesMessages) {
   }
 
   auto dropped = lane.ApplyCapOverflow();
-  EXPECT_GE(dropped.size(), 2u);  // At least 2 dropped
+  EXPECT_GE(dropped.size(), 2u);       // At least 2 dropped
   EXPECT_EQ(lane.PendingCount(), 2u);  // Should be at cap now
 }
 
@@ -492,8 +488,8 @@ TEST_F(ContextPrunerTest, SoftPruneShortContentUnchanged) {
 
     Message assistant;
     assistant.role = "assistant";
-    assistant.content.push_back(ContentBlock::MakeToolUse(
-        "t" + std::to_string(i), "tool", {}));
+    assistant.content.push_back(
+        ContentBlock::MakeToolUse("t" + std::to_string(i), "tool", {}));
     history.push_back(assistant);
 
     Message tool_msg;
@@ -546,7 +542,8 @@ TEST_F(ContextPrunerTest, HardPruneReplacesWithPlaceholder) {
         break;
       }
     }
-    if (found_placeholder) break;
+    if (found_placeholder)
+      break;
   }
   EXPECT_TRUE(found_placeholder);
 }
@@ -560,8 +557,8 @@ TEST_F(ContextPrunerTest, MultipleToolResultsInOneMessage) {
     history.push_back(Message{"user", "Q" + std::to_string(i)});
     Message a;
     a.role = "assistant";
-    a.content.push_back(ContentBlock::MakeToolUse(
-        "t" + std::to_string(i), "tool", {}));
+    a.content.push_back(
+        ContentBlock::MakeToolUse("t" + std::to_string(i), "tool", {}));
     history.push_back(a);
 
     Message tr;
@@ -587,8 +584,10 @@ TEST_F(ContextPrunerTest, MultipleToolResultsInOneMessage) {
   // Insert assistant + tool results at the beginning
   Message multi_asst;
   multi_asst.role = "assistant";
-  multi_asst.content.push_back(ContentBlock::MakeToolUse("multi1", "tool_a", {}));
-  multi_asst.content.push_back(ContentBlock::MakeToolUse("multi2", "tool_b", {}));
+  multi_asst.content.push_back(
+      ContentBlock::MakeToolUse("multi1", "tool_a", {}));
+  multi_asst.content.push_back(
+      ContentBlock::MakeToolUse("multi2", "tool_b", {}));
 
   history.insert(history.begin(), multi_tool);
   history.insert(history.begin(), multi_asst);
@@ -607,9 +606,8 @@ TEST_F(ContextPrunerTest, MultipleToolResultsInOneMessage) {
     for (const auto& block : msg.content) {
       if (block.type == "tool_result" && block.tool_use_id == "multi1") {
         // This large old result should be hard or soft pruned
-        EXPECT_TRUE(
-            block.content.find("omitted") != std::string::npos ||
-            block.content.find("...") != std::string::npos);
+        EXPECT_TRUE(block.content.find("omitted") != std::string::npos ||
+                    block.content.find("...") != std::string::npos);
       }
     }
   }
@@ -623,8 +621,8 @@ TEST_F(ContextPrunerTest, NonToolResultBlocksPreserved) {
     Message a;
     a.role = "assistant";
     a.content.push_back(ContentBlock::MakeText("Thinking about this..."));
-    a.content.push_back(ContentBlock::MakeToolUse(
-        "t" + std::to_string(i), "tool", {}));
+    a.content.push_back(
+        ContentBlock::MakeToolUse("t" + std::to_string(i), "tool", {}));
     history.push_back(a);
 
     Message tr;
@@ -632,7 +630,8 @@ TEST_F(ContextPrunerTest, NonToolResultBlocksPreserved) {
     // Add a text block alongside the tool result
     tr.content.push_back(ContentBlock::MakeText("Some context"));
     std::string big;
-    for (int j = 0; j < 30; ++j) big += "Line " + std::to_string(j) + "\n";
+    for (int j = 0; j < 30; ++j)
+      big += "Line " + std::to_string(j) + "\n";
     tr.content.push_back(
         ContentBlock::MakeToolResult("t" + std::to_string(i), big));
     history.push_back(tr);
@@ -648,14 +647,16 @@ TEST_F(ContextPrunerTest, NonToolResultBlocksPreserved) {
   // Verify text blocks in the old messages are still present
   bool found_text_block = false;
   for (const auto& msg : result) {
-    if (msg.role != "user") continue;
+    if (msg.role != "user")
+      continue;
     for (const auto& block : msg.content) {
       if (block.type == "text" && block.text == "Some context") {
         found_text_block = true;
         break;
       }
     }
-    if (found_text_block) break;
+    if (found_text_block)
+      break;
   }
   EXPECT_TRUE(found_text_block);
 }

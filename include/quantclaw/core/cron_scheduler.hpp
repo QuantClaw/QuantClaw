@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -41,8 +42,8 @@ class CronExpression {
   bool Matches(const std::tm& tm) const;
 
   // Calculate next run time after the given time
-  std::chrono::system_clock::time_point NextAfter(
-      std::chrono::system_clock::time_point after) const;
+  std::chrono::system_clock::time_point
+  NextAfter(std::chrono::system_clock::time_point after) const;
 
  private:
   struct Field {
@@ -64,7 +65,7 @@ class CronScheduler {
  public:
   using JobHandler = std::function<void(const CronJob&)>;
 
-  explicit CronScheduler(std::shared_ptr<spdlog::logger> logger);
+  explicit CronScheduler();
   ~CronScheduler();
 
   // Load jobs from persistent storage
@@ -74,10 +75,9 @@ class CronScheduler {
   void Save(const std::string& filepath) const;
 
   // Add a new cron job
-  std::string AddJob(const std::string& name,
-                      const std::string& schedule,
-                      const std::string& message,
-                      const std::string& session_key = "agent:main:main");
+  std::string AddJob(const std::string& name, const std::string& schedule,
+                     const std::string& message,
+                     const std::string& session_key = "agent:main:main");
 
   // Remove a job by ID
   bool RemoveJob(const std::string& id);
@@ -91,13 +91,14 @@ class CronScheduler {
   // Stop the scheduler
   void Stop();
 
-  bool IsRunning() const { return running_; }
+  bool IsRunning() const {
+    return running_;
+  }
 
  private:
   void scheduler_loop();
   std::string generate_id() const;
 
-  std::shared_ptr<spdlog::logger> logger_;
   mutable std::mutex mu_;
   std::vector<CronJob> jobs_;
   JobHandler handler_;

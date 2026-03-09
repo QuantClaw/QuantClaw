@@ -78,8 +78,7 @@ ChannelPolicyConfig ChannelPolicyConfig::FromJson(const nlohmann::json& j) {
 
 // --- PairingManager ---
 
-PairingManager::PairingManager(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+PairingManager::PairingManager() {}
 
 std::string PairingManager::GenerateCode(const std::string& channel_id) {
   // Generate a 6-digit numeric code

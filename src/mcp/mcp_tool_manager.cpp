@@ -7,8 +7,7 @@
 
 namespace quantclaw::mcp {
 
-MCPToolManager::MCPToolManager(std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {
+MCPToolManager::MCPToolManager() {
   SPDLOG_INFO("MCPToolManager initialized");
 }
 
@@ -28,7 +27,7 @@ void MCPToolManager::DiscoverTools(const MCPConfig& config) {
                 server_cfg.url);
 
     try {
-      auto client = std::make_shared<MCPClient>(server_cfg.url, logger_);
+      auto client = std::make_shared<MCPClient>(server_cfg.url);
       auto tools = client->ListTools();
 
       clients_[server_cfg.name] = client;

@@ -3,21 +3,22 @@
 
 #pragma once
 
-#include <memory>
 #include <functional>
+#include <memory>
+
 #include <spdlog/spdlog.h>
 
 namespace quantclaw {
-    class SessionManager;
-    class AgentLoop;
-    class PromptBuilder;
-    class ToolRegistry;
-    class PluginSystem;
-    struct QuantClawConfig;
-}
+class SessionManager;
+class AgentLoop;
+class PromptBuilder;
+class ToolRegistry;
+class PluginSystem;
+struct QuantClawConfig;
+}  // namespace quantclaw
 
 namespace quantclaw::gateway {
-    class GatewayServer;
+class GatewayServer;
 }
 
 namespace quantclaw::web {
@@ -32,8 +33,7 @@ void register_api_routes(
     const std::shared_ptr<quantclaw::ToolRegistry>& tool_registry,
     const quantclaw::QuantClawConfig& config,
     quantclaw::gateway::GatewayServer& gateway_server,
-    const std::shared_ptr<spdlog::logger>& logger,
     const std::function<void()>& reload_fn = nullptr,
     quantclaw::PluginSystem* plugin_system = nullptr);
 
-} // namespace quantclaw::web
+}  // namespace quantclaw::web

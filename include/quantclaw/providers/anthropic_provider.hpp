@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include "llm_provider.hpp"
-
 #include <memory>
 #include <string>
 
@@ -12,17 +10,17 @@
 
 #include "quantclaw/providers/curl_raii.hpp"
 
+#include "llm_provider.hpp"
+
 namespace quantclaw {
 
 class AnthropicProvider : public LLMProvider {
  public:
-  AnthropicProvider(const std::string& api_key,
-                    const std::string& base_url,
-                    int timeout,
-                    std::shared_ptr<spdlog::logger> logger);
+  AnthropicProvider(const std::string& api_key, const std::string& base_url,
+                    int timeout);
 
-  ChatCompletionResponse ChatCompletion(
-      const ChatCompletionRequest& request) override;
+  ChatCompletionResponse
+  ChatCompletion(const ChatCompletionRequest& request) override;
   void ChatCompletionStream(
       const ChatCompletionRequest& request,
       std::function<void(const ChatCompletionResponse&)> callback) override;
@@ -36,7 +34,6 @@ class AnthropicProvider : public LLMProvider {
   std::string api_key_;
   std::string base_url_;
   int timeout_;
-  std::shared_ptr<spdlog::logger> logger_;
 };
 
-} // namespace quantclaw
+}  // namespace quantclaw

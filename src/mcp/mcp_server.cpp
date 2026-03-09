@@ -53,7 +53,7 @@ std::string MCPTool::Call(const nlohmann::json& arguments) {
   return execute(arguments);
 }
 
-MCPServer::MCPServer(std::shared_ptr<spdlog::logger> logger) : logger_(logger) {
+MCPServer::MCPServer() {
   SPDLOG_INFO("MCPServer initialized");
 }
 
