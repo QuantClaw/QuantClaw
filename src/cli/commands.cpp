@@ -10,4 +10,4 @@ namespace quantclaw::cli {
 // - agent_commands.cpp
 // - session_commands.cpp
 
-} // namespace quantclaw::cli
+}  // namespace quantclaw::cli

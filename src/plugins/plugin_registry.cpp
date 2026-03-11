@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "quantclaw/plugins/plugin_registry.hpp"
+
 #include <algorithm>
 #include <fstream>
 
@@ -11,7 +12,8 @@ namespace {
 
 std::filesystem::path get_quantclaw_home() {
   const char* home = std::getenv("HOME");
-  if (!home) return "/tmp/.quantclaw";
+  if (!home)
+    return "/tmp/.quantclaw";
   return std::filesystem::path(home) / ".quantclaw";
 }
 
@@ -26,9 +28,12 @@ const std::vector<std::string> kBundledEnabledByDefault = {
 
 std::string plugin_status_to_string(PluginStatus s) {
   switch (s) {
-    case PluginStatus::kLoaded:   return "loaded";
-    case PluginStatus::kDisabled: return "disabled";
-    case PluginStatus::kError:    return "error";
+    case PluginStatus::kLoaded:
+      return "loaded";
+    case PluginStatus::kDisabled:
+      return "disabled";
+    case PluginStatus::kError:
+      return "error";
   }
   return "unknown";
 }
@@ -70,13 +75,15 @@ void PluginRegistry::Discover(const QuantClawConfig& config,
       record.skill_names = m.skills;
       record.config_schema = m.config_schema;
     } else {
-      record.name = candidate->package_name.empty() ? id : candidate->package_name;
+      record.name =
+          candidate->package_name.empty() ? id : candidate->package_name;
       record.version = candidate->package_version;
       record.description = candidate->package_description;
     }
 
     record.enabled = should_enable(id, candidate->origin, config);
-    record.status = record.enabled ? PluginStatus::kLoaded : PluginStatus::kDisabled;
+    record.status =
+        record.enabled ? PluginStatus::kLoaded : PluginStatus::kDisabled;
 
     // Load plugin-specific config
     if (config.plugins_config.contains("entries") &&
@@ -95,14 +102,16 @@ void PluginRegistry::Discover(const QuantClawConfig& config,
 
 const PluginRecord* PluginRegistry::Find(const std::string& id) const {
   auto it = id_index_.find(id);
-  if (it == id_index_.end()) return nullptr;
+  if (it == id_index_.end())
+    return nullptr;
   return &plugins_[it->second];
 }
 
 std::vector<std::string> PluginRegistry::EnabledPluginIds() const {
   std::vector<std::string> result;
   for (const auto& p : plugins_) {
-    if (p.enabled) result.push_back(p.id);
+    if (p.enabled)
+      result.push_back(p.id);
   }
   return result;
 }
@@ -122,9 +131,11 @@ void PluginRegistry::UpdateFromSidecar(
   }
 
   for (const auto& entry : sidecar_plugin_list["plugins"]) {
-    if (!entry.is_object()) continue;
+    if (!entry.is_object())
+      continue;
     std::string id = entry.value("id", "");
-    if (id.empty()) continue;
+    if (id.empty())
+      continue;
 
     auto it = id_index_.find(id);
     if (it == id_index_.end()) {
@@ -148,7 +159,8 @@ void PluginRegistry::UpdateFromSidecar(
       std::vector<std::string> result;
       if (j.contains(key) && j[key].is_array()) {
         for (const auto& v : j[key]) {
-          if (v.is_string()) result.push_back(v.get<std::string>());
+          if (v.is_string())
+            result.push_back(v.get<std::string>());
         }
       }
       return result;
@@ -176,8 +188,8 @@ void PluginRegistry::UpdateFromSidecar(
       rec.http_handler_count = entry["httpHandlers"].get<int>();
     }
 
-    logger_->debug("Updated plugin '{}' capabilities: {} tools, {} hooks",
-                   id, rec.tool_names.size(), rec.hook_names.size());
+    logger_->debug("Updated plugin '{}' capabilities: {} tools, {} hooks", id,
+                   rec.tool_names.size(), rec.hook_names.size());
   }
 }
 
@@ -187,32 +199,45 @@ nlohmann::json PluginRegistry::ToJson() const {
     nlohmann::json j;
     j["id"] = p.id;
     j["name"] = p.name;
-    if (!p.version.empty()) j["version"] = p.version;
-    if (!p.description.empty()) j["description"] = p.description;
-    if (!p.kind.empty()) j["kind"] = p.kind;
+    if (!p.version.empty())
+      j["version"] = p.version;
+    if (!p.description.empty())
+      j["description"] = p.description;
+    if (!p.kind.empty())
+      j["kind"] = p.kind;
     j["source"] = p.source.string();
     j["origin"] = plugin_origin_to_string(p.origin);
     j["enabled"] = p.enabled;
     j["status"] = plugin_status_to_string(p.status);
-    if (!p.error.empty()) j["error"] = p.error;
-    if (!p.tool_names.empty()) j["tools"] = p.tool_names;
-    if (!p.channel_ids.empty()) j["channels"] = p.channel_ids;
-    if (!p.provider_ids.empty()) j["providers"] = p.provider_ids;
-    if (!p.service_ids.empty()) j["services"] = p.service_ids;
-    if (!p.skill_names.empty()) j["skills"] = p.skill_names;
-    if (!p.gateway_methods.empty()) j["gatewayMethods"] = p.gateway_methods;
-    if (!p.cli_commands.empty()) j["cliCommands"] = p.cli_commands;
-    if (!p.command_names.empty()) j["commands"] = p.command_names;
-    if (!p.hook_names.empty()) j["hooks"] = p.hook_names;
-    if (p.http_handler_count > 0) j["httpHandlers"] = p.http_handler_count;
+    if (!p.error.empty())
+      j["error"] = p.error;
+    if (!p.tool_names.empty())
+      j["tools"] = p.tool_names;
+    if (!p.channel_ids.empty())
+      j["channels"] = p.channel_ids;
+    if (!p.provider_ids.empty())
+      j["providers"] = p.provider_ids;
+    if (!p.service_ids.empty())
+      j["services"] = p.service_ids;
+    if (!p.skill_names.empty())
+      j["skills"] = p.skill_names;
+    if (!p.gateway_methods.empty())
+      j["gatewayMethods"] = p.gateway_methods;
+    if (!p.cli_commands.empty())
+      j["cliCommands"] = p.cli_commands;
+    if (!p.command_names.empty())
+      j["commands"] = p.command_names;
+    if (!p.hook_names.empty())
+      j["hooks"] = p.hook_names;
+    if (p.http_handler_count > 0)
+      j["httpHandlers"] = p.http_handler_count;
     arr.push_back(j);
   }
   return arr;
 }
 
 std::vector<PluginCandidate> PluginRegistry::discover_candidates(
-    const QuantClawConfig& config,
-    const std::filesystem::path& workspace_dir) {
+    const QuantClawConfig& config, const std::filesystem::path& workspace_dir) {
   std::vector<PluginCandidate> candidates;
   auto qc_home = get_quantclaw_home();
 
@@ -222,7 +247,8 @@ std::vector<PluginCandidate> PluginRegistry::discover_candidates(
       config.plugins_config["load"]["paths"].is_array()) {
     for (const auto& path_val : config.plugins_config["load"]["paths"]) {
       if (path_val.is_string()) {
-        scan_directory(path_val.get<std::string>(), PluginOrigin::kConfig, candidates);
+        scan_directory(path_val.get<std::string>(), PluginOrigin::kConfig,
+                       candidates);
       }
     }
   }
@@ -234,8 +260,8 @@ std::vector<PluginCandidate> PluginRegistry::discover_candidates(
          it != config.plugins_config["installs"].end(); ++it) {
       if (it.value().contains("installPath") &&
           it.value()["installPath"].is_string()) {
-        auto install_path = std::filesystem::path(
-            it.value()["installPath"].get<std::string>());
+        auto install_path =
+            std::filesystem::path(it.value()["installPath"].get<std::string>());
         if (std::filesystem::exists(install_path)) {
           scan_directory(install_path, PluginOrigin::kConfig, candidates);
         }
@@ -272,13 +298,15 @@ void PluginRegistry::scan_directory(const std::filesystem::path& dir,
 
   std::error_code ec;
   for (const auto& entry : std::filesystem::directory_iterator(dir, ec)) {
-    if (!entry.is_directory()) continue;
+    if (!entry.is_directory())
+      continue;
 
     auto manifest_path = entry.path() / "openclaw.plugin.json";
     if (!std::filesystem::exists(manifest_path)) {
       // Also check for quantclaw.plugin.json
       manifest_path = entry.path() / "quantclaw.plugin.json";
-      if (!std::filesystem::exists(manifest_path)) continue;
+      if (!std::filesystem::exists(manifest_path))
+        continue;
     }
 
     PluginCandidate candidate;
@@ -292,7 +320,7 @@ void PluginRegistry::scan_directory(const std::filesystem::path& dir,
       candidate.id_hint = candidate.manifest->id;
     } catch (const std::exception& e) {
       logger_->warn("Failed to parse plugin manifest {}: {}",
-                     manifest_path.string(), e.what());
+                    manifest_path.string(), e.what());
       continue;
     }
 
@@ -321,14 +349,16 @@ bool PluginRegistry::should_enable(const std::string& plugin_id,
   const auto& pc = config.plugins_config;
 
   // Global disable
-  if (pc.contains("enabled") && pc["enabled"].is_boolean() && !pc["enabled"].get<bool>()) {
+  if (pc.contains("enabled") && pc["enabled"].is_boolean() &&
+      !pc["enabled"].get<bool>()) {
     return false;
   }
 
   // Deny list
   if (pc.contains("deny") && pc["deny"].is_array()) {
     for (const auto& d : pc["deny"]) {
-      if (d.is_string() && d.get<std::string>() == plugin_id) return false;
+      if (d.is_string() && d.get<std::string>() == plugin_id)
+        return false;
     }
   }
 
@@ -341,7 +371,8 @@ bool PluginRegistry::should_enable(const std::string& plugin_id,
         break;
       }
     }
-    if (!found) return false;
+    if (!found)
+      return false;
   }
 
   // Memory slot override

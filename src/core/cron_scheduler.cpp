@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "quantclaw/core/cron_scheduler.hpp"
+
 #include <algorithm>
 #include <fstream>
 #include <iomanip>
@@ -72,11 +73,12 @@ CronExpression::CronExpression(const std::string& expr) {
   day_of_week_ = parse_field(fields[4], 0, 6);
 }
 
-CronExpression::Field CronExpression::parse_field(
-    const std::string& field, int min, int max) {
+CronExpression::Field CronExpression::parse_field(const std::string& field,
+                                                  int min, int max) {
   Field f;
 
-  if (field == "*") return f;  // empty = wildcard
+  if (field == "*")
+    return f;  // empty = wildcard
 
   // Handle */N (step)
   if (field.size() > 2 && field.substr(0, 2) == "*/") {
@@ -109,7 +111,8 @@ CronExpression::Field CronExpression::parse_field(
 }
 
 bool CronExpression::field_matches(const Field& f, int value) {
-  if (f.values.empty()) return true;  // wildcard
+  if (f.values.empty())
+    return true;  // wildcard
   return std::find(f.values.begin(), f.values.end(), value) != f.values.end();
 }
 
@@ -121,8 +124,8 @@ bool CronExpression::Matches(const std::tm& tm) const {
          field_matches(day_of_week_, tm.tm_wday);
 }
 
-std::chrono::system_clock::time_point CronExpression::NextAfter(
-    std::chrono::system_clock::time_point after) const {
+std::chrono::system_clock::time_point
+CronExpression::NextAfter(std::chrono::system_clock::time_point after) const {
   // Start from next minute
   auto t = std::chrono::system_clock::to_time_t(after);
   std::tm tm;
@@ -160,7 +163,8 @@ CronScheduler::~CronScheduler() {
 void CronScheduler::Load(const std::string& filepath) {
   storage_path_ = filepath;
 
-  if (!std::filesystem::exists(filepath)) return;
+  if (!std::filesystem::exists(filepath))
+    return;
 
   try {
     std::ifstream ifs(filepath);
@@ -203,9 +207,9 @@ void CronScheduler::Save(const std::string& filepath) const {
 }
 
 std::string CronScheduler::AddJob(const std::string& name,
-                                   const std::string& schedule,
-                                   const std::string& message,
-                                   const std::string& session_key) {
+                                  const std::string& schedule,
+                                  const std::string& message,
+                                  const std::string& session_key) {
   // Validate cron expression
   CronExpression expr(schedule);
 
@@ -224,14 +228,16 @@ std::string CronScheduler::AddJob(const std::string& name,
     jobs_.push_back(std::move(job));
   }
 
-  if (!storage_path_.empty()) Save(storage_path_);
+  if (!storage_path_.empty())
+    Save(storage_path_);
 
   logger_->info("Added cron job '{}' ({}): {}", name, id, schedule);
   return id;
 }
 
 bool CronScheduler::RemoveJob(const std::string& id) {
-  if (id.empty()) return false;  // Guard against empty id
+  if (id.empty())
+    return false;  // Guard against empty id
 
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -243,7 +249,8 @@ bool CronScheduler::RemoveJob(const std::string& id) {
       jobs_.erase(jobs_.begin() + i);
       if (!storage_path_.empty()) {
         nlohmann::json arr = nlohmann::json::array();
-        for (const auto& j : jobs_) arr.push_back(j.ToJson());
+        for (const auto& j : jobs_)
+          arr.push_back(j.ToJson());
         std::ofstream ofs(storage_path_);
         ofs << arr.dump(2) << std::endl;
       }
@@ -257,13 +264,15 @@ bool CronScheduler::RemoveJob(const std::string& id) {
   }
 
   // Only allow prefix deletion if unambiguous (exactly one match)
-  if (matches.size() != 1) return false;
+  if (matches.size() != 1)
+    return false;
 
   jobs_.erase(jobs_.begin() + matches[0]);
 
   if (!storage_path_.empty()) {
     nlohmann::json arr = nlohmann::json::array();
-    for (const auto& j : jobs_) arr.push_back(j.ToJson());
+    for (const auto& j : jobs_)
+      arr.push_back(j.ToJson());
     std::ofstream ofs(storage_path_);
     ofs << arr.dump(2) << std::endl;
   }
@@ -277,7 +286,8 @@ std::vector<CronJob> CronScheduler::ListJobs() const {
 }
 
 void CronScheduler::Start(JobHandler handler) {
-  if (running_) return;
+  if (running_)
+    return;
 
   handler_ = std::move(handler);
   running_ = true;
@@ -299,7 +309,8 @@ void CronScheduler::scheduler_loop() {
     {
       std::lock_guard<std::mutex> lock(mu_);
       for (auto& job : jobs_) {
-        if (!job.enabled) continue;
+        if (!job.enabled)
+          continue;
         if (job.next_run <= now) {
           due_jobs.push_back(&job);
         }

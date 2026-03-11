@@ -7,20 +7,27 @@ namespace quantclaw {
 
 std::string ProviderErrorKindToString(ProviderErrorKind kind) {
   switch (kind) {
-    case ProviderErrorKind::kRateLimit:    return "rate_limit";
-    case ProviderErrorKind::kAuthError:    return "auth_error";
-    case ProviderErrorKind::kBillingError: return "billing_error";
-    case ProviderErrorKind::kTransient:    return "transient";
-    case ProviderErrorKind::kModelNotFound: return "model_not_found";
-    case ProviderErrorKind::kTimeout:         return "timeout";
-    case ProviderErrorKind::kContextOverflow: return "context_overflow";
-    case ProviderErrorKind::kUnknown:         return "unknown";
+    case ProviderErrorKind::kRateLimit:
+      return "rate_limit";
+    case ProviderErrorKind::kAuthError:
+      return "auth_error";
+    case ProviderErrorKind::kBillingError:
+      return "billing_error";
+    case ProviderErrorKind::kTransient:
+      return "transient";
+    case ProviderErrorKind::kModelNotFound:
+      return "model_not_found";
+    case ProviderErrorKind::kTimeout:
+      return "timeout";
+    case ProviderErrorKind::kContextOverflow:
+      return "context_overflow";
+    case ProviderErrorKind::kUnknown:
+      return "unknown";
   }
   return "unknown";
 }
 
-ProviderError::ProviderError(ProviderErrorKind kind,
-                             int http_status,
+ProviderError::ProviderError(ProviderErrorKind kind, int http_status,
                              const std::string& message,
                              const std::string& provider_id,
                              const std::string& profile_id)

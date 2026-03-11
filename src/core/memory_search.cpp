@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "quantclaw/core/memory_search.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -16,12 +17,14 @@ MemorySearch::MemorySearch(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
 void MemorySearch::IndexDirectory(const std::filesystem::path& dir) {
-  if (!std::filesystem::exists(dir)) return;
+  if (!std::filesystem::exists(dir))
+    return;
 
   std::error_code ec;
   for (const auto& entry :
        std::filesystem::recursive_directory_iterator(dir, ec)) {
-    if (!entry.is_regular_file()) continue;
+    if (!entry.is_regular_file())
+      continue;
     auto ext = entry.path().extension().string();
     if (ext == ".md" || ext == ".txt" || ext == ".jsonl") {
       IndexFile(entry.path());
@@ -42,7 +45,8 @@ void MemorySearch::IndexDirectory(const std::filesystem::path& dir) {
 
 void MemorySearch::IndexFile(const std::filesystem::path& file) {
   std::ifstream ifs(file);
-  if (!ifs.is_open()) return;
+  if (!ifs.is_open())
+    return;
 
   std::string line;
   int line_num = 0;
@@ -50,7 +54,8 @@ void MemorySearch::IndexFile(const std::filesystem::path& file) {
   int para_start = 1;
 
   auto flush_paragraph = [&]() {
-    if (paragraph.empty()) return;
+    if (paragraph.empty())
+      return;
     IndexEntry entry;
     entry.filepath = file.string();
     entry.line_number = para_start;
@@ -67,7 +72,8 @@ void MemorySearch::IndexFile(const std::filesystem::path& file) {
     line_num++;
 
     // Split on empty lines (paragraph boundaries)
-    if (line.empty() || line.find_first_not_of(" \t\r\n") == std::string::npos) {
+    if (line.empty() ||
+        line.find_first_not_of(" \t\r\n") == std::string::npos) {
       flush_paragraph();
       para_start = line_num + 1;
       continue;
@@ -76,7 +82,8 @@ void MemorySearch::IndexFile(const std::filesystem::path& file) {
     if (paragraph.empty()) {
       para_start = line_num;
     }
-    if (!paragraph.empty()) paragraph += "\n";
+    if (!paragraph.empty())
+      paragraph += "\n";
     paragraph += line;
   }
   flush_paragraph();
@@ -91,10 +98,11 @@ void MemorySearch::IndexFile(const std::filesystem::path& file) {
   }
 }
 
-std::vector<MemorySearchResult> MemorySearch::Search(
-    const std::string& query, int max_results) const {
+std::vector<MemorySearchResult> MemorySearch::Search(const std::string& query,
+                                                     int max_results) const {
   auto query_tokens = tokenize(query);
-  if (query_tokens.empty()) return {};
+  if (query_tokens.empty())
+    return {};
 
   std::vector<std::pair<double, const IndexEntry*>> scored;
   for (const auto& entry : entries_) {
@@ -167,10 +175,11 @@ int MemorySearch::document_frequency(const std::string& term) const {
   return count;
 }
 
-double MemorySearch::score_entry(
-    const IndexEntry& entry,
-    const std::vector<std::string>& query_tokens) const {
-  if (entry.tokens.empty() || total_documents_ == 0) return 0;
+double
+MemorySearch::score_entry(const IndexEntry& entry,
+                          const std::vector<std::string>& query_tokens) const {
+  if (entry.tokens.empty() || total_documents_ == 0)
+    return 0;
 
   // Build term frequency map for the entry
   std::unordered_map<std::string, int> tf;
@@ -182,12 +191,14 @@ double MemorySearch::score_entry(
   double avgdl = avg_doc_length_ > 0 ? avg_doc_length_ : doc_len;
   double N = static_cast<double>(total_documents_);
 
-  // BM25 scoring: score(D, Q) = Σ IDF(qi) * (f(qi,D) * (k1+1)) / (f(qi,D) + k1*(1-b+b*|D|/avgDL))
+  // BM25 scoring: score(D, Q) = Σ IDF(qi) * (f(qi,D) * (k1+1)) / (f(qi,D) +
+  // k1*(1-b+b*|D|/avgDL))
   double score = 0;
 
   for (const auto& qt : query_tokens) {
     auto it = tf.find(qt);
-    if (it == tf.end()) continue;
+    if (it == tf.end())
+      continue;
 
     double f = static_cast<double>(it->second);  // term frequency in doc
     int df = document_frequency(qt);             // document frequency
@@ -196,8 +207,9 @@ double MemorySearch::score_entry(
     double idf = std::log((N - df + 0.5) / (df + 0.5) + 1.0);
 
     // BM25 TF component
-    double tf_component = (f * (kBM25_k1 + 1.0)) /
-                          (f + kBM25_k1 * (1.0 - kBM25_b + kBM25_b * doc_len / avgdl));
+    double tf_component =
+        (f * (kBM25_k1 + 1.0)) /
+        (f + kBM25_k1 * (1.0 - kBM25_b + kBM25_b * doc_len / avgdl));
 
     score += idf * tf_component;
   }

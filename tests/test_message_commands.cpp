@@ -1,8 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
 #include "quantclaw/core/message_commands.hpp"
+
+#include <gtest/gtest.h>
 
 using namespace quantclaw;
 
@@ -146,9 +147,12 @@ TEST_F(MessageCommandsTest, ListCommandsReturnsExpectedSet) {
 
   bool has_new = false, has_reset = false, has_compact = false;
   for (const auto& [name, desc] : cmds) {
-    if (name == "/new") has_new = true;
-    if (name == "/reset") has_reset = true;
-    if (name == "/compact") has_compact = true;
+    if (name == "/new")
+      has_new = true;
+    if (name == "/reset")
+      has_reset = true;
+    if (name == "/compact")
+      has_compact = true;
     EXPECT_FALSE(desc.empty());
   }
   EXPECT_TRUE(has_new);

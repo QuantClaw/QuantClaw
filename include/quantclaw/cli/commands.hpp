@@ -12,4 +12,4 @@ namespace quantclaw::cli {
 
 // Placeholder for any shared CLI utilities
 
-} // namespace quantclaw::cli
+}  // namespace quantclaw::cli

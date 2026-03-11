@@ -63,7 +63,7 @@ class CooldownTracker {
 
   // Compute cooldown duration based on error kind and failure count.
   static std::chrono::seconds ComputeCooldown(ProviderErrorKind kind,
-                                               int failure_count);
+                                              int failure_count);
 
   mutable std::mutex mu_;
   std::unordered_map<std::string, CooldownState> states_;

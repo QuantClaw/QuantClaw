@@ -42,10 +42,14 @@ class IpcServer {
   static void cleanup(const std::string& path);
 
   // Get the TCP port bound after listen().
-  int port() const { return port_; }
+  int port() const {
+    return port_;
+  }
 
   // Returns the path string passed to the constructor (may be empty).
-  const std::string& path() const { return path_; }
+  const std::string& path() const {
+    return path_;
+  }
 
  private:
   std::string path_;
@@ -72,7 +76,9 @@ class IpcClient {
   bool connect();
 
   // Get the connection handle (for read/write).
-  IpcHandle handle() const { return handle_; }
+  IpcHandle handle() const {
+    return handle_;
+  }
 
   // Close the connection.
   void close();

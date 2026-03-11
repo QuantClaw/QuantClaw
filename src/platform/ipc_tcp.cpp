@@ -8,12 +8,12 @@
 // the port to the sidecar child via QUANTCLAW_PORT.  The sidecar connects
 // back with net.createConnection(port, '127.0.0.1').
 
-#include "quantclaw/platform/ipc.hpp"
-
 #include <chrono>
 #include <cstring>
 #include <stdexcept>
 #include <string>
+
+#include "quantclaw/platform/ipc.hpp"
 
 #ifdef _WIN32
 // ---- Windows WinSock2 ----
@@ -34,10 +34,14 @@ struct WinSockInit {
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
   }
-  ~WinSockInit() { WSACleanup(); }
+  ~WinSockInit() {
+    WSACleanup();
+  }
 } g_winsock;
 
-inline void close_fd(socket_t s) { closesocket(s); }
+inline void close_fd(socket_t s) {
+  closesocket(s);
+}
 }  // namespace
 
 #else
@@ -52,8 +56,11 @@ using socket_t = int;
 #define INVALID_SOCK (-1)
 
 namespace {
-// Use ::close to explicitly call the POSIX close() rather than a member close().
-inline void close_fd(socket_t s) { ::close(s); }
+// Use ::close to explicitly call the POSIX close() rather than a member
+// close().
+inline void close_fd(socket_t s) {
+  ::close(s);
+}
 }  // namespace
 #endif
 
@@ -69,7 +76,7 @@ bool wait_readable(socket_t sock, int ms) {
   FD_SET(sock, &fds);
 
   struct timeval tv;
-  tv.tv_sec  = ms / 1000;
+  tv.tv_sec = ms / 1000;
   tv.tv_usec = (ms % 1000) * 1000;
 
 #ifdef _WIN32
@@ -87,21 +94,24 @@ bool wait_readable(socket_t sock, int ms) {
 
 IpcServer::IpcServer(const std::string& path) : path_(path) {}
 
-IpcServer::~IpcServer() { close(); }
+IpcServer::~IpcServer() {
+  close();
+}
 
 bool IpcServer::listen() {
   socket_t sock = socket(AF_INET, SOCK_STREAM, 0);
-  if (sock == INVALID_SOCK) return false;
+  if (sock == INVALID_SOCK)
+    return false;
 
   // Permit rapid re-bind in tests.
   int opt = 1;
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
              reinterpret_cast<const char*>(&opt), sizeof(opt));
 
-  struct sockaddr_in addr{};
-  addr.sin_family      = AF_INET;
+  struct sockaddr_in addr {};
+  addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-  addr.sin_port        = 0;  // OS picks a free port.
+  addr.sin_port = 0;  // OS picks a free port.
 
   if (bind(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
     close_fd(sock);
@@ -114,7 +124,7 @@ bool IpcServer::listen() {
   }
 
   // Retrieve the actual port assigned by the OS.
-  struct sockaddr_in bound{};
+  struct sockaddr_in bound {};
 #ifdef _WIN32
   int bound_len = sizeof(bound);
 #else
@@ -128,7 +138,8 @@ bool IpcServer::listen() {
 }
 
 IpcHandle IpcServer::accept(int timeout_ms) {
-  if (listen_handle_ == kInvalidIpc) return kInvalidIpc;
+  if (listen_handle_ == kInvalidIpc)
+    return kInvalidIpc;
   socket_t ls = static_cast<socket_t>(listen_handle_);
 
   if (timeout_ms >= 0 && !wait_readable(ls, timeout_ms)) {
@@ -136,7 +147,8 @@ IpcHandle IpcServer::accept(int timeout_ms) {
   }
 
   socket_t conn = ::accept(ls, nullptr, nullptr);
-  if (conn == INVALID_SOCK) return kInvalidIpc;
+  if (conn == INVALID_SOCK)
+    return kInvalidIpc;
   return static_cast<IpcHandle>(conn);
 }
 
@@ -162,28 +174,34 @@ IpcClient::IpcClient(const std::string& path) {
   auto colon = path.rfind(':');
   if (colon != std::string::npos) {
     host_ = path.substr(0, colon);
-    try { port_ = std::stoi(path.substr(colon + 1)); } catch (...) {}
+    try {
+      port_ = std::stoi(path.substr(colon + 1));
+    } catch (...) {}
   } else {
     host_ = "127.0.0.1";
     port_ = 0;
   }
 }
 
-IpcClient::~IpcClient() { close(); }
+IpcClient::~IpcClient() {
+  close();
+}
 
 bool IpcClient::connect() {
-  if (port_ <= 0) return false;
+  if (port_ <= 0)
+    return false;
 
   socket_t sock = socket(AF_INET, SOCK_STREAM, 0);
-  if (sock == INVALID_SOCK) return false;
+  if (sock == INVALID_SOCK)
+    return false;
 
-  struct sockaddr_in addr{};
-  addr.sin_family      = AF_INET;
+  struct sockaddr_in addr {};
+  addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = inet_addr(host_.c_str());
-  addr.sin_port        = htons(static_cast<uint16_t>(port_));
+  addr.sin_port = htons(static_cast<uint16_t>(port_));
 
-  if (::connect(sock, reinterpret_cast<struct sockaddr*>(&addr),
-                sizeof(addr)) < 0) {
+  if (::connect(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) <
+      0) {
     close_fd(sock);
     return false;
   }
@@ -217,22 +235,27 @@ std::string ipc_read_line(IpcHandle h, int timeout_ms) {
   constexpr size_t kMaxSize = 16 * 1024 * 1024;
 
   socket_t sock = static_cast<socket_t>(h);
-  auto deadline = std::chrono::steady_clock::now() +
-                  std::chrono::milliseconds(timeout_ms);
+  auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
 
   while (std::chrono::steady_clock::now() < deadline) {
     auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
         deadline - std::chrono::steady_clock::now());
-    if (remaining.count() <= 0) break;
+    if (remaining.count() <= 0)
+      break;
 
-    if (!wait_readable(sock, static_cast<int>(remaining.count()))) break;
+    if (!wait_readable(sock, static_cast<int>(remaining.count())))
+      break;
 
     char c;
     int n = static_cast<int>(recv(sock, &c, 1, 0));
-    if (n <= 0) break;
-    if (c == '\n') return line;
+    if (n <= 0)
+      break;
+    if (c == '\n')
+      return line;
     line += c;
-    if (line.size() > kMaxSize) break;
+    if (line.size() > kMaxSize)
+      break;
   }
   return line;
 }

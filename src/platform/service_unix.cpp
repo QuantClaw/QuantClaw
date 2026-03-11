@@ -3,13 +3,13 @@
 
 #ifndef _WIN32
 
-#include "quantclaw/platform/service.hpp"
-#include "quantclaw/platform/process.hpp"
-
-#include <cstdlib>
-#include <fstream>
-#include <filesystem>
 #include <csignal>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+
+#include "quantclaw/platform/process.hpp"
+#include "quantclaw/platform/service.hpp"
 
 namespace quantclaw::platform {
 
@@ -24,14 +24,12 @@ ServiceManager::ServiceManager(std::shared_ptr<spdlog::logger> logger)
 }
 
 std::string ServiceManager::service_path() const {
-  return home_directory() +
-         "/.config/systemd/user/quantclaw-gateway.service";
+  return home_directory() + "/.config/systemd/user/quantclaw-gateway.service";
 }
 
 int ServiceManager::install(int port) {
   auto svc = service_path();
-  std::filesystem::create_directories(
-      std::filesystem::path(svc).parent_path());
+  std::filesystem::create_directories(std::filesystem::path(svc).parent_path());
 
   std::string exe = executable_path();
   std::ofstream out(svc);
@@ -57,11 +55,14 @@ int ServiceManager::install(int port) {
   out.close();
 
   int r = std::system("systemctl --user daemon-reload");
-  if (r != 0) logger_->warn("systemctl daemon-reload returned {}", r);
+  if (r != 0)
+    logger_->warn("systemctl daemon-reload returned {}", r);
 
-  [[maybe_unused]] int enable_ret =
-      std::system(("systemctl --user enable " +
-                   std::string(kServiceName) + " 2>/dev/null").c_str());
+  // Execute enable command (return value ignored; redirection suppresses
+  // output)
+  (void)std::system(
+      ("systemctl --user enable " + std::string(kServiceName) + " 2>/dev/null")
+          .c_str());
   logger_->info("Service installed at {}", svc);
   return 0;
 }
@@ -73,12 +74,14 @@ int ServiceManager::uninstall() {
     logger_->info("Service not installed");
     return 0;
   }
-  [[maybe_unused]] int disable_ret =
-      std::system(("systemctl --user disable " +
-                   std::string(kServiceName) + " 2>/dev/null").c_str());
+  // Execute disable command (return value ignored; redirection suppresses
+  // output)
+  (void)std::system(
+      ("systemctl --user disable " + std::string(kServiceName) + " 2>/dev/null")
+          .c_str());
   std::filesystem::remove(svc);
-  [[maybe_unused]] int reload_ret =
-      std::system("systemctl --user daemon-reload 2>/dev/null");
+  // Execute daemon-reload (return value ignored; redirection suppresses output)
+  (void)std::system("systemctl --user daemon-reload 2>/dev/null");
   logger_->info("Service uninstalled");
   return 0;
 }
@@ -116,19 +119,21 @@ int ServiceManager::restart() {
 }
 
 int ServiceManager::status() {
-  return std::system(
-      ("systemctl --user status " +
-       std::string(kServiceName) + " --no-pager 2>/dev/null").c_str());
+  return std::system(("systemctl --user status " + std::string(kServiceName) +
+                      " --no-pager 2>/dev/null")
+                         .c_str());
 }
 
 bool ServiceManager::is_running() const {
   int pid = get_pid();
-  if (pid <= 0) return false;
+  if (pid <= 0)
+    return false;
   return kill(pid, 0) == 0;
 }
 
 int ServiceManager::get_pid() const {
-  if (!std::filesystem::exists(pid_file_)) return -1;
+  if (!std::filesystem::exists(pid_file_))
+    return -1;
   std::ifstream f(pid_file_);
   int pid = -1;
   f >> pid;

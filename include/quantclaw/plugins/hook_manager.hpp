@@ -9,6 +9,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -71,10 +72,8 @@ class HookManager {
   explicit HookManager(std::shared_ptr<spdlog::logger> logger);
 
   // Register a native C++ hook handler
-  void RegisterHook(const std::string& hook_name,
-                    const std::string& plugin_id,
-                    HookHandler handler,
-                    int priority = 0);
+  void RegisterHook(const std::string& hook_name, const std::string& plugin_id,
+                    HookHandler handler, int priority = 0);
 
   // Set the sidecar for forwarding hooks to plugins
   void SetSidecar(std::shared_ptr<SidecarManager> sidecar);
@@ -87,8 +86,7 @@ class HookManager {
                       const nlohmann::json& event);
 
   // Fire a hook asynchronously (fire-and-forget, always uses void semantics)
-  void FireAsync(const std::string& hook_name,
-                 const nlohmann::json& event);
+  void FireAsync(const std::string& hook_name, const nlohmann::json& event);
 
   // List all registered hooks
   std::vector<std::string> RegisteredHooks() const;

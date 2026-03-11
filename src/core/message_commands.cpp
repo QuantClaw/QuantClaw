@@ -11,9 +11,9 @@ namespace quantclaw {
 MessageCommandParser::MessageCommandParser(Handlers handlers)
     : handlers_(std::move(handlers)) {}
 
-CommandResult MessageCommandParser::Parse(
-    const std::string& message,
-    const std::string& session_key) const {
+CommandResult
+MessageCommandParser::Parse(const std::string& message,
+                            const std::string& session_key) const {
   // Trim leading whitespace
   auto start = message.find_first_not_of(" \t\r\n");
   if (start == std::string::npos || message[start] != '/') {
@@ -23,12 +23,14 @@ CommandResult MessageCommandParser::Parse(
   // Extract command name (everything after '/' until whitespace)
   auto cmd_start = start + 1;
   auto cmd_end = message.find_first_of(" \t\r\n", cmd_start);
-  std::string cmd = message.substr(cmd_start,
-      cmd_end == std::string::npos ? std::string::npos : cmd_end - cmd_start);
+  std::string cmd = message.substr(cmd_start, cmd_end == std::string::npos
+                                                  ? std::string::npos
+                                                  : cmd_end - cmd_start);
 
   // Normalize to lowercase
-  std::transform(cmd.begin(), cmd.end(), cmd.begin(),
-      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
 
   if (cmd == "new" || cmd == "reset") {
     if (handlers_.reset_session) {
@@ -70,11 +72,11 @@ CommandResult MessageCommandParser::Parse(
 std::vector<std::pair<std::string, std::string>>
 MessageCommandParser::ListCommands() {
   return {
-      {"/new",      "Start a new session (reset history)"},
-      {"/reset",    "Reset the current session"},
-      {"/compact",  "Compact session history to reduce context size"},
-      {"/status",   "Show current session status"},
-      {"/help",     "Show available commands"},
+      {"/new", "Start a new session (reset history)"},
+      {"/reset", "Reset the current session"},
+      {"/compact", "Compact session history to reduce context size"},
+      {"/status", "Show current session status"},
+      {"/help", "Show available commands"},
       {"/commands", "List all available commands"},
   };
 }

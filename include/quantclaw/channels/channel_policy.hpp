@@ -3,11 +3,12 @@
 
 #pragma once
 
+#include <mutex>
 #include <string>
-#include <vector>
 #include <unordered_map>
 #include <unordered_set>
-#include <mutex>
+#include <vector>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -24,9 +25,9 @@ std::string DmPolicyToString(DmPolicy p);
 
 // Session DM scope determines session isolation per sender
 enum class DmScope {
-  kMain,             // All DMs share the main session
-  kPerPeer,          // Each sender gets their own session
-  kPerChannelPeer,   // Each channel+sender gets their own session
+  kMain,                   // All DMs share the main session
+  kPerPeer,                // Each sender gets their own session
+  kPerChannelPeer,         // Each channel+sender gets their own session
   kPerAccountChannelPeer,  // Each account+channel+sender
 };
 
@@ -62,8 +63,7 @@ class PairingManager {
   std::string GenerateCode(const std::string& channel_id);
 
   // Verify and consume a pairing code. Returns true if valid.
-  bool VerifyCode(const std::string& channel_id,
-                  const std::string& code,
+  bool VerifyCode(const std::string& channel_id, const std::string& code,
                   const std::string& sender_id);
 
   // Check if a sender is already paired
@@ -90,19 +90,17 @@ class PairingManager {
 class SessionResolver {
  public:
   // Build a session key from message context
-  static std::string ResolveSessionKey(
-      DmScope scope,
-      const std::string& agent_id,
-      const std::string& channel_id,
-      const std::string& sender_id,
-      const std::string& account_id = "");
+  static std::string ResolveSessionKey(DmScope scope,
+                                       const std::string& agent_id,
+                                       const std::string& channel_id,
+                                       const std::string& sender_id,
+                                       const std::string& account_id = "");
 
   // Check if a group message should activate the agent
-  static bool ShouldActivateGroup(
-      GroupActivation mode,
-      const std::string& message,
-      const std::string& bot_name,
-      const std::vector<std::string>& mention_patterns = {});
+  static bool
+  ShouldActivateGroup(GroupActivation mode, const std::string& message,
+                      const std::string& bot_name,
+                      const std::vector<std::string>& mention_patterns = {});
 };
 
 }  // namespace quantclaw

@@ -1,10 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/core/subagent.hpp"
+
+#include <gtest/gtest.h>
 
 namespace quantclaw {
 
@@ -190,12 +192,12 @@ TEST_F(SubagentManagerTest, CleanupCompleted) {
 
 TEST_F(SubagentManagerTest, AgentRunner) {
   std::string received_task;
-  mgr_->SetAgentRunner(
-      [&](const std::string&, const std::string& task,
-          const std::string&, const std::string&) -> std::string {
-        received_task = task;
-        return "result from agent";
-      });
+  mgr_->SetAgentRunner([&](const std::string&, const std::string& task,
+                           const std::string&,
+                           const std::string&) -> std::string {
+    received_task = task;
+    return "result from agent";
+  });
 
   SpawnParams params;
   params.task = "Do the thing";

@@ -3,20 +3,21 @@
 
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
-#include <filesystem>
-#include <spdlog/spdlog.h>
+
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 namespace quantclaw {
 
 struct MemorySearchResult {
-  std::string source;     // file path
-  std::string content;    // matching line/paragraph
-  double score;           // relevance score (0-1)
-  int line_number;        // line number in source
+  std::string source;   // file path
+  std::string content;  // matching line/paragraph
+  double score;         // relevance score (0-1)
+  int line_number;      // line number in source
 };
 
 // Full-text memory search across workspace memory files.
@@ -33,7 +34,7 @@ class MemorySearch {
 
   // Search for relevant memory entries
   std::vector<MemorySearchResult> Search(const std::string& query,
-                                          int max_results = 10) const;
+                                         int max_results = 10) const;
 
   // Get index stats
   nlohmann::json Stats() const;

@@ -1,22 +1,26 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
 #include <atomic>
-#include <fstream>
 #include <filesystem>
-#include <spdlog/spdlog.h>
+#include <fstream>
+
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
+#include "quantclaw/config.hpp"
+#include "quantclaw/plugins/hook_manager.hpp"
 #include "quantclaw/plugins/plugin_manifest.hpp"
 #include "quantclaw/plugins/plugin_registry.hpp"
-#include "quantclaw/plugins/hook_manager.hpp"
 #include "quantclaw/plugins/plugin_system.hpp"
-#include "quantclaw/config.hpp"
+
 #include "test_helpers.hpp"
+#include <gtest/gtest.h>
 
 namespace fs = std::filesystem;
 
-static std::shared_ptr<spdlog::logger> make_null_logger(const std::string& name) {
+static std::shared_ptr<spdlog::logger>
+make_null_logger(const std::string& name) {
   auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
   return std::make_shared<spdlog::logger>(name, null_sink);
 }
@@ -127,15 +131,17 @@ TEST_F(PluginManifestTest, ToJsonRoundTrip) {
 TEST_F(PluginManifestTest, ParseUiHints) {
   nlohmann::json j = {
       {"id", "hints"},
-      {"uiHints", {
-          {"apiKey", {
-              {"label", "API Key"},
-              {"help", "Your secret key"},
-              {"sensitive", true},
-              {"advanced", false},
-              {"tags", {"auth", "security"}},
-          }},
-      }},
+      {"uiHints",
+       {
+           {"apiKey",
+            {
+                {"label", "API Key"},
+                {"help", "Your secret key"},
+                {"sensitive", true},
+                {"advanced", false},
+                {"tags", {"auth", "security"}},
+            }},
+       }},
   };
   auto m = quantclaw::PluginManifest::Parse(j);
   ASSERT_EQ(m.ui_hints.size(), 1);
@@ -355,10 +361,10 @@ TEST_F(HookManagerTest, RegisterAndFire) {
   bool called = false;
   // Use a modifying hook so results are returned
   hooks.RegisterHook("before_model_resolve", "test-plugin",
-                      [&called](const nlohmann::json&) -> nlohmann::json {
-                        called = true;
-                        return {{"handled", true}};
-                      });
+                     [&called](const nlohmann::json&) -> nlohmann::json {
+                       called = true;
+                       return {{"handled", true}};
+                     });
 
   auto result = hooks.Fire("before_model_resolve", {{"data", 42}});
   EXPECT_TRUE(called);
@@ -370,23 +376,29 @@ TEST_F(HookManagerTest, PriorityOrdering) {
 
   // Use a modifying hook so handlers execute sequentially in priority order
   std::vector<int> order;
-  hooks.RegisterHook("before_model_resolve", "low",
-                      [&order](const nlohmann::json&) -> nlohmann::json {
-                        order.push_back(3);
-                        return {};
-                      }, 10);
+  hooks.RegisterHook(
+      "before_model_resolve", "low",
+      [&order](const nlohmann::json&) -> nlohmann::json {
+        order.push_back(3);
+        return {};
+      },
+      10);
 
-  hooks.RegisterHook("before_model_resolve", "high",
-                      [&order](const nlohmann::json&) -> nlohmann::json {
-                        order.push_back(1);
-                        return {};
-                      }, 100);
+  hooks.RegisterHook(
+      "before_model_resolve", "high",
+      [&order](const nlohmann::json&) -> nlohmann::json {
+        order.push_back(1);
+        return {};
+      },
+      100);
 
-  hooks.RegisterHook("before_model_resolve", "mid",
-                      [&order](const nlohmann::json&) -> nlohmann::json {
-                        order.push_back(2);
-                        return {};
-                      }, 50);
+  hooks.RegisterHook(
+      "before_model_resolve", "mid",
+      [&order](const nlohmann::json&) -> nlohmann::json {
+        order.push_back(2);
+        return {};
+      },
+      50);
 
   hooks.Fire("before_model_resolve", {});
   ASSERT_EQ(order.size(), 3);
@@ -400,13 +412,13 @@ TEST_F(HookManagerTest, MergedResults) {
 
   // Use a modifying hook so results are merged
   hooks.RegisterHook("before_agent_start", "p1",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"key1", "val1"}};
-                      });
+                     [](const nlohmann::json&) -> nlohmann::json {
+                       return {{"key1", "val1"}};
+                     });
   hooks.RegisterHook("before_agent_start", "p2",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"key2", "val2"}};
-                      });
+                     [](const nlohmann::json&) -> nlohmann::json {
+                       return {{"key2", "val2"}};
+                     });
 
   auto result = hooks.Fire("before_agent_start", {});
   EXPECT_EQ(result["key1"], "val1");
@@ -424,13 +436,13 @@ TEST_F(HookManagerTest, HandlerExceptionDoesNotCrash) {
 
   // Use a modifying hook so results are returned
   hooks.RegisterHook("message_sending", "bad",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        throw std::runtime_error("boom");
-                      });
+                     [](const nlohmann::json&) -> nlohmann::json {
+                       throw std::runtime_error("boom");
+                     });
   hooks.RegisterHook("message_sending", "good",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"survived", true}};
-                      });
+                     [](const nlohmann::json&) -> nlohmann::json {
+                       return {{"survived", true}};
+                     });
 
   auto result = hooks.Fire("message_sending", {});
   EXPECT_TRUE(result.value("survived", false));
@@ -440,15 +452,19 @@ TEST_F(HookManagerTest, HandlerCount) {
   quantclaw::HookManager hooks(logger_);
   EXPECT_EQ(hooks.HandlerCount("test"), 0);
 
-  hooks.RegisterHook("test", "a", [](const nlohmann::json&) { return nlohmann::json{}; });
-  hooks.RegisterHook("test", "b", [](const nlohmann::json&) { return nlohmann::json{}; });
+  hooks.RegisterHook("test", "a",
+                     [](const nlohmann::json&) { return nlohmann::json{}; });
+  hooks.RegisterHook("test", "b",
+                     [](const nlohmann::json&) { return nlohmann::json{}; });
   EXPECT_EQ(hooks.HandlerCount("test"), 2);
 }
 
 TEST_F(HookManagerTest, RegisteredHooksList) {
   quantclaw::HookManager hooks(logger_);
-  hooks.RegisterHook("hook_a", "p", [](const nlohmann::json&) { return nlohmann::json{}; });
-  hooks.RegisterHook("hook_b", "p", [](const nlohmann::json&) { return nlohmann::json{}; });
+  hooks.RegisterHook("hook_a", "p",
+                     [](const nlohmann::json&) { return nlohmann::json{}; });
+  hooks.RegisterHook("hook_b", "p",
+                     [](const nlohmann::json&) { return nlohmann::json{}; });
 
   auto names = hooks.RegisteredHooks();
   ASSERT_EQ(names.size(), 2);
@@ -489,18 +505,15 @@ TEST(HookModeTest, VoidHooks) {
   EXPECT_EQ(quantclaw::GetHookMode("agent_end"), quantclaw::HookMode::kVoid);
   EXPECT_EQ(quantclaw::GetHookMode("message_received"),
             quantclaw::HookMode::kVoid);
-  EXPECT_EQ(quantclaw::GetHookMode("message_sent"),
-            quantclaw::HookMode::kVoid);
+  EXPECT_EQ(quantclaw::GetHookMode("message_sent"), quantclaw::HookMode::kVoid);
   EXPECT_EQ(quantclaw::GetHookMode("after_tool_call"),
             quantclaw::HookMode::kVoid);
   EXPECT_EQ(quantclaw::GetHookMode("session_start"),
             quantclaw::HookMode::kVoid);
-  EXPECT_EQ(quantclaw::GetHookMode("session_end"),
-            quantclaw::HookMode::kVoid);
+  EXPECT_EQ(quantclaw::GetHookMode("session_end"), quantclaw::HookMode::kVoid);
   EXPECT_EQ(quantclaw::GetHookMode("gateway_start"),
             quantclaw::HookMode::kVoid);
-  EXPECT_EQ(quantclaw::GetHookMode("gateway_stop"),
-            quantclaw::HookMode::kVoid);
+  EXPECT_EQ(quantclaw::GetHookMode("gateway_stop"), quantclaw::HookMode::kVoid);
 }
 
 TEST(HookModeTest, UnknownHookDefaultsToVoid) {
@@ -510,16 +523,18 @@ TEST(HookModeTest, UnknownHookDefaultsToVoid) {
 
 TEST(HookModeTest, AllTwentyFourHooksClassified) {
   const std::vector<std::string> all_hooks = {
-      "before_model_resolve", "before_prompt_build", "before_agent_start",
-      "llm_input", "llm_output", "agent_end",
-      "before_compaction", "after_compaction", "before_reset",
-      "message_received", "message_sending", "message_sent",
-      "before_tool_call", "after_tool_call",
-      "tool_result_persist", "before_message_write",
-      "session_start", "session_end",
-      "subagent_spawning", "subagent_delivery_target",
-      "subagent_spawned", "subagent_ended",
-      "gateway_start", "gateway_stop",
+      "before_model_resolve", "before_prompt_build",
+      "before_agent_start",   "llm_input",
+      "llm_output",           "agent_end",
+      "before_compaction",    "after_compaction",
+      "before_reset",         "message_received",
+      "message_sending",      "message_sent",
+      "before_tool_call",     "after_tool_call",
+      "tool_result_persist",  "before_message_write",
+      "session_start",        "session_end",
+      "subagent_spawning",    "subagent_delivery_target",
+      "subagent_spawned",     "subagent_ended",
+      "gateway_start",        "gateway_stop",
   };
 
   for (const auto& hook : all_hooks) {
@@ -537,10 +552,10 @@ TEST_F(HookManagerTest, VoidHooksRunInParallel) {
   std::atomic<int> count{0};
   for (int i = 0; i < 3; ++i) {
     hooks.RegisterHook("message_received", "p" + std::to_string(i),
-                        [&count](const nlohmann::json&) -> nlohmann::json {
-                          count.fetch_add(1);
-                          return {{"ignored", true}};
-                        });
+                       [&count](const nlohmann::json&) -> nlohmann::json {
+                         count.fetch_add(1);
+                         return {{"ignored", true}};
+                       });
   }
 
   auto result = hooks.Fire("message_received", {});
@@ -552,14 +567,18 @@ TEST_F(HookManagerTest, VoidHooksRunInParallel) {
 TEST_F(HookManagerTest, ModifyingHooksMergeResults) {
   quantclaw::HookManager hooks(logger_);
 
-  hooks.RegisterHook("before_model_resolve", "p1",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"model", "gpt-4"}};
-                      }, 10);
-  hooks.RegisterHook("before_model_resolve", "p2",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"provider", "openai"}};
-                      }, 5);
+  hooks.RegisterHook(
+      "before_model_resolve", "p1",
+      [](const nlohmann::json&) -> nlohmann::json {
+        return {{"model", "gpt-4"}};
+      },
+      10);
+  hooks.RegisterHook(
+      "before_model_resolve", "p2",
+      [](const nlohmann::json&) -> nlohmann::json {
+        return {{"provider", "openai"}};
+      },
+      5);
 
   auto result = hooks.Fire("before_model_resolve", {});
   EXPECT_EQ(result["model"], "gpt-4");
@@ -570,11 +589,12 @@ TEST_F(HookManagerTest, SyncHooksMergeResults) {
   quantclaw::HookManager hooks(logger_);
 
   hooks.RegisterHook("tool_result_persist", "p1",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"message", {{"modified", true}}}};
-                      });
+                     [](const nlohmann::json&) -> nlohmann::json {
+                       return {{"message", {{"modified", true}}}};
+                     });
 
-  auto result = hooks.Fire("tool_result_persist", {{"message", {{"original", true}}}});
+  auto result =
+      hooks.Fire("tool_result_persist", {{"message", {{"original", true}}}});
   EXPECT_TRUE(result.contains("message"));
   EXPECT_TRUE(result["message"]["modified"].get<bool>());
 }
@@ -582,14 +602,18 @@ TEST_F(HookManagerTest, SyncHooksMergeResults) {
 TEST_F(HookManagerTest, ModifyingHookLaterOverridesEarlier) {
   quantclaw::HookManager hooks(logger_);
 
-  hooks.RegisterHook("before_prompt_build", "first",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"context", "initial"}};
-                      }, 10);
-  hooks.RegisterHook("before_prompt_build", "second",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"context", "override"}};
-                      }, 5);
+  hooks.RegisterHook(
+      "before_prompt_build", "first",
+      [](const nlohmann::json&) -> nlohmann::json {
+        return {{"context", "initial"}};
+      },
+      10);
+  hooks.RegisterHook(
+      "before_prompt_build", "second",
+      [](const nlohmann::json&) -> nlohmann::json {
+        return {{"context", "override"}};
+      },
+      5);
 
   auto result = hooks.Fire("before_prompt_build", {});
   EXPECT_EQ(result["context"], "override");
@@ -598,16 +622,29 @@ TEST_F(HookManagerTest, ModifyingHookLaterOverridesEarlier) {
 // --- PluginOrigin / PluginStatus Helpers ---
 
 TEST(PluginHelpersTest, OriginToString) {
-  EXPECT_EQ(quantclaw::plugin_origin_to_string(quantclaw::PluginOrigin::kBundled), "bundled");
-  EXPECT_EQ(quantclaw::plugin_origin_to_string(quantclaw::PluginOrigin::kGlobal), "global");
-  EXPECT_EQ(quantclaw::plugin_origin_to_string(quantclaw::PluginOrigin::kWorkspace), "workspace");
-  EXPECT_EQ(quantclaw::plugin_origin_to_string(quantclaw::PluginOrigin::kConfig), "config");
+  EXPECT_EQ(
+      quantclaw::plugin_origin_to_string(quantclaw::PluginOrigin::kBundled),
+      "bundled");
+  EXPECT_EQ(
+      quantclaw::plugin_origin_to_string(quantclaw::PluginOrigin::kGlobal),
+      "global");
+  EXPECT_EQ(
+      quantclaw::plugin_origin_to_string(quantclaw::PluginOrigin::kWorkspace),
+      "workspace");
+  EXPECT_EQ(
+      quantclaw::plugin_origin_to_string(quantclaw::PluginOrigin::kConfig),
+      "config");
 }
 
 TEST(PluginHelpersTest, StatusToString) {
-  EXPECT_EQ(quantclaw::plugin_status_to_string(quantclaw::PluginStatus::kLoaded), "loaded");
-  EXPECT_EQ(quantclaw::plugin_status_to_string(quantclaw::PluginStatus::kDisabled), "disabled");
-  EXPECT_EQ(quantclaw::plugin_status_to_string(quantclaw::PluginStatus::kError), "error");
+  EXPECT_EQ(
+      quantclaw::plugin_status_to_string(quantclaw::PluginStatus::kLoaded),
+      "loaded");
+  EXPECT_EQ(
+      quantclaw::plugin_status_to_string(quantclaw::PluginStatus::kDisabled),
+      "disabled");
+  EXPECT_EQ(quantclaw::plugin_status_to_string(quantclaw::PluginStatus::kError),
+            "error");
 }
 
 // --- PluginSystem Tests (no sidecar, manifest-only mode) ---
@@ -686,10 +723,10 @@ TEST_F(PluginSystemTest, HooksWorkWithoutSidecar) {
   bool fired = false;
   // Use a modifying hook so results are returned
   sys.Hooks().RegisterHook("before_model_resolve", "native",
-                            [&fired](const nlohmann::json&) -> nlohmann::json {
-                              fired = true;
-                              return {{"ok", true}};
-                            });
+                           [&fired](const nlohmann::json&) -> nlohmann::json {
+                             fired = true;
+                             return {{"ok", true}};
+                           });
 
   auto result = sys.Hooks().Fire("before_model_resolve", {});
   EXPECT_TRUE(fired);
@@ -730,18 +767,19 @@ TEST_F(PluginRegistryCapTest, UpdateFromSidecarPopulatesExistingRecord) {
 
   // Simulate sidecar plugin.list response
   nlohmann::json sidecar_list = {
-      {"plugins", {{
-          {"id", "my-plugin"},
-          {"tools", {"read_file", "write_file"}},
-          {"hooks", {"before_tool_call", "after_tool_call"}},
-          {"services", {"file-watcher"}},
-          {"providers", {"local-fs"}},
-          {"commands", {"sync"}},
-          {"gatewayMethods", {"fs.read"}},
-          {"channels", {"stdio"}},
-          {"cliEntries", {"fs-cli"}},
-          {"httpHandlers", 3},
-      }}},
+      {"plugins",
+       {{
+           {"id", "my-plugin"},
+           {"tools", {"read_file", "write_file"}},
+           {"hooks", {"before_tool_call", "after_tool_call"}},
+           {"services", {"file-watcher"}},
+           {"providers", {"local-fs"}},
+           {"commands", {"sync"}},
+           {"gatewayMethods", {"fs.read"}},
+           {"channels", {"stdio"}},
+           {"cliEntries", {"fs-cli"}},
+           {"httpHandlers", 3},
+       }}},
   };
 
   reg.UpdateFromSidecar(sidecar_list);
@@ -762,7 +800,8 @@ TEST_F(PluginRegistryCapTest, UpdateFromSidecarPopulatesExistingRecord) {
   EXPECT_EQ(rec->http_handler_count, 3);
 }
 
-TEST_F(PluginRegistryCapTest, UpdateFromSidecarCreatesNewRecordForUnknownPlugin) {
+TEST_F(PluginRegistryCapTest,
+       UpdateFromSidecarCreatesNewRecordForUnknownPlugin) {
   quantclaw::PluginRegistry reg(logger_);
 
   // Empty registry — no plugins discovered
@@ -772,12 +811,13 @@ TEST_F(PluginRegistryCapTest, UpdateFromSidecarCreatesNewRecordForUnknownPlugin)
 
   // Sidecar reports a plugin the registry didn't know about
   nlohmann::json sidecar_list = {
-      {"plugins", {{
-          {"id", "dynamic-plugin"},
-          {"name", "Dynamic Plugin"},
-          {"version", "2.0.0"},
-          {"tools", {"calculate"}},
-      }}},
+      {"plugins",
+       {{
+           {"id", "dynamic-plugin"},
+           {"name", "Dynamic Plugin"},
+           {"version", "2.0.0"},
+           {"tools", {"calculate"}},
+       }}},
   };
 
   reg.UpdateFromSidecar(sidecar_list);
@@ -806,11 +846,12 @@ TEST_F(PluginRegistryCapTest, UpdateFromSidecarMergesWithoutDuplication) {
 
   // Sidecar reports overlapping capabilities
   nlohmann::json sidecar_list = {
-      {"plugins", {{
-          {"id", "my-plugin"},
-          {"channels", {"discord", "slack"}},
-          {"providers", {"openai", "anthropic"}},
-      }}},
+      {"plugins",
+       {{
+           {"id", "my-plugin"},
+           {"channels", {"discord", "slack"}},
+           {"providers", {"openai", "anthropic"}},
+       }}},
   };
 
   reg.UpdateFromSidecar(sidecar_list);
@@ -850,11 +891,12 @@ TEST_F(PluginRegistryCapTest, UpdateFromSidecarSkipsEntriesWithoutId) {
   reg.Discover(config, test_dir_);
 
   nlohmann::json sidecar_list = {
-      {"plugins", {
-          {{"tools", {"tool1"}}},  // no id
-          {{"id", ""}, {"tools", {"tool2"}}},  // empty id
-          {{"id", "valid"}, {"tools", {"tool3"}}},
-      }},
+      {"plugins",
+       {
+           {{"tools", {"tool1"}}},              // no id
+           {{"id", ""}, {"tools", {"tool2"}}},  // empty id
+           {{"id", "valid"}, {"tools", {"tool3"}}},
+       }},
   };
 
   reg.UpdateFromSidecar(sidecar_list);
@@ -878,13 +920,14 @@ TEST_F(PluginRegistryCapTest, ToJsonIncludesCapabilities) {
   reg.Discover(config, test_dir_);
 
   nlohmann::json sidecar_list = {
-      {"plugins", {{
-          {"id", "full-plugin"},
-          {"tools", {"t1"}},
-          {"hooks", {"h1"}},
-          {"services", {"s1"}},
-          {"httpHandlers", 2},
-      }}},
+      {"plugins",
+       {{
+           {"id", "full-plugin"},
+           {"tools", {"t1"}},
+           {"hooks", {"h1"}},
+           {"services", {"s1"}},
+           {"httpHandlers", 2},
+       }}},
   };
   reg.UpdateFromSidecar(sidecar_list);
 
@@ -925,10 +968,11 @@ TEST_F(PluginRegistryCapTest, MultiplePluginsUpdated) {
   reg.Discover(config, test_dir_);
 
   nlohmann::json sidecar_list = {
-      {"plugins", {
-          {{"id", "p1"}, {"tools", {"a", "b"}}},
-          {{"id", "p2"}, {"tools", {"c"}}, {"services", {"svc"}}},
-      }},
+      {"plugins",
+       {
+           {{"id", "p1"}, {"tools", {"a", "b"}}},
+           {{"id", "p2"}, {"tools", {"c"}}, {"services", {"svc"}}},
+       }},
   };
   reg.UpdateFromSidecar(sidecar_list);
 
@@ -1013,15 +1057,15 @@ TEST_F(HookManagerTest, UnregisterSpecificHandler) {
 
   std::vector<std::string> calls;
   hooks.RegisterHook("before_model_resolve", "plugin-a",
-                      [&calls](const nlohmann::json&) -> nlohmann::json {
-                        calls.push_back("a");
-                        return {{"from", "a"}};
-                      });
+                     [&calls](const nlohmann::json&) -> nlohmann::json {
+                       calls.push_back("a");
+                       return {{"from", "a"}};
+                     });
   hooks.RegisterHook("before_model_resolve", "plugin-b",
-                      [&calls](const nlohmann::json&) -> nlohmann::json {
-                        calls.push_back("b");
-                        return {{"from", "b"}};
-                      });
+                     [&calls](const nlohmann::json&) -> nlohmann::json {
+                       calls.push_back("b");
+                       return {{"from", "b"}};
+                     });
 
   EXPECT_EQ(hooks.HandlerCount("before_model_resolve"), 2u);
 
@@ -1042,15 +1086,19 @@ TEST_F(HookManagerTest, ErrorInHandlerDoesNotBreakOthers) {
 
   std::vector<std::string> calls;
   // Use a modifying hook so handlers run sequentially
-  hooks.RegisterHook("before_prompt_build", "bad-handler",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        throw std::runtime_error("handler exploded");
-                      }, 100);  // Higher priority, runs first
-  hooks.RegisterHook("before_prompt_build", "good-handler",
-                      [&calls](const nlohmann::json&) -> nlohmann::json {
-                        calls.push_back("good");
-                        return {{"ok", true}};
-                      }, 50);   // Lower priority, runs second
+  hooks.RegisterHook(
+      "before_prompt_build", "bad-handler",
+      [](const nlohmann::json&) -> nlohmann::json {
+        throw std::runtime_error("handler exploded");
+      },
+      100);  // Higher priority, runs first
+  hooks.RegisterHook(
+      "before_prompt_build", "good-handler",
+      [&calls](const nlohmann::json&) -> nlohmann::json {
+        calls.push_back("good");
+        return {{"ok", true}};
+      },
+      50);  // Lower priority, runs second
 
   auto result = hooks.Fire("before_prompt_build", {});
   // good-handler should have run despite bad-handler throwing
@@ -1063,8 +1111,7 @@ TEST_F(HookManagerTest, HookModeForClassification) {
   // Verify at least 5 hook names return correct modes
   EXPECT_EQ(quantclaw::GetHookMode("before_model_resolve"),
             quantclaw::HookMode::kModifying);
-  EXPECT_EQ(quantclaw::GetHookMode("llm_input"),
-            quantclaw::HookMode::kVoid);
+  EXPECT_EQ(quantclaw::GetHookMode("llm_input"), quantclaw::HookMode::kVoid);
   EXPECT_EQ(quantclaw::GetHookMode("tool_result_persist"),
             quantclaw::HookMode::kSync);
   EXPECT_EQ(quantclaw::GetHookMode("message_received"),
@@ -1077,13 +1124,13 @@ TEST_F(HookManagerTest, ClearAllHandlers) {
   quantclaw::HookManager hooks(logger_);
 
   hooks.RegisterHook("before_model_resolve", "p1",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"cleared", false}};
-                      });
+                     [](const nlohmann::json&) -> nlohmann::json {
+                       return {{"cleared", false}};
+                     });
   hooks.RegisterHook("llm_input", "p2",
-                      [](const nlohmann::json&) -> nlohmann::json {
-                        return {{"cleared", false}};
-                      });
+                     [](const nlohmann::json&) -> nlohmann::json {
+                       return {{"cleared", false}};
+                     });
 
   EXPECT_EQ(hooks.HandlerCount("before_model_resolve"), 1u);
   EXPECT_EQ(hooks.HandlerCount("llm_input"), 1u);

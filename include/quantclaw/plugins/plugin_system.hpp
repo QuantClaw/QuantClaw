@@ -3,11 +3,12 @@
 
 #pragma once
 
+#include <memory>
+
+#include "quantclaw/config.hpp"
 #include "quantclaw/plugins/hook_manager.hpp"
 #include "quantclaw/plugins/plugin_registry.hpp"
 #include "quantclaw/plugins/sidecar_manager.hpp"
-#include "quantclaw/config.hpp"
-#include <memory>
 
 namespace quantclaw {
 
@@ -34,10 +35,18 @@ class PluginSystem {
               const std::filesystem::path& workspace_dir);
 
   // Access components
-  PluginRegistry& Registry() { return registry_; }
-  const PluginRegistry& Registry() const { return registry_; }
-  HookManager& Hooks() { return hooks_; }
-  SidecarManager* Sidecar() { return sidecar_.get(); }
+  PluginRegistry& Registry() {
+    return registry_;
+  }
+  const PluginRegistry& Registry() const {
+    return registry_;
+  }
+  HookManager& Hooks() {
+    return hooks_;
+  }
+  SidecarManager* Sidecar() {
+    return sidecar_.get();
+  }
 
   // Convenience: call a plugin tool via sidecar
   nlohmann::json CallTool(const std::string& tool_name,
@@ -50,8 +59,7 @@ class PluginSystem {
   nlohmann::json ListSidecarPlugins();
 
   // Handle an HTTP request through sidecar plugin routes
-  nlohmann::json HandleHttp(const std::string& method,
-                            const std::string& path,
+  nlohmann::json HandleHttp(const std::string& method, const std::string& path,
                             const nlohmann::json& body,
                             const std::map<std::string, std::string>& headers);
 

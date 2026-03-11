@@ -64,9 +64,8 @@ class FailoverResolver {
 
   // Resolve a provider for the given model, considering cooldowns
   // and session pin. Returns nullopt if all options exhausted.
-  std::optional<ResolvedProvider> Resolve(
-      const std::string& model,
-      const std::string& session_key = "");
+  std::optional<ResolvedProvider> Resolve(const std::string& model,
+                                          const std::string& session_key = "");
 
   // Record a successful API call. Clears cooldown, pins session.
   void RecordSuccess(const std::string& provider_id,
@@ -76,24 +75,24 @@ class FailoverResolver {
   // Record a failed API call. Sets cooldown based on error kind.
   // If retry_after_seconds > 0, uses that as cooldown instead of backoff.
   void RecordFailure(const std::string& provider_id,
-                     const std::string& profile_id,
-                     ProviderErrorKind kind,
+                     const std::string& profile_id, ProviderErrorKind kind,
                      int retry_after_seconds = 0);
 
   // Clear session pin (e.g., on session reset).
   void ClearSessionPin(const std::string& session_key);
 
   // Get cooldown tracker (for status queries).
-  const CooldownTracker& GetCooldownTracker() const { return cooldown_; }
+  const CooldownTracker& GetCooldownTracker() const {
+    return cooldown_;
+  }
 
  private:
   std::string cooldown_key(const std::string& provider_id,
                            const std::string& profile_id) const;
 
   // Try to resolve a specific model (without walking fallback chain).
-  std::optional<ResolvedProvider> try_resolve_model(
-      const std::string& model,
-      const std::string& session_key);
+  std::optional<ResolvedProvider>
+  try_resolve_model(const std::string& model, const std::string& session_key);
 
   ProviderRegistry* registry_;
   std::shared_ptr<spdlog::logger> logger_;

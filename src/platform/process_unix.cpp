@@ -3,32 +3,36 @@
 
 #ifndef _WIN32
 
-#include "quantclaw/platform/process.hpp"
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include <cerrno>
+#include <chrono>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <chrono>
 #include <thread>
-#include <unistd.h>
-#include <sys/wait.h>
+
+#include "quantclaw/platform/process.hpp"
 
 namespace quantclaw::platform {
 
 ProcessId spawn_process(const std::vector<std::string>& args,
                         const std::vector<std::string>& env,
                         const std::string& working_dir) {
-  if (args.empty()) return kInvalidPid;
+  if (args.empty())
+    return kInvalidPid;
 
   pid_t pid = fork();
-  if (pid < 0) return kInvalidPid;
+  if (pid < 0)
+    return kInvalidPid;
 
   if (pid == 0) {
     // Child process
     if (!working_dir.empty()) {
-      if (chdir(working_dir.c_str()) != 0) _exit(1);
+      if (chdir(working_dir.c_str()) != 0)
+        _exit(1);
     }
     for (const auto& e : env) {
       auto eq = e.find('=');
@@ -49,30 +53,36 @@ ProcessId spawn_process(const std::vector<std::string>& args,
 }
 
 bool is_process_alive(ProcessId pid) {
-  if (pid <= 0) return false;
+  if (pid <= 0)
+    return false;
   return kill(pid, 0) == 0;
 }
 
 void terminate_process(ProcessId pid) {
-  if (pid > 0) kill(pid, SIGTERM);
+  if (pid > 0)
+    kill(pid, SIGTERM);
 }
 
 void kill_process(ProcessId pid) {
-  if (pid > 0) kill(pid, SIGKILL);
+  if (pid > 0)
+    kill(pid, SIGKILL);
 }
 
 void reload_process(ProcessId pid) {
-  if (pid > 0) kill(pid, SIGHUP);
+  if (pid > 0)
+    kill(pid, SIGHUP);
 }
 
 int wait_process(ProcessId pid, int timeout_ms) {
-  if (pid <= 0) return -1;
+  if (pid <= 0)
+    return -1;
 
   if (timeout_ms == 0) {
     // Non-blocking
     int status;
     pid_t r = waitpid(pid, &status, WNOHANG);
-    if (r <= 0) return -1;
+    if (r <= 0)
+      return -1;
     return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
   }
 
@@ -80,13 +90,14 @@ int wait_process(ProcessId pid, int timeout_ms) {
     // Wait forever
     int status;
     pid_t r = waitpid(pid, &status, 0);
-    if (r <= 0) return -1;
+    if (r <= 0)
+      return -1;
     return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
   }
 
   // Timed wait via polling
-  auto deadline = std::chrono::steady_clock::now() +
-                  std::chrono::milliseconds(timeout_ms);
+  auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
   while (std::chrono::steady_clock::now() < deadline) {
     int status;
     pid_t r = waitpid(pid, &status, WNOHANG);

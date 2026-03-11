@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include "llm_provider.hpp"
-
 #include <memory>
 #include <string>
 
@@ -12,17 +10,17 @@
 
 #include "quantclaw/providers/curl_raii.hpp"
 
+#include "llm_provider.hpp"
+
 namespace quantclaw {
 
 class OpenAIProvider : public LLMProvider {
  public:
-  OpenAIProvider(const std::string& api_key,
-                 const std::string& base_url,
-                 int timeout,
-                 std::shared_ptr<spdlog::logger> logger);
+  OpenAIProvider(const std::string& api_key, const std::string& base_url,
+                 int timeout, std::shared_ptr<spdlog::logger> logger);
 
-  ChatCompletionResponse ChatCompletion(
-      const ChatCompletionRequest& request) override;
+  ChatCompletionResponse
+  ChatCompletion(const ChatCompletionRequest& request) override;
   void ChatCompletionStream(
       const ChatCompletionRequest& request,
       std::function<void(const ChatCompletionResponse&)> callback) override;
@@ -39,4 +37,4 @@ class OpenAIProvider : public LLMProvider {
   std::shared_ptr<spdlog::logger> logger_;
 };
 
-} // namespace quantclaw
+}  // namespace quantclaw

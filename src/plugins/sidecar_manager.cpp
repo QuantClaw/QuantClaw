@@ -72,7 +72,8 @@ bool SidecarManager::Start(const Options& opts) {
 }
 
 void SidecarManager::Stop() {
-  if (!running_) return;
+  if (!running_)
+    return;
 
   stopping_ = true;
   running_ = false;
@@ -96,7 +97,8 @@ void SidecarManager::Stop() {
 }
 
 bool SidecarManager::Reload() {
-  if (!IsRunning()) return false;
+  if (!IsRunning())
+    return false;
 
   auto p = pid_.load();
   if (p != platform::kInvalidPid) {
@@ -166,7 +168,8 @@ SidecarResponse SidecarManager::Call(const std::string& method,
 
 bool SidecarManager::IsRunning() const {
   auto p = pid_.load();
-  if (p == platform::kInvalidPid) return false;
+  if (p == platform::kInvalidPid)
+    return false;
   return platform::is_process_alive(p);
 }
 
@@ -175,10 +178,12 @@ void SidecarManager::monitor_loop() {
     std::this_thread::sleep_for(
         std::chrono::milliseconds(opts_.heartbeat_interval_ms));
 
-    if (stopping_) break;
+    if (stopping_)
+      break;
 
     if (!IsRunning()) {
-      if (stopping_) break;
+      if (stopping_)
+        break;
 
       logger_->warn("Sidecar process died unexpectedly");
       pid_ = platform::kInvalidPid;
@@ -191,11 +196,12 @@ void SidecarManager::monitor_loop() {
       }
 
       int backoff = next_backoff_ms();
-      logger_->info("Restarting sidecar in {}ms (attempt {}/{})",
-                    backoff, restart_count_ + 1, opts_.max_restarts);
+      logger_->info("Restarting sidecar in {}ms (attempt {}/{})", backoff,
+                    restart_count_ + 1, opts_.max_restarts);
       std::this_thread::sleep_for(std::chrono::milliseconds(backoff));
 
-      if (stopping_) break;
+      if (stopping_)
+        break;
 
       {
         std::lock_guard<std::mutex> lock(ipc_mu_);
@@ -281,7 +287,8 @@ bool SidecarManager::spawn_sidecar() {
 
 void SidecarManager::kill_sidecar(bool force) {
   auto p = pid_.load();
-  if (p == platform::kInvalidPid) return;
+  if (p == platform::kInvalidPid)
+    return;
 
   if (force) {
     logger_->info("Force killing sidecar (pid={})", p);
@@ -305,15 +312,18 @@ void SidecarManager::kill_sidecar(bool force) {
 }
 
 bool SidecarManager::connect_ipc() {
-  if (ipc_port_ <= 0) return false;
+  if (ipc_port_ <= 0)
+    return false;
   platform::IpcClient client("127.0.0.1", ipc_port_);
-  if (!client.connect()) return false;
+  if (!client.connect())
+    return false;
   ipc_handle_ = client.handle();
   return true;
 }
 
 void SidecarManager::write_pid_file() {
-  if (opts_.pid_file.empty()) return;
+  if (opts_.pid_file.empty())
+    return;
   auto parent = std::filesystem::path(opts_.pid_file).parent_path();
   if (!parent.empty()) {
     std::filesystem::create_directories(parent);

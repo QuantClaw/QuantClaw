@@ -27,8 +27,12 @@ class CurlHandle {
   CurlHandle(CurlHandle&& other) noexcept;
   CurlHandle& operator=(CurlHandle&& other) noexcept;
 
-  CURL* get() const { return handle_; }
-  operator CURL*() const { return handle_; }
+  CURL* get() const {
+    return handle_;
+  }
+  operator CURL*() const {
+    return handle_;
+  }
 
  private:
   CURL* handle_;
@@ -47,8 +51,12 @@ class CurlSlist {
   CurlSlist& operator=(CurlSlist&& other) noexcept;
 
   void append(const char* str);
-  curl_slist* get() const { return list_; }
-  operator curl_slist*() const { return list_; }
+  curl_slist* get() const {
+    return list_;
+  }
+  operator curl_slist*() const {
+    return list_;
+  }
 
  private:
   curl_slist* list_ = nullptr;

@@ -35,6 +35,14 @@ adapters/node_modules/
 adapters/package-lock.json
 sidecar/node_modules/
 sidecar/dist/
+ui/dist/
+ui/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
 
 # Reference code (local only, not committed)
 refs/

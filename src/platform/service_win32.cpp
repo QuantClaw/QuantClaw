@@ -3,11 +3,11 @@
 
 #ifdef _WIN32
 
-#include "quantclaw/platform/service.hpp"
-#include "quantclaw/platform/process.hpp"
-
-#include <fstream>
 #include <filesystem>
+#include <fstream>
+
+#include "quantclaw/platform/process.hpp"
+#include "quantclaw/platform/service.hpp"
 
 namespace quantclaw::platform {
 
@@ -37,8 +37,7 @@ int ServiceManager::install(int port) {
   std::string exe = executable_path();
   out << "{\n"
       << "  \"executable\": \"" << exe << "\",\n"
-      << "  \"args\": [\"gateway\", \"run\", \"--port\", \""
-      << port << "\"],\n"
+      << "  \"args\": [\"gateway\", \"run\", \"--port\", \"" << port << "\"],\n"
       << "  \"logFile\": \"" << log_file_ << "\"\n"
       << "}\n";
   out.close();
@@ -104,12 +103,14 @@ int ServiceManager::status() {
 
 bool ServiceManager::is_running() const {
   int pid = get_pid();
-  if (pid <= 0) return false;
+  if (pid <= 0)
+    return false;
   return is_process_alive(static_cast<ProcessId>(pid));
 }
 
 int ServiceManager::get_pid() const {
-  if (!std::filesystem::exists(pid_file_)) return -1;
+  if (!std::filesystem::exists(pid_file_))
+    return -1;
   std::ifstream f(pid_file_);
   int pid = -1;
   f >> pid;

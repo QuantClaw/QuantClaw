@@ -3,10 +3,11 @@
 
 #pragma once
 
+#include <chrono>
+#include <filesystem>
 #include <string>
 #include <vector>
-#include <filesystem>
-#include <chrono>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -73,7 +74,9 @@ class SessionMaintenance {
   static int64_t ParseSizeBytes(const std::string& s);
 
   // Get current config
-  const SessionMaintenanceConfig& GetConfig() const { return config_; }
+  const SessionMaintenanceConfig& GetConfig() const {
+    return config_;
+  }
 
  private:
   std::filesystem::path sessions_dir_;

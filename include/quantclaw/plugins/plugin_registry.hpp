@@ -3,11 +3,13 @@
 
 #pragma once
 
-#include "quantclaw/plugins/plugin_manifest.hpp"
-#include "quantclaw/config.hpp"
 #include <map>
 #include <memory>
+
 #include <spdlog/spdlog.h>
+
+#include "quantclaw/config.hpp"
+#include "quantclaw/plugins/plugin_manifest.hpp"
 
 namespace quantclaw {
 
@@ -57,7 +59,9 @@ class PluginRegistry {
                 const std::filesystem::path& workspace_dir);
 
   // Get all plugin records
-  const std::vector<PluginRecord>& Plugins() const { return plugins_; }
+  const std::vector<PluginRecord>& Plugins() const {
+    return plugins_;
+  }
 
   // Find a plugin by ID
   const PluginRecord* Find(const std::string& id) const;
@@ -76,16 +80,14 @@ class PluginRegistry {
 
  private:
   // Discovery helpers
-  std::vector<PluginCandidate> discover_candidates(
-      const QuantClawConfig& config,
-      const std::filesystem::path& workspace_dir);
+  std::vector<PluginCandidate>
+  discover_candidates(const QuantClawConfig& config,
+                      const std::filesystem::path& workspace_dir);
 
-  void scan_directory(const std::filesystem::path& dir,
-                      PluginOrigin origin,
+  void scan_directory(const std::filesystem::path& dir, PluginOrigin origin,
                       std::vector<PluginCandidate>& out);
 
-  bool should_enable(const std::string& plugin_id,
-                     PluginOrigin origin,
+  bool should_enable(const std::string& plugin_id, PluginOrigin origin,
                      const QuantClawConfig& config) const;
 
   std::shared_ptr<spdlog::logger> logger_;

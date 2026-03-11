@@ -1,12 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include "quantclaw/platform/process.hpp"
-#include "quantclaw/platform/ipc.hpp"
-#include "quantclaw/platform/service.hpp"
 #include <filesystem>
 #include <thread>
+
+#include "quantclaw/platform/ipc.hpp"
+#include "quantclaw/platform/process.hpp"
+#include "quantclaw/platform/service.hpp"
+
+#include <gtest/gtest.h>
 
 using namespace quantclaw::platform;
 

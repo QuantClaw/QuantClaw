@@ -27,20 +27,30 @@ std::string ProviderErrorKindToString(ProviderErrorKind kind);
 // whether to retry, cool down, or fall back to another model.
 class ProviderError : public std::runtime_error {
  public:
-  ProviderError(ProviderErrorKind kind,
-                int http_status,
-                const std::string& message,
-                const std::string& provider_id = "",
+  ProviderError(ProviderErrorKind kind, int http_status,
+                const std::string& message, const std::string& provider_id = "",
                 const std::string& profile_id = "");
 
-  ProviderErrorKind Kind() const { return kind_; }
-  int HttpStatus() const { return http_status_; }
-  const std::string& ProviderId() const { return provider_id_; }
-  const std::string& ProfileId() const { return profile_id_; }
+  ProviderErrorKind Kind() const {
+    return kind_;
+  }
+  int HttpStatus() const {
+    return http_status_;
+  }
+  const std::string& ProviderId() const {
+    return provider_id_;
+  }
+  const std::string& ProfileId() const {
+    return profile_id_;
+  }
 
   // Server-provided Retry-After value in seconds (0 = not provided).
-  int RetryAfterSeconds() const { return retry_after_seconds_; }
-  void SetRetryAfterSeconds(int seconds) { retry_after_seconds_ = seconds; }
+  int RetryAfterSeconds() const {
+    return retry_after_seconds_;
+  }
+  void SetRetryAfterSeconds(int seconds) {
+    retry_after_seconds_ = seconds;
+  }
 
  private:
   ProviderErrorKind kind_;

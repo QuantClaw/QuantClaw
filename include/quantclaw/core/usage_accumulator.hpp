@@ -7,6 +7,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+
 #include <nlohmann/json.hpp>
 
 namespace quantclaw {
@@ -23,8 +24,8 @@ class UsageAccumulator {
   };
 
   // Record a single LLM call's token usage.
-  void Record(const std::string& session_key,
-              int input_tokens, int output_tokens);
+  void Record(const std::string& session_key, int input_tokens,
+              int output_tokens);
 
   // Get usage for a specific session.
   Stats GetSession(const std::string& session_key) const;

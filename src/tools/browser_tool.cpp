@@ -3,7 +3,6 @@
 
 #include "quantclaw/tools/browser_tool.hpp"
 
-#include "quantclaw/common/parse_util.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -12,7 +11,10 @@
 #include <regex>
 #include <sstream>
 #include <thread>
+
 #include <httplib.h>
+
+#include "quantclaw/common/parse_util.hpp"
 
 namespace quantclaw {
 
@@ -20,11 +22,13 @@ namespace quantclaw {
 
 bool SsrfPolicy::is_allowed(const std::string& host) const {
   for (const auto& blocked : blocked_hosts) {
-    if (host == blocked) return false;
+    if (host == blocked)
+      return false;
   }
 
   for (const auto& range : blocked_ranges) {
-    if (range == "10.0.0.0/8" && host.substr(0, 3) == "10.") return false;
+    if (range == "10.0.0.0/8" && host.substr(0, 3) == "10.")
+      return false;
     if (range == "172.16.0.0/12" && host.substr(0, 4) == "172.") {
       return false;
     }
@@ -35,7 +39,8 @@ bool SsrfPolicy::is_allowed(const std::string& host) const {
 
   if (!allowed_hosts.empty()) {
     for (const auto& allowed : allowed_hosts) {
-      if (host == allowed) return true;
+      if (host == allowed)
+        return true;
     }
     return false;
   }
@@ -56,7 +61,7 @@ BrowserToolConfig BrowserToolConfig::FromJson(const nlohmann::json& j) {
   BrowserToolConfig c;
   if (j.contains("mode") && j["mode"].is_string()) {
     c.mode = (j["mode"] == "remote") ? BrowserToolConfig::Mode::kRemote
-                                      : BrowserToolConfig::Mode::kLocal;
+                                     : BrowserToolConfig::Mode::kLocal;
   }
   c.chromium_path = j.value("chromiumPath", std::string{});
   c.remote_cdp_url = j.value("remoteCdpUrl", std::string{});
@@ -73,12 +78,14 @@ BrowserToolConfig BrowserToolConfig::FromJson(const nlohmann::json& j) {
     auto& ssrf = j["ssrf"];
     if (ssrf.contains("blockedHosts") && ssrf["blockedHosts"].is_array()) {
       for (const auto& h : ssrf["blockedHosts"]) {
-        if (h.is_string()) c.ssrf_policy.blocked_hosts.push_back(h);
+        if (h.is_string())
+          c.ssrf_policy.blocked_hosts.push_back(h);
       }
     }
     if (ssrf.contains("allowedHosts") && ssrf["allowedHosts"].is_array()) {
       for (const auto& h : ssrf["allowedHosts"]) {
-        if (h.is_string()) c.ssrf_policy.allowed_hosts.push_back(h);
+        if (h.is_string())
+          c.ssrf_policy.allowed_hosts.push_back(h);
       }
     }
   } else {
@@ -93,7 +100,9 @@ BrowserToolConfig BrowserToolConfig::FromJson(const nlohmann::json& j) {
 BrowserSession::BrowserSession(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
-BrowserSession::~BrowserSession() { close(); }
+BrowserSession::~BrowserSession() {
+  close();
+}
 
 bool BrowserSession::initialize(const BrowserToolConfig& config) {
   config_ = config;
@@ -121,7 +130,8 @@ bool BrowserSession::navigate(const std::string& url) {
   }
 
   auto result = cdp_send("Page.navigate", {{"url", url}});
-  if (result.empty()) return false;
+  if (result.empty())
+    return false;
 
   std::lock_guard<std::mutex> lock(mu_);
   state_.url = url;
@@ -150,7 +160,7 @@ bool BrowserSession::click(const std::string& selector) {
 }
 
 bool BrowserSession::type(const std::string& selector,
-                           const std::string& text) {
+                          const std::string& text) {
   std::string js = "(() => { var el = document.querySelector('" + selector +
                    "'); if(el) { el.value = '" + text +
                    "'; el.dispatchEvent(new Event('input')); return true; } "
@@ -211,7 +221,8 @@ bool BrowserSession::launch_local() {
   browser_pid_ = pid;
   connection_.pid_or_id = std::to_string(pid);
   connection_.is_remote = false;
-  logger_->info("Launched browser: PID={}, binary={}, port={}", pid, chromium, port);
+  logger_->info("Launched browser: PID={}, binary={}, port={}", pid, chromium,
+                port);
 
   // Wait for DevTools HTTP endpoint to become ready (up to 5 seconds)
   std::string ws_url;
@@ -223,7 +234,8 @@ bool BrowserSession::launch_local() {
       if (res && res->status == 200) {
         auto j = nlohmann::json::parse(res->body);
         ws_url = j.value("webSocketDebuggerUrl", "");
-        if (!ws_url.empty()) break;
+        if (!ws_url.empty())
+          break;
       }
     } catch (...) {}
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -238,7 +250,10 @@ bool BrowserSession::launch_local() {
   logger_->info("Browser DevTools ready: {}", ws_url);
   bool connected = connect_cdp_websocket(ws_url);
   if (!connected) {
-    logger_->warn("Port {} may already be in use. Consider setting a unique cdp_debug_port.", port);
+    logger_->warn(
+        "Port {} may already be in use. Consider setting a unique "
+        "cdp_debug_port.",
+        port);
     close();
   }
   return connected;
@@ -295,7 +310,8 @@ bool BrowserSession::connect_remote() {
     } catch (...) {}
     // If the URL still starts with "http", we failed to resolve a WS URL
     if (ws_url.rfind("http", 0) == 0) {
-      logger_->error("Failed to resolve WebSocket URL from HTTP endpoint: {}", ws_url);
+      logger_->error("Failed to resolve WebSocket URL from HTTP endpoint: {}",
+                     ws_url);
       return false;
     }
   }
@@ -352,8 +368,9 @@ bool BrowserSession::connect_cdp_websocket(const std::string& ws_url) {
 }
 
 std::string BrowserSession::cdp_send(const std::string& method,
-                                      const nlohmann::json& params) {
-  if (!connection_.is_running || cdp_ws_.getReadyState() != ix::ReadyState::Open) {
+                                     const nlohmann::json& params) {
+  if (!connection_.is_running ||
+      cdp_ws_.getReadyState() != ix::ReadyState::Open) {
     logger_->warn("CDP not connected, skipping: {}", method);
     return "{}";
   }
@@ -372,8 +389,7 @@ std::string BrowserSession::cdp_send(const std::string& method,
   // Wait for response
   std::unique_lock<std::mutex> lock(cdp_mu_);
   bool ok = cdp_cv_.wait_for(
-      lock,
-      std::chrono::milliseconds(config_.navigation_timeout_ms),
+      lock, std::chrono::milliseconds(config_.navigation_timeout_ms),
       [this, id] { return cdp_responses_.count(id) > 0; });
 
   if (!ok) {
@@ -404,14 +420,18 @@ std::string BrowserSession::find_chromium() {
   const char* localappdata = std::getenv("LOCALAPPDATA");
 
   if (pf) {
-    candidates.push_back(std::string(pf) + "\\Google\\Chrome\\Application\\chrome.exe");
+    candidates.push_back(std::string(pf) +
+                         "\\Google\\Chrome\\Application\\chrome.exe");
   }
   if (pf86) {
-    candidates.push_back(std::string(pf86) + "\\Google\\Chrome\\Application\\chrome.exe");
+    candidates.push_back(std::string(pf86) +
+                         "\\Google\\Chrome\\Application\\chrome.exe");
   }
   if (localappdata) {
-    candidates.push_back(std::string(localappdata) + "\\Google\\Chrome\\Application\\chrome.exe");
-    candidates.push_back(std::string(localappdata) + "\\Chromium\\Application\\chrome.exe");
+    candidates.push_back(std::string(localappdata) +
+                         "\\Google\\Chrome\\Application\\chrome.exe");
+    candidates.push_back(std::string(localappdata) +
+                         "\\Chromium\\Application\\chrome.exe");
   }
 
   for (const auto& path : candidates) {
@@ -424,8 +444,10 @@ std::string BrowserSession::find_chromium() {
   auto result = platform::exec_capture("where chrome.exe 2>nul", 5);
   if (result.exit_code == 0 && !result.output.empty()) {
     auto line = result.output.substr(0, result.output.find('\n'));
-    if (!line.empty() && line.back() == '\r') line.pop_back();
-    if (!line.empty()) return line;
+    if (!line.empty() && line.back() == '\r')
+      line.pop_back();
+    if (!line.empty())
+      return line;
   }
 #else
   // Check common Linux paths
@@ -448,8 +470,10 @@ std::string BrowserSession::find_chromium() {
       "which chromium-browser chromium google-chrome 2>/dev/null", 5);
   if (result.exit_code == 0 && !result.output.empty()) {
     auto line = result.output.substr(0, result.output.find('\n'));
-    if (!line.empty() && line.back() == '\n') line.pop_back();
-    if (!line.empty()) return line;
+    if (!line.empty() && line.back() == '\n')
+      line.pop_back();
+    if (!line.empty())
+      return line;
   }
 #endif
 
@@ -479,7 +503,8 @@ std::vector<nlohmann::json> get_tool_schemas() {
          {"parameters",
           {{"type", "object"},
            {"properties",
-            {{"url", {{"type", "string"}, {"description", "URL to navigate to"}}}}},
+            {{"url",
+              {{"type", "string"}, {"description", "URL to navigate to"}}}}},
            {"required", nlohmann::json::array({"url"})}}}}}},
       {{"type", "function"},
        {"function",
@@ -513,8 +538,7 @@ std::vector<nlohmann::json> get_tool_schemas() {
             {{"selector",
               {{"type", "string"},
                {"description", "CSS selector of input element"}}},
-             {"text",
-              {{"type", "string"}, {"description", "Text to type"}}}}},
+             {"text", {{"type", "string"}, {"description", "Text to type"}}}}},
            {"required", nlohmann::json::array({"selector", "text"})}}}}}},
       {{"type", "function"},
        {"function",

@@ -24,15 +24,16 @@ namespace quantclaw {
 class ContextPruner {
  public:
   struct Options {
-    int protect_recent = 3;      // Keep tool results for the N most recent
-                                 // assistant messages intact
-    int soft_prune_lines = 5;    // Keep this many lines at start+end for soft
-    int hard_prune_after = 10;   // Hard prune tool results older than this
-                                 // many assistant messages
+    int protect_recent = 3;     // Keep tool results for the N most recent
+                                // assistant messages intact
+    int soft_prune_lines = 5;   // Keep this many lines at start+end for soft
+    int hard_prune_after = 10;  // Hard prune tool results older than this
+                                // many assistant messages
     int max_tool_result_chars = 2000;  // Soft prune results exceeding this
-    int context_window = 0;      // If > 0, use budget-based pruning
-    int max_tokens = 8192;       // Model max_tokens (output budget)
-    double prune_target_ratio = 0.75;  // Target: use at most this fraction of window
+    int context_window = 0;            // If > 0, use budget-based pruning
+    int max_tokens = 8192;             // Model max_tokens (output budget)
+    double prune_target_ratio =
+        0.75;  // Target: use at most this fraction of window
   };
 
   // Prune tool results in a message history.

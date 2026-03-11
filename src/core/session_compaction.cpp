@@ -9,17 +9,17 @@ SessionCompaction::SessionCompaction(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
 bool SessionCompaction::NeedsCompaction(
-    const std::vector<nlohmann::json>& messages,
-    const Options& opts) const {
-  if (static_cast<int>(messages.size()) > opts.max_messages) return true;
-  if (EstimateTokens(messages) > opts.max_tokens) return true;
+    const std::vector<nlohmann::json>& messages, const Options& opts) const {
+  if (static_cast<int>(messages.size()) > opts.max_messages)
+    return true;
+  if (EstimateTokens(messages) > opts.max_tokens)
+    return true;
   return false;
 }
 
-std::vector<nlohmann::json> SessionCompaction::Compact(
-    const std::vector<nlohmann::json>& messages,
-    const Options& opts,
-    SummaryFn summary_fn) {
+std::vector<nlohmann::json>
+SessionCompaction::Compact(const std::vector<nlohmann::json>& messages,
+                           const Options& opts, SummaryFn summary_fn) {
   if (!NeedsCompaction(messages, opts)) {
     return messages;
   }
@@ -34,9 +34,9 @@ std::vector<nlohmann::json> SessionCompaction::Compact(
 
   // Split into old (to summarize) and recent (to keep)
   std::vector<nlohmann::json> old_msgs(messages.begin(),
-                                        messages.begin() + to_summarize);
+                                       messages.begin() + to_summarize);
   std::vector<nlohmann::json> recent(messages.begin() + to_summarize,
-                                      messages.end());
+                                     messages.end());
 
   // Generate summary of old messages
   std::string summary;
@@ -66,18 +66,19 @@ std::vector<nlohmann::json> SessionCompaction::Compact(
     result.push_back(std::move(msg));
   }
 
-  logger_->info("Compacted {} messages into summary + {} recent",
-                to_summarize, keep);
+  logger_->info("Compacted {} messages into summary + {} recent", to_summarize,
+                keep);
   return result;
 }
 
-std::vector<nlohmann::json> SessionCompaction::Truncate(
-    const std::vector<nlohmann::json>& messages,
-    const Options& opts) {
+std::vector<nlohmann::json>
+SessionCompaction::Truncate(const std::vector<nlohmann::json>& messages,
+                            const Options& opts) {
   int total = static_cast<int>(messages.size());
   int keep = std::min(opts.keep_recent, total);
 
-  if (total <= keep) return messages;
+  if (total <= keep)
+    return messages;
 
   std::vector<nlohmann::json> result(messages.end() - keep, messages.end());
 
@@ -89,8 +90,7 @@ std::vector<nlohmann::json> SessionCompaction::Truncate(
   note["metadata"] = {{"truncated", true}, {"removed_count", total - keep}};
   result.insert(result.begin(), note);
 
-  logger_->info("Truncated {} messages, keeping {} recent",
-                total - keep, keep);
+  logger_->info("Truncated {} messages, keeping {} recent", total - keep, keep);
   return result;
 }
 

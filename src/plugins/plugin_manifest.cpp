@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "quantclaw/plugins/plugin_manifest.hpp"
+
 #include <fstream>
 #include <stdexcept>
 
@@ -22,17 +23,20 @@ PluginManifest PluginManifest::Parse(const nlohmann::json& j) {
 
   if (j.contains("channels") && j["channels"].is_array()) {
     for (const auto& ch : j["channels"]) {
-      if (ch.is_string()) m.channels.push_back(ch.get<std::string>());
+      if (ch.is_string())
+        m.channels.push_back(ch.get<std::string>());
     }
   }
   if (j.contains("providers") && j["providers"].is_array()) {
     for (const auto& p : j["providers"]) {
-      if (p.is_string()) m.providers.push_back(p.get<std::string>());
+      if (p.is_string())
+        m.providers.push_back(p.get<std::string>());
     }
   }
   if (j.contains("skills") && j["skills"].is_array()) {
     for (const auto& s : j["skills"]) {
-      if (s.is_string()) m.skills.push_back(s.get<std::string>());
+      if (s.is_string())
+        m.skills.push_back(s.get<std::string>());
     }
   }
 
@@ -53,7 +57,8 @@ PluginManifest PluginManifest::Parse(const nlohmann::json& j) {
       hint.placeholder = v.value("placeholder", "");
       if (v.contains("tags") && v["tags"].is_array()) {
         for (const auto& t : v["tags"]) {
-          if (t.is_string()) hint.tags.push_back(t.get<std::string>());
+          if (t.is_string())
+            hint.tags.push_back(t.get<std::string>());
         }
       }
       m.ui_hints[it.key()] = std::move(hint);
@@ -72,7 +77,8 @@ PluginManifest PluginManifest::LoadFromFile(const std::filesystem::path& path) {
   try {
     ifs >> j;
   } catch (const nlohmann::json::parse_error& e) {
-    throw std::runtime_error("Invalid JSON in " + path.string() + ": " + e.what());
+    throw std::runtime_error("Invalid JSON in " + path.string() + ": " +
+                             e.what());
   }
   return Parse(j);
 }
@@ -80,13 +86,20 @@ PluginManifest PluginManifest::LoadFromFile(const std::filesystem::path& path) {
 nlohmann::json PluginManifest::ToJson() const {
   nlohmann::json j;
   j["id"] = id;
-  if (!name.empty() && name != id) j["name"] = name;
-  if (!description.empty()) j["description"] = description;
-  if (!version.empty()) j["version"] = version;
-  if (!kind.empty()) j["kind"] = kind;
-  if (!channels.empty()) j["channels"] = channels;
-  if (!providers.empty()) j["providers"] = providers;
-  if (!skills.empty()) j["skills"] = skills;
+  if (!name.empty() && name != id)
+    j["name"] = name;
+  if (!description.empty())
+    j["description"] = description;
+  if (!version.empty())
+    j["version"] = version;
+  if (!kind.empty())
+    j["kind"] = kind;
+  if (!channels.empty())
+    j["channels"] = channels;
+  if (!providers.empty())
+    j["providers"] = providers;
+  if (!skills.empty())
+    j["skills"] = skills;
   if (!config_schema.is_null() && !config_schema.empty()) {
     j["configSchema"] = config_schema;
   }
@@ -95,10 +108,14 @@ nlohmann::json PluginManifest::ToJson() const {
 
 std::string plugin_origin_to_string(PluginOrigin origin) {
   switch (origin) {
-    case PluginOrigin::kBundled:   return "bundled";
-    case PluginOrigin::kGlobal:    return "global";
-    case PluginOrigin::kWorkspace: return "workspace";
-    case PluginOrigin::kConfig:    return "config";
+    case PluginOrigin::kBundled:
+      return "bundled";
+    case PluginOrigin::kGlobal:
+      return "global";
+    case PluginOrigin::kWorkspace:
+      return "workspace";
+    case PluginOrigin::kConfig:
+      return "config";
   }
   return "unknown";
 }

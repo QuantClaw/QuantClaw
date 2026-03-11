@@ -31,36 +31,45 @@ namespace quantclaw {
 template <typename F>
 class Defer {
  public:
-    explicit Defer(F action) noexcept(std::is_nothrow_move_constructible_v<F>)
-        : action_(std::move(action)), active_(true) {}
+  explicit Defer(F action) noexcept(std::is_nothrow_move_constructible_v<F>)
+      : action_(std::move(action)), active_(true) {}
 
-    Defer(Defer&& other) noexcept(std::is_nothrow_move_constructible_v<F>)
-        : action_(std::move(other.action_)), active_(other.active_) {
-        other.active_ = false;
-    }
+  Defer(Defer&& other) noexcept(std::is_nothrow_move_constructible_v<F>)
+      : action_(std::move(other.action_)), active_(other.active_) {
+    other.active_ = false;
+  }
 
-    ~Defer() noexcept { if (active_) action_(); }
+  ~Defer() noexcept {
+    if (active_)
+      action_();
+  }
 
-    Defer(const Defer&)            = delete;
-    Defer& operator=(const Defer&) = delete;
-    Defer& operator=(Defer&&)      = delete;
+  Defer(const Defer&) = delete;
+  Defer& operator=(const Defer&) = delete;
+  Defer& operator=(Defer&&) = delete;
 
-    // Cancel the deferred action (idempotent).
-    void dismiss() noexcept { active_ = false; }
+  // Cancel the deferred action (idempotent).
+  void dismiss() noexcept {
+    active_ = false;
+  }
 
-    // Re-arm after dismiss() (e.g., for retry loops).
-    void arm()     noexcept { active_ = true;  }
+  // Re-arm after dismiss() (e.g., for retry loops).
+  void arm() noexcept {
+    active_ = true;
+  }
 
-    bool is_active() const noexcept { return active_; }
+  bool is_active() const noexcept {
+    return active_;
+  }
 
  private:
-    F    action_;
-    bool active_;
+  F action_;
+  bool active_;
 };
 
 template <typename F>
 [[nodiscard]] Defer<std::decay_t<F>> MakeDefer(F&& f) {
-    return Defer<std::decay_t<F>>(std::forward<F>(f));
+  return Defer<std::decay_t<F>>(std::forward<F>(f));
 }
 
 }  // namespace quantclaw
@@ -69,7 +78,7 @@ template <typename F>
 // braced block.  The variable name embeds __LINE__ to avoid shadowing.
 // Two-level macro expansion is required to stringify __LINE__ correctly.
 #define QC_DEFER_CONCAT_IMPL(a, b) a##b
-#define QC_DEFER_CONCAT(a, b)      QC_DEFER_CONCAT_IMPL(a, b)
-#define DEFER(code) \
-    auto QC_DEFER_CONCAT(_defer_guard_, __LINE__) = \
-        ::quantclaw::MakeDefer([&]() noexcept { code; })
+#define QC_DEFER_CONCAT(a, b) QC_DEFER_CONCAT_IMPL(a, b)
+#define DEFER(code)                               \
+  auto QC_DEFER_CONCAT(_defer_guard_, __LINE__) = \
+      ::quantclaw::MakeDefer([&]() noexcept { code; })

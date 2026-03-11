@@ -11,13 +11,13 @@
 #include <string>
 
 #ifdef _WIN32
-#include <winsock2.h>
 #include <process.h>
+#include <winsock2.h>
 #pragma comment(lib, "ws2_32.lib")
 #else
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <netinet/in.h>
 #include <unistd.h>
 #endif
 
@@ -43,7 +43,8 @@ inline int FindFreePort() {
 
   for (int attempt = 0; attempt < 100; ++attempt) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) return 0;
+    if (sock < 0)
+      return 0;
 
     struct sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
@@ -51,7 +52,8 @@ inline int FindFreePort() {
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     addr.sin_port = 0;
 
-    if (bind(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
+    if (bind(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) <
+        0) {
 #ifdef _WIN32
       closesocket(sock);
 #else
@@ -61,7 +63,8 @@ inline int FindFreePort() {
     }
 
     socklen_t len = sizeof(addr);
-    if (getsockname(sock, reinterpret_cast<struct sockaddr*>(&addr), &len) < 0) {
+    if (getsockname(sock, reinterpret_cast<struct sockaddr*>(&addr), &len) <
+        0) {
 #ifdef _WIN32
       closesocket(sock);
 #else
@@ -97,14 +100,14 @@ inline int FindFreePort() {
 /// @return Absolute path to the newly created directory.
 inline std::filesystem::path MakeTestDir(const std::string& base_name) {
 #ifdef _WIN32
-    int pid = _getpid();
+  int pid = _getpid();
 #else
-    int pid = static_cast<int>(getpid());
+  int pid = static_cast<int>(getpid());
 #endif
-    auto path = std::filesystem::temp_directory_path()
-                / (base_name + "_" + std::to_string(pid));
-    std::filesystem::create_directories(path);
-    return path;
+  auto path = std::filesystem::temp_directory_path() /
+              (base_name + "_" + std::to_string(pid));
+  std::filesystem::create_directories(path);
+  return path;
 }
 
 }  // namespace quantclaw::test

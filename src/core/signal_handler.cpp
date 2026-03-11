@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "quantclaw/core/signal_handler.hpp"
+
+#include <chrono>
 #include <csignal>
 #include <thread>
-#include <chrono>
 
 namespace quantclaw {
 
@@ -12,43 +13,44 @@ std::atomic<bool> SignalHandler::shutdown_requested_{false};
 SignalHandler::ShutdownCallback SignalHandler::shutdown_callback_;
 SignalHandler::ReloadCallback SignalHandler::reload_callback_;
 
-void SignalHandler::Install(ShutdownCallback on_shutdown, ReloadCallback on_reload) {
-    shutdown_callback_ = std::move(on_shutdown);
-    reload_callback_ = std::move(on_reload);
-    shutdown_requested_ = false;
+void SignalHandler::Install(ShutdownCallback on_shutdown,
+                            ReloadCallback on_reload) {
+  shutdown_callback_ = std::move(on_shutdown);
+  reload_callback_ = std::move(on_reload);
+  shutdown_requested_ = false;
 
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
+  std::signal(SIGINT, signal_handler);
+  std::signal(SIGTERM, signal_handler);
 #ifndef _WIN32
-    std::signal(SIGUSR1, signal_handler);
-    std::signal(SIGHUP, SIG_IGN);
+  std::signal(SIGUSR1, signal_handler);
+  std::signal(SIGHUP, SIG_IGN);
 #endif
 }
 
 void SignalHandler::WaitForShutdown() {
-    while (!shutdown_requested_) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
+  while (!shutdown_requested_) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
 }
 
 bool SignalHandler::ShouldShutdown() {
-    return shutdown_requested_;
+  return shutdown_requested_;
 }
 
 void SignalHandler::signal_handler(int signum) {
-    if (signum == SIGINT || signum == SIGTERM) {
-        shutdown_requested_ = true;
-        if (shutdown_callback_) {
-            shutdown_callback_();
-        }
+  if (signum == SIGINT || signum == SIGTERM) {
+    shutdown_requested_ = true;
+    if (shutdown_callback_) {
+      shutdown_callback_();
     }
+  }
 #ifndef _WIN32
-    else if (signum == SIGUSR1) {
-        if (reload_callback_) {
-            reload_callback_();
-        }
+  else if (signum == SIGUSR1) {
+    if (reload_callback_) {
+      reload_callback_();
     }
+  }
 #endif
 }
 
-} // namespace quantclaw
+}  // namespace quantclaw

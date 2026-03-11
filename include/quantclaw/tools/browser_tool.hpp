@@ -12,17 +12,19 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include <ixwebsocket/IXWebSocket.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
-#include <ixwebsocket/IXWebSocket.h>
+
 #include "quantclaw/platform/process.hpp"
 
 namespace quantclaw {
 
 // Browser connection info
 struct BrowserConnection {
-  std::string cdp_url;       // Chrome DevTools Protocol WebSocket URL
-  std::string pid_or_id;     // Browser PID or container ID
+  std::string cdp_url;    // Chrome DevTools Protocol WebSocket URL
+  std::string pid_or_id;  // Browser PID or container ID
   bool is_remote = false;
   std::atomic<bool> is_running{false};
 
@@ -42,9 +44,10 @@ struct PageState {
 
 // SSRF policy for navigation
 struct SsrfPolicy {
-  std::vector<std::string> blocked_hosts;   // e.g. ["localhost", "127.0.0.1"]
-  std::vector<std::string> blocked_ranges;  // e.g. ["10.0.0.0/8", "192.168.0.0/16"]
-  std::vector<std::string> allowed_hosts;   // If non-empty, only these allowed
+  std::vector<std::string> blocked_hosts;  // e.g. ["localhost", "127.0.0.1"]
+  std::vector<std::string>
+      blocked_ranges;  // e.g. ["10.0.0.0/8", "192.168.0.0/16"]
+  std::vector<std::string> allowed_hosts;  // If non-empty, only these allowed
 
   bool is_allowed(const std::string& host) const;
 
@@ -55,13 +58,13 @@ struct SsrfPolicy {
 struct BrowserToolConfig {
   // How to get a browser
   enum class Mode {
-    kLocal,    // Spawn local Chromium/Chrome
-    kRemote,   // Connect to remote browser via CDP
+    kLocal,   // Spawn local Chromium/Chrome
+    kRemote,  // Connect to remote browser via CDP
   };
 
   Mode mode = Mode::kLocal;
-  std::string chromium_path;      // Path to chromium binary (auto-detect if empty)
-  std::string remote_cdp_url;     // CDP URL for remote mode
+  std::string chromium_path;   // Path to chromium binary (auto-detect if empty)
+  std::string remote_cdp_url;  // CDP URL for remote mode
   bool headless = true;
   int viewport_width = 1280;
   int viewport_height = 720;
@@ -105,7 +108,9 @@ class BrowserSession {
   bool is_connected() const;
 
   // Get connection info
-  const BrowserConnection& connection() const { return connection_; }
+  const BrowserConnection& connection() const {
+    return connection_;
+  }
 
  private:
   std::shared_ptr<spdlog::logger> logger_;
@@ -132,7 +137,7 @@ class BrowserSession {
 
   // CDP communication (sends over WebSocket, waits for response)
   std::string cdp_send(const std::string& method,
-                        const nlohmann::json& params = {});
+                       const nlohmann::json& params = {});
 
   // Find chromium binary
   static std::string find_chromium();

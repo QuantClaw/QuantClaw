@@ -23,28 +23,30 @@ int ContextPruner::EstimateTokens(const Message& msg) {
 
 int ContextPruner::EstimateTokens(const std::vector<Message>& msgs) {
   int total = 0;
-  for (const auto& msg : msgs) total += EstimateTokens(msg);
+  for (const auto& msg : msgs)
+    total += EstimateTokens(msg);
   return total;
 }
 
-std::vector<Message> ContextPruner::Prune(
-    const std::vector<Message>& history,
-    const Options& opts) {
-  if (history.empty()) return history;
+std::vector<Message> ContextPruner::Prune(const std::vector<Message>& history,
+                                          const Options& opts) {
+  if (history.empty())
+    return history;
 
   // Budget-based pruning: dynamically adjust thresholds based on context window
   Options effective = opts;
   if (opts.context_window > 0) {
-    int budget = static_cast<int>(opts.context_window * opts.prune_target_ratio)
-                 - opts.max_tokens;
+    int budget =
+        static_cast<int>(opts.context_window * opts.prune_target_ratio) -
+        opts.max_tokens;
     if (budget > 0) {
       int current_tokens = EstimateTokens(history);
       if (current_tokens > budget) {
         // Over budget: aggressively prune
         // Scale down max_tool_result_chars and protect_recent
         double over_ratio = static_cast<double>(current_tokens) / budget;
-        effective.max_tool_result_chars =
-            std::max(200, static_cast<int>(opts.max_tool_result_chars / over_ratio));
+        effective.max_tool_result_chars = std::max(
+            200, static_cast<int>(opts.max_tool_result_chars / over_ratio));
         effective.protect_recent =
             std::max(1, static_cast<int>(opts.protect_recent / over_ratio));
         effective.hard_prune_after =
@@ -83,7 +85,8 @@ std::vector<Message> ContextPruner::Prune(
 
   // Hard prune threshold: messages before this many assistant msgs ago
   int hard_threshold = -1;
-  if (num_assistants > effective.hard_prune_after && !assistant_indices.empty()) {
+  if (num_assistants > effective.hard_prune_after &&
+      !assistant_indices.empty()) {
     hard_threshold =
         assistant_indices[num_assistants - effective.hard_prune_after];
   }
@@ -104,8 +107,8 @@ std::vector<Message> ContextPruner::Prune(
       }
     }
 
-    if (!has_tool_result || protect_threshold < 0 ||
-        i >= protect_threshold || i <= bootstrap_end) {
+    if (!has_tool_result || protect_threshold < 0 || i >= protect_threshold ||
+        i <= bootstrap_end) {
       // No tool results to prune, within protected range,
       // or within bootstrap region (before first user message)
       result.push_back(msg);
@@ -125,17 +128,14 @@ std::vector<Message> ContextPruner::Prune(
       // Decide soft vs hard prune
       if (hard_threshold >= 0 && i < hard_threshold) {
         // Hard prune: replace with placeholder
-        pruned_msg.content.push_back(
-            ContentBlock::MakeToolResult(
-                block.tool_use_id,
-                "[Tool result omitted — older context]"));
+        pruned_msg.content.push_back(ContentBlock::MakeToolResult(
+            block.tool_use_id, "[Tool result omitted — older context]"));
       } else if (static_cast<int>(block.content.size()) >
                  effective.max_tool_result_chars) {
         // Soft prune: truncate long results
-        pruned_msg.content.push_back(
-            ContentBlock::MakeToolResult(
-                block.tool_use_id,
-                soft_prune(block.content, effective.soft_prune_lines)));
+        pruned_msg.content.push_back(ContentBlock::MakeToolResult(
+            block.tool_use_id,
+            soft_prune(block.content, effective.soft_prune_lines)));
       } else {
         // Below size threshold, keep as-is
         pruned_msg.content.push_back(block);
@@ -172,7 +172,8 @@ std::string ContextPruner::soft_prune(const std::string& content,
   result += "\n... [" + std::to_string(omitted) + " lines omitted] ...\n\n";
   for (int i = total - keep_lines; i < total; ++i) {
     result += lines[i];
-    if (i < total - 1) result += "\n";
+    if (i < total - 1)
+      result += "\n";
   }
 
   return result;

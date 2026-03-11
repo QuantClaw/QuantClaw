@@ -1,35 +1,60 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
-  <!-- Claw/Crab inspired logo for QuantClaw -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 992 1067" width="992" height="1067">
+  <!-- QuantClaw Logo - Version 0307 -->
   <defs>
-    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+    <style>
+      .quantclaw-text {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 120px;
+        font-weight: 700;
+        fill: #1f2937;
+      }
+      .quantclaw-url {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 32px;
+        fill: #6b7280;
+      }
+      .gradient-cyan {
+        fill: url(#cyanGradient);
+      }
+    </style>
+    <linearGradient id="cyanGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#0891b2;stop-opacity:1" />
     </linearGradient>
   </defs>
 
-  <!-- Background circle -->
-  <circle cx="100" cy="100" r="95" fill="none" stroke="url(#grad1)" stroke-width="2" opacity="0.3"/>
+  <!-- White background -->
+  <rect width="992" height="1067" fill="#ffffff"/>
 
-  <!-- Main body -->
-  <ellipse cx="100" cy="110" rx="45" ry="50" fill="url(#grad1)"/>
+  <!-- Metallic ring (simplified representation) -->
+  <circle cx="200" cy="250" r="180" fill="none" stroke="#b0b8c1" stroke-width="30" opacity="0.6"/>
+  <circle cx="200" cy="250" r="160" fill="none" stroke="#d4dce8" stroke-width="8" opacity="0.4"/>
 
-  <!-- Left claw -->
-  <path d="M 60 90 Q 40 70 35 50" stroke="url(#grad1)" stroke-width="8" fill="none" stroke-linecap="round"/>
-  <circle cx="35" cy="45" r="6" fill="url(#grad1)"/>
+  <!-- Atom nucleus center -->
+  <circle cx="200" cy="250" r="35" class="gradient-cyan" opacity="0.9"/>
 
-  <!-- Right claw -->
-  <path d="M 140 90 Q 160 70 165 50" stroke="url(#grad1)" stroke-width="8" fill="none" stroke-linecap="round"/>
-  <circle cx="165" cy="45" r="6" fill="url(#grad1)"/>
+  <!-- Three electron orbits -->
+  <ellipse cx="200" cy="250" rx="110" ry="80" fill="none" stroke="#06b6d4" stroke-width="12" opacity="0.6" transform="rotate(0 200 250)"/>
+  <ellipse cx="200" cy="250" rx="110" ry="80" fill="none" stroke="#06b6d4" stroke-width="12" opacity="0.6" transform="rotate(60 200 250)"/>
+  <ellipse cx="200" cy="250" rx="110" ry="80" fill="none" stroke="#06b6d4" stroke-width="12" opacity="0.6" transform="rotate(120 200 250)"/>
 
-  <!-- Left leg -->
-  <path d="M 70 155 Q 60 170 65 185" stroke="url(#grad1)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <!-- Electrons on orbits (dots) -->
+  <circle cx="310" cy="250" r="8" class="gradient-cyan"/>
+  <circle cx="175" cy="320" r="8" class="gradient-cyan"/>
+  <circle cx="175" cy="180" r="8" class="gradient-cyan"/>
 
-  <!-- Right leg -->
-  <path d="M 130 155 Q 140 170 135 185" stroke="url(#grad1)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <!-- Text: QuantClaw -->
+  <text x="496" y="380" class="quantclaw-text">QuantClaw</text>
 
-  <!-- Eyes -->
-  <circle cx="85" cy="95" r="5" fill="#ffffff"/>
-  <circle cx="115" cy="95" r="5" fill="#ffffff"/>
-  <circle cx="84" cy="96" r="2.5" fill="#0891b2"/>
-  <circle cx="114" cy="96" r="2.5" fill="#0891b2"/>
+  <!-- URL -->
+  <text x="496" y="440" class="quantclaw-url">https://github.com/quantclaw</text>
+
+  <!-- Decorative quantum scatter (top right) -->
+  <g opacity="0.4">
+    <line x1="650" y1="100" x2="750" y2="150" stroke="#06b6d4" stroke-width="2"/>
+    <line x1="700" y1="80" x2="800" y2="140" stroke="#0891b2" stroke-width="2"/>
+    <circle cx="750" cy="120" r="3" fill="#06b6d4"/>
+    <circle cx="800" cy="150" r="3" fill="#0891b2"/>
+    <path d="M 650 160 Q 700 180 750 200" stroke="#06b6d4" stroke-width="1.5" fill="none"/>
+  </g>
 </svg>

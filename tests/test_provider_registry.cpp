@@ -1,10 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/providers/provider_registry.hpp"
+
+#include <gtest/gtest.h>
 
 namespace quantclaw {
 
@@ -75,9 +77,7 @@ TEST(ProviderRegistryTest, LoadFromConfig) {
        {{"apiKey", "sk-test"},
         {"baseUrl", "https://api.openai.com/v1"},
         {"timeout", 60}}},
-      {"anthropic",
-       {{"apiKey", "ak-test"},
-        {"timeout", 45}}},
+      {"anthropic", {{"apiKey", "ak-test"}, {"timeout", 45}}},
   };
   reg->LoadFromConfig(config);
 

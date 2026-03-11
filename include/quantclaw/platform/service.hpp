@@ -5,7 +5,9 @@
 
 #include <memory>
 #include <string>
+
 #include <spdlog/spdlog.h>
+
 #include "quantclaw/constants.hpp"
 
 namespace quantclaw::platform {

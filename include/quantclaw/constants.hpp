@@ -13,13 +13,13 @@
 // Fallbacks in case the file is included without CMake's compile definitions
 // (e.g., in a standalone IDE configuration or unit test binary).
 #ifndef QUANTCLAW_VERSION
-#  define QUANTCLAW_VERSION "dev"
+#define QUANTCLAW_VERSION "dev"
 #endif
 #ifndef QUANTCLAW_BUILD_DATE
-#  define QUANTCLAW_BUILD_DATE "unknown"
+#define QUANTCLAW_BUILD_DATE "unknown"
 #endif
 #ifndef QUANTCLAW_GIT_COMMIT
-#  define QUANTCLAW_GIT_COMMIT "unknown"
+#define QUANTCLAW_GIT_COMMIT "unknown"
 #endif
 
 namespace quantclaw {
@@ -29,7 +29,7 @@ namespace quantclaw {
 // ------------------------------------------------------------
 
 /// Release version string (semver, e.g. "0.3.0")
-inline constexpr const char* kVersion   = QUANTCLAW_VERSION;
+inline constexpr const char* kVersion = QUANTCLAW_VERSION;
 
 /// Build date (ISO 8601, e.g. "2026-03-05")
 inline constexpr const char* kBuildDate = QUANTCLAW_BUILD_DATE;
@@ -49,7 +49,7 @@ inline constexpr int kDefaultHttpPort = 18801;
 
 /// Sidecar IPC port range (reserved for adapter subprocesses)
 inline constexpr int kSidecarPortRangeStart = 18802;
-inline constexpr int kSidecarPortRangeEnd   = 18899;
+inline constexpr int kSidecarPortRangeEnd = 18899;
 
 /// Legacy default port used before the 18800 standardisation.
 /// Kept only for backwards-compatible daemon/service parameter defaults.
@@ -85,10 +85,10 @@ inline constexpr int kDefaultMaxTokens = 8192;
 inline constexpr int kContextWindowMinTokens = 16384;
 
 /// Context window sizes for known model families (tokens)
-inline constexpr int kContextWindow4K   = 4096;
-inline constexpr int kContextWindow8K   = 8192;
-inline constexpr int kContextWindow16K  = 16384;
-inline constexpr int kContextWindow32K  = 32768;
+inline constexpr int kContextWindow4K = 4096;
+inline constexpr int kContextWindow8K = 8192;
+inline constexpr int kContextWindow16K = 16384;
+inline constexpr int kContextWindow32K = 32768;
 inline constexpr int kContextWindow128K = 131072;
 inline constexpr int kContextWindow200K = 200000;
 

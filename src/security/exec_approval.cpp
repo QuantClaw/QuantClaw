@@ -12,16 +12,21 @@ namespace quantclaw {
 // --- AskMode ---
 
 AskMode AskModeFromString(const std::string& s) {
-  if (s == "off") return AskMode::kOff;
-  if (s == "always") return AskMode::kAlways;
+  if (s == "off")
+    return AskMode::kOff;
+  if (s == "always")
+    return AskMode::kAlways;
   return AskMode::kOnMiss;  // default
 }
 
 std::string AskModeToString(AskMode m) {
   switch (m) {
-    case AskMode::kOff: return "off";
-    case AskMode::kAlways: return "always";
-    case AskMode::kOnMiss: return "on-miss";
+    case AskMode::kOff:
+      return "off";
+    case AskMode::kAlways:
+      return "always";
+    case AskMode::kOnMiss:
+      return "on-miss";
   }
   return "on-miss";
 }
@@ -30,10 +35,14 @@ std::string AskModeToString(AskMode m) {
 
 std::string ApprovalDecisionToString(ApprovalDecision d) {
   switch (d) {
-    case ApprovalDecision::kApproved: return "approved";
-    case ApprovalDecision::kDenied: return "denied";
-    case ApprovalDecision::kTimeout: return "timeout";
-    case ApprovalDecision::kPending: return "pending";
+    case ApprovalDecision::kApproved:
+      return "approved";
+    case ApprovalDecision::kDenied:
+      return "denied";
+    case ApprovalDecision::kTimeout:
+      return "timeout";
+    case ApprovalDecision::kPending:
+      return "pending";
   }
   return "pending";
 }
@@ -46,7 +55,8 @@ void ExecAllowlist::AddPattern(const std::string& pattern) {
 
 bool ExecAllowlist::Matches(const std::string& command) const {
   for (const auto& pattern : patterns_) {
-    if (glob_match(pattern, command)) return true;
+    if (glob_match(pattern, command))
+      return true;
   }
   return false;
 }
@@ -63,13 +73,14 @@ void ExecAllowlist::LoadFromJson(const nlohmann::json& j) {
 }
 
 bool ExecAllowlist::glob_match(const std::string& pattern,
-                                const std::string& text) {
+                               const std::string& text) {
   // Simple glob matching: * matches anything, ? matches single char
   size_t pi = 0, ti = 0;
   size_t star_p = std::string::npos, star_t = 0;
 
   while (ti < text.size()) {
-    if (pi < pattern.size() && (pattern[pi] == text[ti] || pattern[pi] == '?')) {
+    if (pi < pattern.size() &&
+        (pattern[pi] == text[ti] || pattern[pi] == '?')) {
       ++pi;
       ++ti;
     } else if (pi < pattern.size() && pattern[pi] == '*') {
@@ -85,7 +96,8 @@ bool ExecAllowlist::glob_match(const std::string& pattern,
     }
   }
 
-  while (pi < pattern.size() && pattern[pi] == '*') ++pi;
+  while (pi < pattern.size() && pattern[pi] == '*')
+    ++pi;
   return pi == pattern.size();
 }
 
@@ -100,13 +112,14 @@ ExecApprovalConfig ExecApprovalConfig::FromJson(const nlohmann::json& j) {
   if (j.contains("askFallback") && j["askFallback"].is_string()) {
     auto fb = j["askFallback"].get<std::string>();
     c.timeout_fallback = (fb == "approve") ? ApprovalDecision::kApproved
-                                            : ApprovalDecision::kDenied;
+                                           : ApprovalDecision::kDenied;
   }
   if (j.contains("allowlist")) {
     auto& al = j["allowlist"];
     if (al.is_array()) {
       for (const auto& item : al) {
-        if (item.is_string()) c.allowlist.push_back(item.get<std::string>());
+        if (item.is_string())
+          c.allowlist.push_back(item.get<std::string>());
       }
     }
   }
@@ -134,10 +147,8 @@ void ExecApprovalManager::SetApprovalHandler(ApprovalCallback handler) {
 }
 
 ApprovalDecision ExecApprovalManager::RequestApproval(
-    const std::string& command,
-    const std::string& cwd,
-    const std::string& agent_id,
-    const std::string& session_key) {
+    const std::string& command, const std::string& cwd,
+    const std::string& agent_id, const std::string& session_key) {
   // Check ask mode
   if (config_.ask == AskMode::kOff) {
     return ApprovalDecision::kApproved;
@@ -189,11 +200,12 @@ ApprovalDecision ExecApprovalManager::RequestApproval(
 }
 
 bool ExecApprovalManager::Resolve(const std::string& request_id,
-                                   ApprovalDecision decision,
-                                   const std::string& resolved_by) {
+                                  ApprovalDecision decision,
+                                  const std::string& resolved_by) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = pending_.find(request_id);
-  if (it == pending_.end()) return false;
+  if (it == pending_.end())
+    return false;
 
   ApprovalResolved res;
   res.id = request_id;
@@ -203,10 +215,8 @@ bool ExecApprovalManager::Resolve(const std::string& request_id,
   resolved_.push_back(res);
   pending_.erase(it);
 
-  logger_->info("Approval {} resolved: {} by {}",
-                request_id,
-                ApprovalDecisionToString(decision),
-                resolved_by);
+  logger_->info("Approval {} resolved: {} by {}", request_id,
+                ApprovalDecisionToString(decision), resolved_by);
   return true;
 }
 

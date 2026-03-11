@@ -3,10 +3,11 @@
 
 #pragma once
 
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
-#include <optional>
-#include <filesystem>
+
 #include <nlohmann/json.hpp>
 
 namespace quantclaw {

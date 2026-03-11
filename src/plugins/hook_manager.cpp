@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "quantclaw/plugins/hook_manager.hpp"
-#include "quantclaw/plugins/sidecar_manager.hpp"
+
 #include <algorithm>
 #include <future>
 #include <thread>
 #include <unordered_map>
+
+#include "quantclaw/plugins/sidecar_manager.hpp"
 
 namespace quantclaw {
 
@@ -45,7 +47,8 @@ static const std::unordered_map<std::string, HookMode> kHookModes = {
 
 HookMode GetHookMode(const std::string& hook_name) {
   auto it = kHookModes.find(hook_name);
-  if (it != kHookModes.end()) return it->second;
+  if (it != kHookModes.end())
+    return it->second;
   return HookMode::kVoid;  // Unknown hooks default to void
 }
 
@@ -55,9 +58,8 @@ HookManager::HookManager(std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {}
 
 void HookManager::RegisterHook(const std::string& hook_name,
-                                const std::string& plugin_id,
-                                HookHandler handler,
-                                int priority) {
+                               const std::string& plugin_id,
+                               HookHandler handler, int priority) {
   std::lock_guard<std::mutex> lock(mu_);
   auto& handlers = hooks_[hook_name];
   handlers.push_back({plugin_id, hook_name, std::move(handler), priority});
@@ -100,7 +102,7 @@ nlohmann::json HookManager::Fire(const std::string& hook_name,
 }
 
 void HookManager::FireAsync(const std::string& hook_name,
-                              const nlohmann::json& event) {
+                            const nlohmann::json& event) {
   auto logger = logger_;
   auto self_hooks = [this, hook_name, event, logger]() {
     try {
@@ -113,20 +115,20 @@ void HookManager::FireAsync(const std::string& hook_name,
 }
 
 // Void mode: fire-and-forget, parallel execution.
-nlohmann::json HookManager::FireVoid(
-    const std::string& hook_name,
-    const std::vector<HookRegistration>& handlers,
-    const nlohmann::json& event) {
+nlohmann::json
+HookManager::FireVoid(const std::string& hook_name,
+                      const std::vector<HookRegistration>& handlers,
+                      const nlohmann::json& event) {
   // Launch native handlers in parallel
   std::vector<std::future<void>> futures;
   for (const auto& reg : handlers) {
-    futures.push_back(std::async(std::launch::async,
-        [this, &reg, &event, &hook_name]() {
+    futures.push_back(
+        std::async(std::launch::async, [this, &reg, &event, &hook_name]() {
           try {
             reg.handler(event);
           } catch (const std::exception& e) {
-            logger_->error("Hook {} handler from {} failed: {}",
-                           hook_name, reg.plugin_id, e.what());
+            logger_->error("Hook {} handler from {} failed: {}", hook_name,
+                           reg.plugin_id, e.what());
           }
         }));
   }
@@ -143,10 +145,10 @@ nlohmann::json HookManager::FireVoid(
 }
 
 // Modifying mode: sequential, results merged via merge_patch.
-nlohmann::json HookManager::FireModifying(
-    const std::string& hook_name,
-    const std::vector<HookRegistration>& handlers,
-    const nlohmann::json& event) {
+nlohmann::json
+HookManager::FireModifying(const std::string& hook_name,
+                           const std::vector<HookRegistration>& handlers,
+                           const nlohmann::json& event) {
   nlohmann::json merged_result = nlohmann::json::object();
 
   // Run native handlers sequentially in priority order
@@ -157,8 +159,8 @@ nlohmann::json HookManager::FireModifying(
         merged_result.merge_patch(result);
       }
     } catch (const std::exception& e) {
-      logger_->error("Hook {} handler from {} failed: {}",
-                     hook_name, reg.plugin_id, e.what());
+      logger_->error("Hook {} handler from {} failed: {}", hook_name,
+                     reg.plugin_id, e.what());
     }
   }
 
@@ -172,10 +174,10 @@ nlohmann::json HookManager::FireModifying(
 }
 
 // Sync mode: synchronous only, for hot paths like tool_result_persist.
-nlohmann::json HookManager::FireSync(
-    const std::string& hook_name,
-    const std::vector<HookRegistration>& handlers,
-    const nlohmann::json& event) {
+nlohmann::json
+HookManager::FireSync(const std::string& hook_name,
+                      const std::vector<HookRegistration>& handlers,
+                      const nlohmann::json& event) {
   nlohmann::json merged_result = nlohmann::json::object();
 
   // Run native handlers sequentially
@@ -186,8 +188,8 @@ nlohmann::json HookManager::FireSync(
         merged_result.merge_patch(result);
       }
     } catch (const std::exception& e) {
-      logger_->error("Hook {} handler from {} failed: {}",
-                     hook_name, reg.plugin_id, e.what());
+      logger_->error("Hook {} handler from {} failed: {}", hook_name,
+                     reg.plugin_id, e.what());
     }
   }
 
@@ -201,7 +203,7 @@ nlohmann::json HookManager::FireSync(
 }
 
 nlohmann::json HookManager::ForwardToSidecar(const std::string& hook_name,
-                                              const nlohmann::json& event) {
+                                             const nlohmann::json& event) {
   std::shared_ptr<SidecarManager> sidecar;
   {
     std::lock_guard<std::mutex> lock(mu_);
@@ -232,19 +234,19 @@ nlohmann::json HookManager::ForwardToSidecar(const std::string& hook_name,
 }
 
 bool HookManager::UnregisterHook(const std::string& hook_name,
-                                  const std::string& plugin_id) {
+                                 const std::string& plugin_id) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = hooks_.find(hook_name);
-  if (it == hooks_.end()) return false;
+  if (it == hooks_.end())
+    return false;
 
   auto& handlers = it->second;
   auto before = handlers.size();
-  handlers.erase(
-      std::remove_if(handlers.begin(), handlers.end(),
-                     [&](const HookRegistration& r) {
-                       return r.plugin_id == plugin_id;
-                     }),
-      handlers.end());
+  handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
+                                [&](const HookRegistration& r) {
+                                  return r.plugin_id == plugin_id;
+                                }),
+                 handlers.end());
   if (handlers.empty()) {
     hooks_.erase(it);
   }
@@ -268,7 +270,8 @@ std::vector<std::string> HookManager::RegisteredHooks() const {
 size_t HookManager::HandlerCount(const std::string& hook_name) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = hooks_.find(hook_name);
-  if (it == hooks_.end()) return 0;
+  if (it == hooks_.end())
+    return 0;
   return it->second.size();
 }
 

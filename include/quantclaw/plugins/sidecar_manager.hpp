@@ -10,10 +10,12 @@
 #include <mutex>
 #include <string>
 #include <thread>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
-#include "quantclaw/platform/process.hpp"
+
 #include "quantclaw/platform/ipc.hpp"
+#include "quantclaw/platform/process.hpp"
 
 namespace quantclaw {
 
@@ -70,15 +72,16 @@ class SidecarManager {
   bool Reload();
 
   // Send a JSON-RPC request and wait for response
-  SidecarResponse Call(const std::string& method,
-                       const nlohmann::json& params,
+  SidecarResponse Call(const std::string& method, const nlohmann::json& params,
                        int timeout_ms = 30000);
 
   // Check if sidecar is alive
   bool IsRunning() const;
 
   // Get sidecar PID
-  platform::ProcessId pid() const { return pid_; }
+  platform::ProcessId pid() const {
+    return pid_;
+  }
 
  private:
   void monitor_loop();

@@ -1,19 +1,23 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <fstream>
 #include <filesystem>
-#include <spdlog/spdlog.h>
+#include <fstream>
+
 #include <spdlog/sinks/null_sink.h>
-#include "quantclaw/core/session_compaction.hpp"
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/core/cron_scheduler.hpp"
 #include "quantclaw/core/memory_search.hpp"
+#include "quantclaw/core/session_compaction.hpp"
+
 #include "test_helpers.hpp"
+#include <gtest/gtest.h>
 
 namespace fs = std::filesystem;
 
-static std::shared_ptr<spdlog::logger> make_null_logger(const std::string& name) {
+static std::shared_ptr<spdlog::logger>
+make_null_logger(const std::string& name) {
   auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
   return std::make_shared<spdlog::logger>(name, null_sink);
 }
@@ -75,8 +79,8 @@ TEST_F(CompactionTest, CompactWithSummary) {
   opts.max_messages = 30;
   opts.keep_recent = 10;
 
-  auto result = compaction_->Compact(msgs, opts,
-      [](const std::vector<nlohmann::json>& old_msgs) {
+  auto result = compaction_->Compact(
+      msgs, opts, [](const std::vector<nlohmann::json>& old_msgs) {
         return "Summary of " + std::to_string(old_msgs.size()) + " messages";
       });
 
@@ -93,8 +97,8 @@ TEST_F(CompactionTest, CompactFallsBackToTruncate) {
   opts.max_messages = 30;
   opts.keep_recent = 10;
 
-  auto result = compaction_->Compact(msgs, opts,
-      [](const std::vector<nlohmann::json>&) {
+  auto result =
+      compaction_->Compact(msgs, opts, [](const std::vector<nlohmann::json>&) {
         return "";  // empty summary → fallback
       });
 
@@ -267,15 +271,15 @@ TEST_F(CronSchedulerTest, RemoveEmptyIdFails) {
 
 TEST_F(CronSchedulerTest, PrefixMatchAmbiguousFails) {
   quantclaw::CronScheduler sched(logger_);
-  // Add two jobs with similar IDs (both will have prefixes that start with same chars)
-  // Since job IDs are random, we can't easily create ambiguous prefixes
+  // Add two jobs with similar IDs (both will have prefixes that start with same
+  // chars) Since job IDs are random, we can't easily create ambiguous prefixes
   // Instead, test that a short prefix matching multiple jobs fails
   auto id1 = sched.AddJob("job1", "0 * * * *", "msg1");
   auto id2 = sched.AddJob("job2", "0 * * * *", "msg2");
 
   // Try to remove with a very short prefix (if both IDs start with same char)
-  // This is a probabilistic test, but with random IDs it's unlikely they share long prefixes
-  // So instead, test that non-matching prefix fails
+  // This is a probabilistic test, but with random IDs it's unlikely they share
+  // long prefixes So instead, test that non-matching prefix fails
   EXPECT_FALSE(sched.RemoveJob("xyz"));  // Definitely won't match random IDs
 
   // Both jobs should still exist
@@ -356,16 +360,18 @@ class MemorySearchTest : public ::testing::Test {
 };
 
 TEST_F(MemorySearchTest, IndexAndSearch) {
-  write_file("test.md", "The quick brown fox jumps over the lazy dog.\n\n"
-                         "Machine learning is a subset of artificial intelligence.\n\n"
-                         "The weather today is sunny and warm.\n");
+  write_file("test.md",
+             "The quick brown fox jumps over the lazy dog.\n\n"
+             "Machine learning is a subset of artificial intelligence.\n\n"
+             "The weather today is sunny and warm.\n");
 
   quantclaw::MemorySearch search(logger_);
   search.IndexDirectory(test_dir_);
 
   auto results = search.Search("machine learning artificial intelligence");
   ASSERT_FALSE(results.empty());
-  EXPECT_TRUE(results[0].content.find("machine learning") != std::string::npos ||
+  EXPECT_TRUE(results[0].content.find("machine learning") !=
+                  std::string::npos ||
               results[0].content.find("Machine learning") != std::string::npos);
 }
 
@@ -423,9 +429,11 @@ TEST_F(MemorySearchTest, ClearIndex) {
 }
 
 TEST_F(MemorySearchTest, ScoreRelevance) {
-  write_file("relevant.md", "Kubernetes container orchestration deployment pods services\n\n"
-                              "Docker containers and images for development\n");
-  write_file("irrelevant.md", "The weather is sunny today\n\nCooking recipes for pasta\n");
+  write_file("relevant.md",
+             "Kubernetes container orchestration deployment pods services\n\n"
+             "Docker containers and images for development\n");
+  write_file("irrelevant.md",
+             "The weather is sunny today\n\nCooking recipes for pasta\n");
 
   quantclaw::MemorySearch search(logger_);
   search.IndexDirectory(test_dir_);

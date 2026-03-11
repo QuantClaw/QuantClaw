@@ -5,9 +5,11 @@
 
 #include <memory>
 #include <string>
+
 #include <spdlog/spdlog.h>
-#include "quantclaw/platform/service.hpp"
+
 #include "quantclaw/constants.hpp"
+#include "quantclaw/platform/service.hpp"
 
 namespace quantclaw::gateway {
 

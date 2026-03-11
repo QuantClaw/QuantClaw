@@ -161,33 +161,31 @@ jobs:
   format-check:
     name: Code Format Check
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install clang-format
+    - name: Install clang-format-18
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang-format-14
+        sudo apt-get install -y clang-format-18
 
     - name: Check C++ formatting
-      continue-on-error: true
       run: |
-        echo "Checking code formatting..."
+        echo "Checking code formatting with clang-format-18..."
         FAILED_FILES=""
 
-        for file in $(find src include tests \( -name "*.cpp" -o -name "*.hpp" \) -not -path "*/ui/*"); do
-          if ! clang-format-14 --dry-run --Werror "$file" 2>&1 > /dev/null; then
+        while IFS= read -r -d '' file; do
+          if ! clang-format-18 --dry-run --Werror "$file" > /dev/null 2>&1; then
             FAILED_FILES="$FAILED_FILES\n  - $file"
           fi
-        done
+        done < <(find src include tests \( -name "*.cpp" -o -name "*.hpp" \) -print0)
 
         if [ -n "$FAILED_FILES" ]; then
-          echo "Warning: The following files have formatting issues:"
-          echo -e "$FAILED_FILES"
+          echo "The following files are not formatted correctly:"
+          printf '%b\n' "$FAILED_FILES"
           echo ""
-          echo "To fix: ./scripts/format-code.sh"
+          echo "Run scripts/format-code.sh to fix."
           exit 1
         fi
 

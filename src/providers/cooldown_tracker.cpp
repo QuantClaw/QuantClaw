@@ -10,13 +10,14 @@ namespace quantclaw {
 bool CooldownTracker::IsInCooldown(const std::string& key) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = states_.find(key);
-  if (it == states_.end()) return false;
+  if (it == states_.end())
+    return false;
   return std::chrono::steady_clock::now() < it->second.cooldown_until;
 }
 
 void CooldownTracker::RecordFailure(const std::string& key,
-                                     ProviderErrorKind kind,
-                                     int retry_after_seconds) {
+                                    ProviderErrorKind kind,
+                                    int retry_after_seconds) {
   std::lock_guard<std::mutex> lock(mu_);
   auto now = std::chrono::steady_clock::now();
   auto& state = states_[key];
@@ -31,7 +32,8 @@ void CooldownTracker::RecordFailure(const std::string& key,
   state.consecutive_failures++;
   state.last_error = kind;
   state.last_failure_at = now;
-  state.last_probe_at = now;  // Reset probe timer so first probe waits kProbeInterval
+  state.last_probe_at =
+      now;  // Reset probe timer so first probe waits kProbeInterval
 
   // Prefer server-provided Retry-After over computed backoff
   if (retry_after_seconds > 0) {
@@ -47,14 +49,16 @@ void CooldownTracker::RecordSuccess(const std::string& key) {
   states_.erase(key);
 }
 
-std::chrono::seconds CooldownTracker::CooldownRemaining(
-    const std::string& key) const {
+std::chrono::seconds
+CooldownTracker::CooldownRemaining(const std::string& key) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = states_.find(key);
-  if (it == states_.end()) return std::chrono::seconds(0);
+  if (it == states_.end())
+    return std::chrono::seconds(0);
 
   auto now = std::chrono::steady_clock::now();
-  if (now >= it->second.cooldown_until) return std::chrono::seconds(0);
+  if (now >= it->second.cooldown_until)
+    return std::chrono::seconds(0);
 
   return std::chrono::duration_cast<std::chrono::seconds>(
       it->second.cooldown_until - now);
@@ -68,17 +72,20 @@ void CooldownTracker::Reset() {
 int CooldownTracker::FailureCount(const std::string& key) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = states_.find(key);
-  if (it == states_.end()) return 0;
+  if (it == states_.end())
+    return 0;
   return it->second.consecutive_failures;
 }
 
 bool CooldownTracker::TryProbe(const std::string& key) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = states_.find(key);
-  if (it == states_.end()) return false;  // Not in cooldown, no probe needed
+  if (it == states_.end())
+    return false;  // Not in cooldown, no probe needed
 
   auto now = std::chrono::steady_clock::now();
-  if (now >= it->second.cooldown_until) return false;  // Cooldown expired
+  if (now >= it->second.cooldown_until)
+    return false;  // Cooldown expired
 
   // Check if enough time has passed since the last probe
   if (now - it->second.last_probe_at < kProbeInterval) {
@@ -89,8 +96,8 @@ bool CooldownTracker::TryProbe(const std::string& key) {
   return true;
 }
 
-std::chrono::seconds CooldownTracker::ComputeCooldown(
-    ProviderErrorKind kind, int failure_count) {
+std::chrono::seconds CooldownTracker::ComputeCooldown(ProviderErrorKind kind,
+                                                      int failure_count) {
   // Base cooldown per error type (seconds)
   int base_s = 0;
   int cap_s = 0;
@@ -134,7 +141,8 @@ std::chrono::seconds CooldownTracker::ComputeCooldown(
       break;
   }
 
-  if (base_s == 0) return std::chrono::seconds(0);
+  if (base_s == 0)
+    return std::chrono::seconds(0);
 
   // Exponential backoff: base * 5^(failures-1), capped
   // failure_count: 1 → base, 2 → base*5, 3 → base*25, ...

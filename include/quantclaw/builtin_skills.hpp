@@ -12,8 +12,8 @@
 namespace quantclaw {
 
 struct BuiltinSkill {
-    const char* name;     // directory name (== skill name)
-    const char* content;  // full SKILL.md content
+  const char* name;     // directory name (== skill name)
+  const char* content;  // full SKILL.md content
 };
 
 // Returns the compile-time registry of built-in skills embedded from
@@ -27,12 +27,11 @@ struct BuiltinSkill {
 // Onboarding copies these files to the user workspace, skipping any that
 // already exist so user edits are preserved.
 inline const std::vector<BuiltinSkill>& GetBuiltinSkills() {
-    // Raw-string delimiter SKILL avoids conflicts with any character in the
-    // markdown content (backticks, quotes, closing parens, arrows, etc.).
-    static const std::vector<BuiltinSkill> kSkills = {
-        {
-            "search",
-            R"SKILL(---
+  // Raw-string delimiter SKILL avoids conflicts with any character in the
+  // markdown content (backticks, quotes, closing parens, arrows, etc.).
+  static const std::vector<BuiltinSkill> kSkills = {
+      {"search",
+       R"SKILL(---
 name: search
 emoji: "🔍"
 description: Web search with automatic provider fallback (Tavily → DuckDuckGo)
@@ -71,11 +70,9 @@ web_search({"query": "market open price TSLA", "freshness": "day"})
 ```
 
 **Slash command:** `/search <query>` triggers an immediate web search.
-)SKILL"
-        },
-        {
-            "weather",
-            R"SKILL(---
+)SKILL"},
+      {"weather",
+       R"SKILL(---
 name: weather
 emoji: "🌦️"
 description: Check current weather using wttr.in
@@ -92,11 +89,9 @@ Examples:
 - `curl "wttr.in/Beijing?format=3"` → Beijing: ☀️ +25°C
 - `curl "wttr.in/Tokyo?format=%C+%t+%w"` → Clear +22°C ↗10km/h
 - `curl "wttr.in/London?lang=zh"` → Chinese output
-)SKILL"
-        },
-        {
-            "github",
-            R"SKILL(---
+)SKILL"},
+      {"github",
+       R"SKILL(---
 name: github
 emoji: "🐙"
 description: Interact with GitHub via gh CLI
@@ -121,11 +116,9 @@ You can interact with GitHub using the `gh` CLI tool via `system.run`.
 - View notifications: `gh api notifications`
 
 **Authentication:** Ensure `gh auth login` has been run first.
-)SKILL"
-        },
-        {
-            "healthcheck",
-            R"SKILL(---
+)SKILL"},
+      {"healthcheck",
+       R"SKILL(---
 name: healthcheck
 emoji: "🏥"
 description: System health audit and diagnostics
@@ -152,11 +145,9 @@ You can perform system health checks and diagnostics using standard Linux tools.
 - Gateway status: `quantclaw status`
 - Config check: `quantclaw doctor`
 - Health endpoint: `quantclaw health`
-)SKILL"
-        },
-        {
-            "skill-creator",
-            R"SKILL(---
+)SKILL"},
+      {"skill-creator",
+       R"SKILL(---
 name: skill-creator
 emoji: "🎨"
 description: Guide for creating new QuantClaw skills
@@ -206,10 +197,9 @@ metadata:
 ```
 
 The markdown body after the frontmatter becomes the skill context injected into the LLM prompt.
-)SKILL"
-        },
-    };
-    return kSkills;
+)SKILL"},
+  };
+  return kSkills;
 }
 
 }  // namespace quantclaw

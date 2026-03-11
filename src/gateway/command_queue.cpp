@@ -4,9 +4,9 @@
 #include "quantclaw/gateway/command_queue.hpp"
 
 #include <algorithm>
+#include <iomanip>
 #include <random>
 #include <sstream>
-#include <iomanip>
 
 namespace quantclaw::gateway {
 
@@ -15,37 +15,53 @@ namespace quantclaw::gateway {
 // ================================================================
 
 QueueMode QueueModeFromString(const std::string& s) {
-  if (s == "collect")        return QueueMode::kCollect;
-  if (s == "followup")       return QueueMode::kFollowup;
-  if (s == "steer")          return QueueMode::kSteer;
-  if (s == "steer-backlog")  return QueueMode::kSteerBacklog;
-  if (s == "interrupt")      return QueueMode::kInterrupt;
+  if (s == "collect")
+    return QueueMode::kCollect;
+  if (s == "followup")
+    return QueueMode::kFollowup;
+  if (s == "steer")
+    return QueueMode::kSteer;
+  if (s == "steer-backlog")
+    return QueueMode::kSteerBacklog;
+  if (s == "interrupt")
+    return QueueMode::kInterrupt;
   return QueueMode::kCollect;
 }
 
 std::string QueueModeToString(QueueMode mode) {
   switch (mode) {
-    case QueueMode::kCollect:      return "collect";
-    case QueueMode::kFollowup:     return "followup";
-    case QueueMode::kSteer:        return "steer";
-    case QueueMode::kSteerBacklog: return "steer-backlog";
-    case QueueMode::kInterrupt:    return "interrupt";
+    case QueueMode::kCollect:
+      return "collect";
+    case QueueMode::kFollowup:
+      return "followup";
+    case QueueMode::kSteer:
+      return "steer";
+    case QueueMode::kSteerBacklog:
+      return "steer-backlog";
+    case QueueMode::kInterrupt:
+      return "interrupt";
   }
   return "collect";
 }
 
 DropPolicy DropPolicyFromString(const std::string& s) {
-  if (s == "summarize")    return DropPolicy::kSummarize;
-  if (s == "drop-oldest")  return DropPolicy::kDropOldest;
-  if (s == "reject")       return DropPolicy::kReject;
+  if (s == "summarize")
+    return DropPolicy::kSummarize;
+  if (s == "drop-oldest")
+    return DropPolicy::kDropOldest;
+  if (s == "reject")
+    return DropPolicy::kReject;
   return DropPolicy::kSummarize;
 }
 
 std::string DropPolicyToString(DropPolicy policy) {
   switch (policy) {
-    case DropPolicy::kSummarize:  return "summarize";
-    case DropPolicy::kDropOldest: return "drop-oldest";
-    case DropPolicy::kReject:     return "reject";
+    case DropPolicy::kSummarize:
+      return "summarize";
+    case DropPolicy::kDropOldest:
+      return "drop-oldest";
+    case DropPolicy::kReject:
+      return "reject";
   }
   return "summarize";
 }
@@ -89,14 +105,16 @@ bool SessionLane::HasPending() const {
   return !pending_.empty();
 }
 
-std::optional<QueuedCommand> SessionLane::TryActivate(
-    std::chrono::steady_clock::time_point now) {
-  if (pending_.empty() || active_command_) return std::nullopt;
+std::optional<QueuedCommand>
+SessionLane::TryActivate(std::chrono::steady_clock::time_point now) {
+  if (pending_.empty() || active_command_)
+    return std::nullopt;
 
   auto& front = pending_.front();
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
       now - front.enqueued_at);
-  if (elapsed.count() < debounce_ms_) return std::nullopt;
+  if (elapsed.count() < debounce_ms_)
+    return std::nullopt;
 
   QueuedCommand cmd = std::move(front);
   pending_.pop_front();
@@ -106,7 +124,8 @@ std::optional<QueuedCommand> SessionLane::TryActivate(
 }
 
 std::optional<QueuedCommand> SessionLane::CompleteActive() {
-  if (!active_command_) return std::nullopt;
+  if (!active_command_)
+    return std::nullopt;
   auto cmd = std::move(*active_command_);
   cmd.state = QueuedCommand::State::kComplete;
   active_command_.reset();
@@ -133,16 +152,19 @@ std::vector<std::string> SessionLane::ApplyCapOverflow() {
             if (pos != std::string::npos) {
               auto start = oldest.message.find(": ") + 2;
               try {
-                collapsed_count = std::stoi(oldest.message.substr(start, pos - start));
+                collapsed_count =
+                    std::stoi(oldest.message.substr(start, pos - start));
               } catch (...) {}
             }
           }
           collapsed_count++;  // +1 for the newly merged message
 
           // Build summary with truncated snippets
-          std::string summary = "[Queue summary: " +
-                                std::to_string(collapsed_count) + " messages] ";
-          // Keep the core content from the existing oldest (may already be a summary)
+          std::string summary =
+              "[Queue summary: " + std::to_string(collapsed_count) +
+              " messages] ";
+          // Keep the core content from the existing oldest (may already be a
+          // summary)
           if (oldest.message.find("[Queue summary:") == 0) {
             auto content_start = oldest.message.find("] ");
             if (content_start != std::string::npos) {
@@ -175,16 +197,19 @@ std::vector<std::string> SessionLane::ApplyCapOverflow() {
       }
     }
     // Safety: avoid infinite loop if cap is 0 or other edge case
-    if (cap_ <= 0) break;
+    if (cap_ <= 0)
+      break;
   }
   return dropped_ids;
 }
 
 std::string SessionLane::DrainPendingAsSteeringText() {
-  if (pending_.empty()) return "";
+  if (pending_.empty())
+    return "";
   std::string result;
   for (auto& cmd : pending_) {
-    if (!result.empty()) result += "\n\n";
+    if (!result.empty())
+      result += "\n\n";
     result += cmd.message;
   }
   pending_.clear();
@@ -238,17 +263,13 @@ static std::string generate_uuid() {
   std::ostringstream ss;
   ss << std::hex << std::setfill('0');
   uint32_t a = dist(gen), b = dist(gen), c = dist(gen), d = dist(gen);
-  ss << std::setw(8) << a << "-"
-     << std::setw(4) << (b >> 16) << "-"
-     << std::setw(4) << (b & 0xFFFF) << "-"
-     << std::setw(4) << (c >> 16) << "-"
-     << std::setw(4) << (c & 0xFFFF)
-     << std::setw(8) << d;
+  ss << std::setw(8) << a << "-" << std::setw(4) << (b >> 16) << "-"
+     << std::setw(4) << (b & 0xFFFF) << "-" << std::setw(4) << (c >> 16) << "-"
+     << std::setw(4) << (c & 0xFFFF) << std::setw(8) << d;
   return ss.str();
 }
 
-CommandQueue::CommandQueue(const QueueConfig& config,
-                           AgentExecutor executor,
+CommandQueue::CommandQueue(const QueueConfig& config, AgentExecutor executor,
                            ResponseSender response_sender,
                            EventSender event_sender,
                            std::shared_ptr<spdlog::logger> logger)
@@ -263,14 +284,17 @@ CommandQueue::~CommandQueue() {
 }
 
 void CommandQueue::Start() {
-  if (running_) return;
+  if (running_)
+    return;
   running_ = true;
   dispatcher_ = std::thread([this] { dispatcher_loop(); });
-  logger_->info("CommandQueue started (maxConcurrent={})", config_.max_concurrent);
+  logger_->info("CommandQueue started (maxConcurrent={})",
+                config_.max_concurrent);
 }
 
 void CommandQueue::Stop() {
-  if (!running_) return;
+  if (!running_)
+    return;
   running_ = false;
   cv_.notify_all();
   if (dispatcher_.joinable()) {
@@ -374,12 +398,13 @@ std::string CommandQueue::Submit(const std::string& session_key,
         command_to_session_.erase(did);
       }
       // Notify the client about the overflow summarization
-      event_sender_(connection_id, "queue.overflow", {
-          {"sessionKey", session_key},
-          {"droppedCount", dropped.size()},
-          {"policy", DropPolicyToString(lane.GetDropPolicy())},
-          {"pendingCount", lane.PendingCount()},
-      });
+      event_sender_(connection_id, "queue.overflow",
+                    {
+                        {"sessionKey", session_key},
+                        {"droppedCount", dropped.size()},
+                        {"policy", DropPolicyToString(lane.GetDropPolicy())},
+                        {"pendingCount", lane.PendingCount()},
+                    });
     }
   }
 
@@ -391,7 +416,8 @@ std::string CommandQueue::Submit(const std::string& session_key,
 bool CommandQueue::Cancel(const std::string& command_id) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = command_to_session_.find(command_id);
-  if (it == command_to_session_.end()) return false;
+  if (it == command_to_session_.end())
+    return false;
 
   auto& lane = get_lane(it->second);
   bool cancelled = lane.CancelPending(command_id);
@@ -402,7 +428,8 @@ bool CommandQueue::Cancel(const std::string& command_id) {
 bool CommandQueue::AbortSession(const std::string& session_key) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = lanes_.find(session_key);
-  if (it == lanes_.end()) return false;
+  if (it == lanes_.end())
+    return false;
 
   auto aborted_id = it->second->InterruptActive();
   if (aborted_id) {
@@ -414,20 +441,21 @@ bool CommandQueue::AbortSession(const std::string& session_key) {
 }
 
 void CommandQueue::ConfigureSession(const std::string& session_key,
-                                    QueueMode mode,
-                                    int debounce_ms,
-                                    int cap,
+                                    QueueMode mode, int debounce_ms, int cap,
                                     const std::string& drop) {
   std::lock_guard<std::mutex> lock(mu_);
   auto& lane = get_lane(session_key);
   lane.SetMode(mode);
-  if (debounce_ms >= 0) lane.SetDebounceMs(debounce_ms);
-  if (cap >= 0) lane.SetCap(cap);
-  if (!drop.empty()) lane.SetDropPolicy(DropPolicyFromString(drop));
+  if (debounce_ms >= 0)
+    lane.SetDebounceMs(debounce_ms);
+  if (cap >= 0)
+    lane.SetCap(cap);
+  if (!drop.empty())
+    lane.SetDropPolicy(DropPolicyFromString(drop));
 }
 
-nlohmann::json CommandQueue::SessionQueueStatus(
-    const std::string& session_key) const {
+nlohmann::json
+CommandQueue::SessionQueueStatus(const std::string& session_key) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = lanes_.find(session_key);
   if (it == lanes_.end()) {
@@ -444,13 +472,12 @@ nlohmann::json CommandQueue::GlobalStatus() const {
   int active_lanes = 0;
   for (const auto& [key, lane] : lanes_) {
     total_pending += static_cast<int>(lane->PendingCount());
-    if (lane->HasActive()) active_lanes++;
+    if (lane->HasActive())
+      active_lanes++;
   }
   return {
-      {"config", config_.ToJson()},
-      {"activeLanes", active_lanes},
-      {"activeCount", active_count_.load()},
-      {"totalPending", total_pending},
+      {"config", config_.ToJson()},          {"activeLanes", active_lanes},
+      {"activeCount", active_count_.load()}, {"totalPending", total_pending},
       {"totalLanes", lanes_.size()},
   };
 }
@@ -465,15 +492,19 @@ void CommandQueue::dispatcher_loop() {
     std::unique_lock<std::mutex> lock(mu_);
 
     cv_.wait_for(lock, std::chrono::milliseconds(100), [this] {
-      if (!running_) return true;
-      if (active_count_ >= config_.max_concurrent) return false;
+      if (!running_)
+        return true;
+      if (active_count_ >= config_.max_concurrent)
+        return false;
       for (auto& [key, lane] : lanes_) {
-        if (!lane->HasActive() && lane->HasPending()) return true;
+        if (!lane->HasActive() && lane->HasPending())
+          return true;
       }
       return false;
     });
 
-    if (!running_) break;
+    if (!running_)
+      break;
 
     auto now = std::chrono::steady_clock::now();
 
@@ -490,16 +521,20 @@ void CommandQueue::dispatcher_loop() {
 
     for (const auto& key : session_keys) {
       auto it = lanes_.find(key);
-      if (it == lanes_.end()) continue;
+      if (it == lanes_.end())
+        continue;
       auto& lane = it->second;
 
-      if (lane->HasActive()) continue;
-      if (active_count_ >= config_.max_concurrent) break;
+      if (lane->HasActive())
+        continue;
+      if (active_count_ >= config_.max_concurrent)
+        break;
 
       // For collect mode: try to activate, but also collect
       // any additional pending messages
       auto cmd_opt = lane->TryActivate(now);
-      if (!cmd_opt) continue;
+      if (!cmd_opt)
+        continue;
 
       QueuedCommand command = std::move(*cmd_opt);
 
@@ -526,13 +561,13 @@ void CommandQueue::dispatcher_loop() {
     }
 
     // Clean up completed workers to prevent unbounded growth.
-    workers_.erase(
-        std::remove_if(workers_.begin(), workers_.end(),
-                        [](std::thread& t) {
-                          if (!t.joinable()) return true;
-                          return false;
-                        }),
-        workers_.end());
+    workers_.erase(std::remove_if(workers_.begin(), workers_.end(),
+                                  [](std::thread& t) {
+                                    if (!t.joinable())
+                                      return true;
+                                    return false;
+                                  }),
+                   workers_.end());
 
     // Clean up idle lanes (no active, no pending, avoid map bloat)
     for (auto it = lanes_.begin(); it != lanes_.end();) {
@@ -556,29 +591,28 @@ void CommandQueue::dispatcher_loop() {
 }
 
 void CommandQueue::execute_command(QueuedCommand cmd) {
-  logger_->debug("Executing command {} for session {}",
-                 cmd.id, cmd.session_key);
+  logger_->debug("Executing command {} for session {}", cmd.id,
+                 cmd.session_key);
 
   emit_queue_event(cmd, "queue.started");
 
   try {
-    auto event_fn = [this, conn_id = cmd.connection_id](
-                        const std::string& event_name,
-                        const nlohmann::json& payload) {
-      event_sender_(conn_id, event_name, payload);
-    };
+    auto event_fn =
+        [this, conn_id = cmd.connection_id](const std::string& event_name,
+                                            const nlohmann::json& payload) {
+          event_sender_(conn_id, event_name, payload);
+        };
 
     auto result = executor_(cmd, event_fn);
 
     if (!cmd.rpc_request_id.empty()) {
-      response_sender_(cmd.connection_id, cmd.rpc_request_id,
-                       true, result);
+      response_sender_(cmd.connection_id, cmd.rpc_request_id, true, result);
     }
   } catch (const std::exception& e) {
     logger_->error("Command {} failed: {}", cmd.id, e.what());
     if (!cmd.rpc_request_id.empty()) {
-      response_sender_(cmd.connection_id, cmd.rpc_request_id,
-                       false, {{"error", e.what()}});
+      response_sender_(cmd.connection_id, cmd.rpc_request_id, false,
+                       {{"error", e.what()}});
     }
   }
 

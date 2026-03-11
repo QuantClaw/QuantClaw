@@ -3,15 +3,17 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <memory>
 #include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
-#include "quantclaw/providers/llm_provider.hpp"
+
 #include "quantclaw/config.hpp"
+#include "quantclaw/providers/llm_provider.hpp"
 
 namespace quantclaw {
 
@@ -20,7 +22,9 @@ struct ModelRef {
   std::string provider;  // e.g. "anthropic", "openai", "ollama"
   std::string model;     // e.g. "claude-opus-4-6", "gpt-4o"
 
-  std::string to_string() const { return provider + "/" + model; }
+  std::string to_string() const {
+    return provider + "/" + model;
+  }
 
   static ModelRef parse(const std::string& raw,
                         const std::string& default_provider = "openai");
@@ -28,27 +32,26 @@ struct ModelRef {
 
 // Provider entry with auth and config
 struct ProviderEntry {
-  std::string id;           // e.g. "anthropic", "openai"
+  std::string id;  // e.g. "anthropic", "openai"
   std::string display_name;
   std::string base_url;
   std::string api_key;
   std::string api_key_env;  // Env var name for API key
-  std::string api;          // API type: "openai-completions", "anthropic-messages"
+  std::string api;  // API type: "openai-completions", "anthropic-messages"
   int timeout = 30;
-  nlohmann::json extra;     // Provider-specific settings
+  nlohmann::json extra;                 // Provider-specific settings
   std::vector<ModelDefinition> models;  // Per-provider model definitions
 };
 
 // Model alias mapping (OpenClaw compatible)
 struct ModelAlias {
-  std::string alias;     // Short name (e.g. "opus")
-  std::string target;    // Full model ref (e.g. "anthropic/claude-opus-4-6")
+  std::string alias;   // Short name (e.g. "opus")
+  std::string target;  // Full model ref (e.g. "anthropic/claude-opus-4-6")
 };
 
 // Provider factory: creates LLMProvider instances
 using ProviderFactory = std::function<std::shared_ptr<LLMProvider>(
-    const ProviderEntry& entry,
-    std::shared_ptr<spdlog::logger> logger)>;
+    const ProviderEntry& entry, std::shared_ptr<spdlog::logger> logger)>;
 
 // Central provider registry — manages all LLM providers and model resolution
 class ProviderRegistry {
@@ -56,8 +59,7 @@ class ProviderRegistry {
   explicit ProviderRegistry(std::shared_ptr<spdlog::logger> logger);
 
   // Register a provider factory (e.g. "openai", "anthropic", "ollama")
-  void RegisterFactory(const std::string& provider_id,
-                       ProviderFactory factory);
+  void RegisterFactory(const std::string& provider_id, ProviderFactory factory);
 
   // Register built-in provider factories (openai, anthropic, ollama, gemini)
   void RegisterBuiltinFactories();
@@ -86,9 +88,9 @@ class ProviderRegistry {
 
   // Create a provider instance using a specific API key
   // (for multi-profile auth rotation). Not cached.
-  std::shared_ptr<LLMProvider> GetProviderWithKey(
-      const std::string& provider_id,
-      const std::string& api_key);
+  std::shared_ptr<LLMProvider>
+  GetProviderWithKey(const std::string& provider_id,
+                     const std::string& api_key);
 
   // List all registered provider IDs
   std::vector<std::string> ProviderIds() const;
@@ -103,19 +105,20 @@ class ProviderRegistry {
   const ProviderEntry* GetEntry(const std::string& provider_id) const;
 
   // Load models from model_providers config section (OpenClaw models.providers)
-  void LoadModelProviders(const std::unordered_map<std::string, ProviderConfig>& model_providers);
+  void LoadModelProviders(
+      const std::unordered_map<std::string, ProviderConfig>& model_providers);
 
   // Model catalog entry (merged from all providers)
   struct ModelCatalogEntry {
-      std::string id;
-      std::string name;
-      std::string provider;
-      int context_window = 0;
-      bool reasoning = false;
-      std::vector<std::string> input;
-      ModelCost cost;
-      int max_tokens = 0;
-      nlohmann::json ToJson() const;
+    std::string id;
+    std::string name;
+    std::string provider;
+    int context_window = 0;
+    bool reasoning = false;
+    std::vector<std::string> input;
+    ModelCost cost;
+    int max_tokens = 0;
+    nlohmann::json ToJson() const;
   };
 
   // Get model catalog (merged from all providers)

@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "quantclaw/providers/failover_resolver.hpp"
-#include "quantclaw/providers/provider_registry.hpp"
 
 #include <optional>
+
+#include "quantclaw/providers/provider_registry.hpp"
 
 namespace quantclaw {
 
@@ -18,30 +19,34 @@ void FailoverResolver::SetFallbackChain(
   fallback_chain_ = models;
 }
 
-void FailoverResolver::SetProfiles(
-    const std::string& provider_id,
-    const std::vector<AuthProfile>& profiles) {
+void FailoverResolver::SetProfiles(const std::string& provider_id,
+                                   const std::vector<AuthProfile>& profiles) {
   std::lock_guard<std::mutex> lock(mu_);
   profiles_[provider_id] = profiles;
 }
 
-std::optional<ResolvedProvider> FailoverResolver::Resolve(
-    const std::string& model,
-    const std::string& session_key) {
+std::optional<ResolvedProvider>
+FailoverResolver::Resolve(const std::string& model,
+                          const std::string& session_key) {
   // Try the primary model first
   auto result = try_resolve_model(model, session_key);
-  if (result) return result;
+  if (result)
+    return result;
 
   // Walk the fallback chain
-  std::lock_guard<std::mutex> lock(mu_);
-  for (const auto& fallback_model : fallback_chain_) {
-    // Skip if it's the same as primary
-    if (fallback_model == model) continue;
+  // Snapshot the fallback chain under lock, then release lock before iterating
+  std::vector<std::string> chain_snapshot;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    chain_snapshot = fallback_chain_;
+  }
 
-    // Need to unlock for try_resolve_model (it locks internally)
-    mu_.unlock();
+  for (const auto& fallback_model : chain_snapshot) {
+    // Skip if it's the same as primary
+    if (fallback_model == model)
+      continue;
+
     result = try_resolve_model(fallback_model, session_key);
-    mu_.lock();
 
     if (result) {
       result->is_fallback = true;
@@ -51,14 +56,14 @@ std::optional<ResolvedProvider> FailoverResolver::Resolve(
     }
   }
 
-  logger_->error("All models exhausted (primary='{}', {} fallbacks)",
-                 model, fallback_chain_.size());
+  logger_->error("All models exhausted (primary='{}', {} fallbacks)", model,
+                 chain_snapshot.size());
   return std::nullopt;
 }
 
 void FailoverResolver::RecordSuccess(const std::string& provider_id,
-                                      const std::string& profile_id,
-                                      const std::string& session_key) {
+                                     const std::string& profile_id,
+                                     const std::string& session_key) {
   cooldown_.RecordSuccess(cooldown_key(provider_id, profile_id));
 
   if (!session_key.empty()) {
@@ -68,16 +73,16 @@ void FailoverResolver::RecordSuccess(const std::string& provider_id,
 }
 
 void FailoverResolver::RecordFailure(const std::string& provider_id,
-                                      const std::string& profile_id,
-                                      ProviderErrorKind kind,
-                                      int retry_after_seconds) {
+                                     const std::string& profile_id,
+                                     ProviderErrorKind kind,
+                                     int retry_after_seconds) {
   cooldown_.RecordFailure(cooldown_key(provider_id, profile_id), kind,
                           retry_after_seconds);
-  logger_->warn("Provider {}:{} failed ({}), cooldown set{}",
-                provider_id, profile_id,
-                ProviderErrorKindToString(kind),
+  logger_->warn("Provider {}:{} failed ({}), cooldown set{}", provider_id,
+                profile_id, ProviderErrorKindToString(kind),
                 retry_after_seconds > 0
-                    ? " (Retry-After: " + std::to_string(retry_after_seconds) + "s)"
+                    ? " (Retry-After: " + std::to_string(retry_after_seconds) +
+                          "s)"
                     : "");
 }
 
@@ -86,16 +91,17 @@ void FailoverResolver::ClearSessionPin(const std::string& session_key) {
   session_pins_.erase(session_key);
 }
 
-std::string FailoverResolver::cooldown_key(
-    const std::string& provider_id,
-    const std::string& profile_id) const {
-  if (profile_id.empty()) return provider_id;
+std::string
+FailoverResolver::cooldown_key(const std::string& provider_id,
+                               const std::string& profile_id) const {
+  if (profile_id.empty())
+    return provider_id;
   return provider_id + ":" + profile_id;
 }
 
-std::optional<ResolvedProvider> FailoverResolver::try_resolve_model(
-    const std::string& model,
-    const std::string& session_key) {
+std::optional<ResolvedProvider>
+FailoverResolver::try_resolve_model(const std::string& model,
+                                    const std::string& session_key) {
   auto ref = registry_->ResolveModel(model);
   const std::string& provider_id = ref.provider;
 
@@ -115,11 +121,11 @@ std::optional<ResolvedProvider> FailoverResolver::try_resolve_model(
           for (const auto& profile : prof_it->second) {
             if (profile.id == pin.profile_id) {
               // Temporarily override the entry's API key
-              auto provider = registry_->GetProviderWithKey(
-                  provider_id, profile.api_key);
+              auto provider =
+                  registry_->GetProviderWithKey(provider_id, profile.api_key);
               if (provider) {
-                return ResolvedProvider{provider, provider_id,
-                                        pin.profile_id, ref.model, false};
+                return ResolvedProvider{provider, provider_id, pin.profile_id,
+                                        ref.model, false};
               }
             }
           }
@@ -141,11 +147,11 @@ std::optional<ResolvedProvider> FailoverResolver::try_resolve_model(
         continue;
       }
 
-      auto provider = registry_->GetProviderWithKey(
-          provider_id, profile.api_key);
+      auto provider =
+          registry_->GetProviderWithKey(provider_id, profile.api_key);
       if (provider) {
-        return ResolvedProvider{provider, provider_id,
-                                profile.id, ref.model, false};
+        return ResolvedProvider{provider, provider_id, profile.id, ref.model,
+                                false};
       }
     }
 
@@ -160,8 +166,8 @@ std::optional<ResolvedProvider> FailoverResolver::try_resolve_model(
         auto provider = registry_->GetProviderWithKey(
             provider_id, prof_it->second[0].api_key);
         if (provider) {
-          return ResolvedProvider{provider, provider_id,
-                                  prof_it->second[0].id, ref.model, false};
+          return ResolvedProvider{provider, provider_id, prof_it->second[0].id,
+                                  ref.model, false};
         }
       }
     }

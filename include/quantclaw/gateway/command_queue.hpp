@@ -18,6 +18,7 @@
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+
 #include "quantclaw/common/noncopyable.hpp"
 
 namespace quantclaw::gateway {
@@ -101,29 +102,51 @@ class SessionLane {
  public:
   explicit SessionLane(const std::string& session_key);
 
-  const std::string& SessionKey() const { return session_key_; }
+  const std::string& SessionKey() const {
+    return session_key_;
+  }
 
   // Per-session config overrides
-  void SetMode(QueueMode mode) { mode_ = mode; }
-  QueueMode GetMode() const { return mode_; }
-  void SetDebounceMs(int ms) { debounce_ms_ = ms; }
-  int GetDebounceMs() const { return debounce_ms_; }
-  void SetCap(int cap) { cap_ = cap; }
-  int GetCap() const { return cap_; }
-  void SetDropPolicy(DropPolicy policy) { drop_ = policy; }
-  DropPolicy GetDropPolicy() const { return drop_; }
+  void SetMode(QueueMode mode) {
+    mode_ = mode;
+  }
+  QueueMode GetMode() const {
+    return mode_;
+  }
+  void SetDebounceMs(int ms) {
+    debounce_ms_ = ms;
+  }
+  int GetDebounceMs() const {
+    return debounce_ms_;
+  }
+  void SetCap(int cap) {
+    cap_ = cap;
+  }
+  int GetCap() const {
+    return cap_;
+  }
+  void SetDropPolicy(DropPolicy policy) {
+    drop_ = policy;
+  }
+  DropPolicy GetDropPolicy() const {
+    return drop_;
+  }
 
   // Queue management (caller holds CommandQueue's mutex)
   void Enqueue(QueuedCommand cmd);
   bool HasPending() const;
-  bool HasActive() const { return active_command_.has_value(); }
-  const QueuedCommand& ActiveCommand() const { return *active_command_; }
+  bool HasActive() const {
+    return active_command_.has_value();
+  }
+  const QueuedCommand& ActiveCommand() const {
+    return *active_command_;
+  }
 
   // Pop the next pending command and mark it active.
   // Returns nullopt if no pending commands or debounce
   // timer hasn't expired.
-  std::optional<QueuedCommand> TryActivate(
-      std::chrono::steady_clock::time_point now);
+  std::optional<QueuedCommand>
+  TryActivate(std::chrono::steady_clock::time_point now);
 
   // Mark the active command as complete and return it.
   std::optional<QueuedCommand> CompleteActive();
@@ -144,8 +167,12 @@ class SessionLane {
   std::optional<std::string> InterruptActive();
 
   // Queue introspection
-  size_t PendingCount() const { return pending_.size(); }
-  bool IsIdle() const { return !HasActive() && !HasPending(); }
+  size_t PendingCount() const {
+    return pending_.size();
+  }
+  bool IsIdle() const {
+    return !HasActive() && !HasPending();
+  }
 
   nlohmann::json ToJson() const;
 
@@ -168,21 +195,18 @@ class SessionLane {
 // Must block until the agent run completes.
 using AgentExecutor = std::function<nlohmann::json(
     const QueuedCommand& cmd,
-    std::function<void(const std::string& event,
-                       const nlohmann::json& payload)> event_sink)>;
+    std::function<void(const std::string& event, const nlohmann::json& payload)>
+        event_sink)>;
 
 // Sends a final RPC response to a client.
 using ResponseSender = std::function<void(
-    const std::string& connection_id,
-    const std::string& rpc_request_id,
-    bool ok,
-    const nlohmann::json& payload_or_error)>;
+    const std::string& connection_id, const std::string& rpc_request_id,
+    bool ok, const nlohmann::json& payload_or_error)>;
 
 // Sends an RPC event to a specific client.
-using EventSender = std::function<void(
-    const std::string& connection_id,
-    const std::string& event_name,
-    const nlohmann::json& payload)>;
+using EventSender = std::function<void(const std::string& connection_id,
+                                       const std::string& event_name,
+                                       const nlohmann::json& payload)>;
 
 // ================================================================
 // CommandQueue: central queue manager.
@@ -193,10 +217,8 @@ using EventSender = std::function<void(
 
 class CommandQueue : public quantclaw::Noncopyable {
  public:
-  CommandQueue(const QueueConfig& config,
-               AgentExecutor executor,
-               ResponseSender response_sender,
-               EventSender event_sender,
+  CommandQueue(const QueueConfig& config, AgentExecutor executor,
+               ResponseSender response_sender, EventSender event_sender,
                std::shared_ptr<spdlog::logger> logger);
   ~CommandQueue();
 
@@ -208,12 +230,10 @@ class CommandQueue : public quantclaw::Noncopyable {
 
   // Submit a new command. Returns the command ID.
   // Thread-safe: called from any RPC handler thread.
-  std::string Submit(const std::string& session_key,
-                     const std::string& message,
+  std::string Submit(const std::string& session_key, const std::string& message,
                      const nlohmann::json& params,
                      const std::string& connection_id,
-                     const std::string& rpc_request_id,
-                     QueueMode mode);
+                     const std::string& rpc_request_id, QueueMode mode);
 
   // Cancel a specific queued command (not yet active).
   bool Cancel(const std::string& command_id);
@@ -222,10 +242,8 @@ class CommandQueue : public quantclaw::Noncopyable {
   bool AbortSession(const std::string& session_key);
 
   // Per-session configuration override.
-  void ConfigureSession(const std::string& session_key,
-                        QueueMode mode,
-                        int debounce_ms = -1,
-                        int cap = -1,
+  void ConfigureSession(const std::string& session_key, QueueMode mode,
+                        int debounce_ms = -1, int cap = -1,
                         const std::string& drop = "");
 
   // Query queue state.
@@ -240,8 +258,7 @@ class CommandQueue : public quantclaw::Noncopyable {
   SessionLane& get_lane(const std::string& session_key);
   void dispatcher_loop();
   void execute_command(QueuedCommand cmd);
-  void emit_queue_event(const QueuedCommand& cmd,
-                        const std::string& event_type,
+  void emit_queue_event(const QueuedCommand& cmd, const std::string& event_type,
                         const nlohmann::json& data = {});
 
   QueueConfig config_;

@@ -1,10 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/tools/browser_tool.hpp"
+
+#include <gtest/gtest.h>
 
 namespace quantclaw {
 
@@ -56,12 +58,9 @@ TEST(SsrfPolicyTest, EmptyPolicyAllowsAll) {
 
 TEST(BrowserToolConfigTest, FromJson) {
   nlohmann::json j = {
-      {"mode", "remote"},
-      {"cdpUrl", "ws://localhost:9222"},
-      {"headless", false},
-      {"viewportWidth", 1920},
-      {"viewportHeight", 1080},
-      {"navigationTimeoutMs", 60000},
+      {"mode", "remote"},       {"cdpUrl", "ws://localhost:9222"},
+      {"headless", false},      {"viewportWidth", 1920},
+      {"viewportHeight", 1080}, {"navigationTimeoutMs", 60000},
   };
   auto c = BrowserToolConfig::FromJson(j);
   EXPECT_EQ(c.mode, BrowserToolConfig::Mode::kRemote);
@@ -107,7 +106,7 @@ TEST(BrowserSessionTest, RemoteConnectionUnreachable) {
   config.remote_cdp_url = "ws://127.0.0.1:9999/devtools/browser/fake-id";
 
   bool ok = session->initialize(config);
-  EXPECT_FALSE(ok);            // real connect attempt fails for unreachable URL
+  EXPECT_FALSE(ok);  // real connect attempt fails for unreachable URL
   EXPECT_FALSE(session->is_connected());
   EXPECT_TRUE(session->connection().is_remote);  // set before connect attempt
 
@@ -124,7 +123,8 @@ TEST(BrowserSessionTest, NavigateGracefulWhenUnconnected) {
   session->initialize(config);  // returns false — session not connected
 
   // With default (empty) SSRF policy, public URLs pass the SSRF check.
-  // cdp_send returns "{}" gracefully when not connected. We only verify no crash.
+  // cdp_send returns "{}" gracefully when not connected. We only verify no
+  // crash.
   (void)session->navigate("https://example.com");
 
   // SSRF-blocked URLs still require the SSRF policy to be set explicitly.
@@ -151,13 +151,16 @@ TEST(BrowserSessionTest, NavigationSsrfBlock) {
   config.mode = BrowserToolConfig::Mode::kRemote;
   config.remote_cdp_url = "ws://127.0.0.1:9999/fake";
   config.ssrf_policy = SsrfPolicy::default_policy();
-  session->initialize(config);  // will fail for unreachable URL; that's OK for SSRF testing
+  session->initialize(
+      config);  // will fail for unreachable URL; that's OK for SSRF testing
 
-  // SSRF-blocked URLs are rejected before CDP is called, regardless of connection state
+  // SSRF-blocked URLs are rejected before CDP is called, regardless of
+  // connection state
   EXPECT_FALSE(session->navigate("http://localhost:8080/admin"));
   EXPECT_FALSE(session->navigate("http://127.0.0.1/api"));
 
-  // Public URLs pass the SSRF check; cdp_send gracefully returns "{}" when not connected
+  // Public URLs pass the SSRF check; cdp_send gracefully returns "{}" when not
+  // connected
   EXPECT_TRUE(session->navigate("https://example.com"));
 }
 
@@ -169,7 +172,7 @@ TEST(BrowserToolSchemaTest, HasAllTools) {
 
   std::vector<std::string> expected_names = {
       "browser_navigate", "browser_screenshot", "browser_click",
-      "browser_type", "browser_evaluate",
+      "browser_type",     "browser_evaluate",
   };
   for (const auto& schema : schemas) {
     auto name = schema["function"]["name"].get<std::string>();
@@ -190,7 +193,8 @@ TEST(BrowserToolSchemaTest, ExecutorCreation) {
   ASSERT_TRUE(executor);
 
   // Test navigate action
-  nlohmann::json params = {{"action", "navigate"}, {"url", "https://example.com"}};
+  nlohmann::json params = {{"action", "navigate"},
+                           {"url", "https://example.com"}};
   auto result = executor(params);
   EXPECT_FALSE(result.empty());
 

@@ -3,13 +3,14 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-#include <unordered_map>
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <atomic>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -26,14 +27,14 @@ SpawnMode spawn_mode_from_string(const std::string& s);
 
 // Subagent spawn parameters
 struct SpawnParams {
-  std::string task;              // Task description for subagent
-  std::string label;             // Human-readable label
-  std::string agent_id;          // Target agent ID (defaults to current)
-  std::string model;             // Model override (e.g. "openai/gpt-4")
-  std::string thinking;          // Thinking level: off|low|medium|high
-  int timeout_seconds = 300;     // Run timeout
+  std::string task;           // Task description for subagent
+  std::string label;          // Human-readable label
+  std::string agent_id;       // Target agent ID (defaults to current)
+  std::string model;          // Model override (e.g. "openai/gpt-4")
+  std::string thinking;       // Thinking level: off|low|medium|high
+  int timeout_seconds = 300;  // Run timeout
   SpawnMode mode = SpawnMode::kRun;
-  bool cleanup = true;           // Auto-delete session on completion
+  bool cleanup = true;  // Auto-delete session on completion
 };
 
 // Spawn result
@@ -65,8 +66,8 @@ struct SubagentRun {
 
 // Subagent configuration limits
 struct SubagentConfig {
-  int max_depth = 5;          // Max spawn depth
-  int max_children = 5;       // Max active children per parent
+  int max_depth = 5;                        // Max spawn depth
+  int max_children = 5;                     // Max active children per parent
   std::vector<std::string> allowed_agents;  // Allowed agent IDs (empty = all)
 
   static SubagentConfig FromJson(const nlohmann::json& j);
@@ -74,10 +75,8 @@ struct SubagentConfig {
 
 // Callback for launching agent runs on child sessions
 using AgentRunFn = std::function<std::string(
-    const std::string& session_key,
-    const std::string& task,
-    const std::string& model,
-    const std::string& extra_system_prompt)>;
+    const std::string& session_key, const std::string& task,
+    const std::string& model, const std::string& extra_system_prompt)>;
 
 // Manages subagent lifecycle: spawn, track, and cleanup
 class SubagentManager {
@@ -97,7 +96,7 @@ class SubagentManager {
 
   // Mark a run as completed with result
   void CompleteRun(const std::string& run_id,
-                    const std::string& result_summary = "");
+                   const std::string& result_summary = "");
 
   // Mark a run as failed
   void FailRun(const std::string& run_id, const std::string& error = "");
@@ -106,8 +105,8 @@ class SubagentManager {
   bool CancelRun(const std::string& run_id);
 
   // Get active children for a parent session
-  std::vector<SubagentRun> ActiveChildren(
-      const std::string& parent_session_key) const;
+  std::vector<SubagentRun>
+  ActiveChildren(const std::string& parent_session_key) const;
 
   // Get all tracked runs
   std::vector<SubagentRun> AllRuns() const;
@@ -119,7 +118,9 @@ class SubagentManager {
   int CleanupCompleted();
 
   // Get current config
-  const SubagentConfig& GetConfig() const { return config_; }
+  const SubagentConfig& GetConfig() const {
+    return config_;
+  }
 
  private:
   std::shared_ptr<spdlog::logger> logger_;

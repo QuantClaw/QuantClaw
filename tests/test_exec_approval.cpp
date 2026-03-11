@@ -1,10 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/security/exec_approval.hpp"
+
+#include <gtest/gtest.h>
 
 namespace quantclaw {
 
@@ -151,9 +153,8 @@ TEST(ExecApprovalManagerTest, HandlerApproves) {
   config.ask = AskMode::kAlways;
   mgr->Configure(config);
 
-  mgr->SetApprovalHandler([](const ApprovalRequest&) {
-    return ApprovalDecision::kApproved;
-  });
+  mgr->SetApprovalHandler(
+      [](const ApprovalRequest&) { return ApprovalDecision::kApproved; });
 
   auto decision = mgr->RequestApproval("rm -rf /");
   EXPECT_EQ(decision, ApprovalDecision::kApproved);
@@ -189,9 +190,8 @@ TEST(ExecApprovalManagerTest, ResolvedHistory) {
   // Let's test with always mode and handler
   config.ask = AskMode::kAlways;
   mgr->Configure(config);
-  mgr->SetApprovalHandler([](const ApprovalRequest&) {
-    return ApprovalDecision::kApproved;
-  });
+  mgr->SetApprovalHandler(
+      [](const ApprovalRequest&) { return ApprovalDecision::kApproved; });
 
   mgr->RequestApproval("cmd3");
   auto history = mgr->ResolvedHistory();

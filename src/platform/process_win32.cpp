@@ -3,26 +3,29 @@
 
 #ifdef _WIN32
 
-#include "quantclaw/platform/process.hpp"
-
-#include <cstdlib>
 #include <chrono>
+#include <cstdlib>
 #include <sstream>
 #include <thread>
-#include <windows.h>
+
+#include "quantclaw/platform/process.hpp"
+
 #include <psapi.h>
+#include <windows.h>
 
 namespace quantclaw::platform {
 
 ProcessId spawn_process(const std::vector<std::string>& args,
                         const std::vector<std::string>& env,
                         const std::string& working_dir) {
-  if (args.empty()) return kInvalidPid;
+  if (args.empty())
+    return kInvalidPid;
 
   // Build command line
   std::ostringstream cmdline;
   for (size_t i = 0; i < args.size(); ++i) {
-    if (i > 0) cmdline << " ";
+    if (i > 0)
+      cmdline << " ";
     // Quote args that contain spaces
     if (args[i].find(' ') != std::string::npos) {
       cmdline << "\"" << args[i] << "\"";
@@ -59,15 +62,13 @@ ProcessId spawn_process(const std::vector<std::string>& args,
   PROCESS_INFORMATION pi = {};
 
   BOOL ok = CreateProcessA(
-      nullptr,
-      const_cast<char*>(cmd_str.c_str()),
-      nullptr, nullptr, FALSE,
+      nullptr, const_cast<char*>(cmd_str.c_str()), nullptr, nullptr, FALSE,
       env.empty() ? 0 : 0,
       env.empty() ? nullptr : const_cast<char*>(env_block.c_str()),
-      working_dir.empty() ? nullptr : working_dir.c_str(),
-      &si, &pi);
+      working_dir.empty() ? nullptr : working_dir.c_str(), &si, &pi);
 
-  if (!ok) return kInvalidPid;
+  if (!ok)
+    return kInvalidPid;
 
   CloseHandle(pi.hThread);
   CloseHandle(pi.hProcess);
@@ -75,9 +76,11 @@ ProcessId spawn_process(const std::vector<std::string>& args,
 }
 
 bool is_process_alive(ProcessId pid) {
-  if (pid == 0) return false;
+  if (pid == 0)
+    return false;
   HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-  if (!h) return false;
+  if (!h)
+    return false;
   DWORD exit_code;
   BOOL ok = GetExitCodeProcess(h, &exit_code);
   CloseHandle(h);
@@ -101,13 +104,14 @@ void reload_process(ProcessId /*pid*/) {
 }
 
 int wait_process(ProcessId pid, int timeout_ms) {
-  HANDLE h = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
-                         FALSE, pid);
-  if (!h) return -1;
+  HANDLE h =
+      OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+  if (!h)
+    return -1;
 
-  DWORD wait_time = (timeout_ms < 0) ? INFINITE
-                  : (timeout_ms == 0) ? 0
-                  : static_cast<DWORD>(timeout_ms);
+  DWORD wait_time = (timeout_ms < 0)    ? INFINITE
+                    : (timeout_ms == 0) ? 0
+                                        : static_cast<DWORD>(timeout_ms);
 
   DWORD wait_result = WaitForSingleObject(h, wait_time);
   if (wait_result != WAIT_OBJECT_0) {
@@ -161,10 +165,12 @@ std::string executable_path() {
 
 std::string home_directory() {
   const char* userprofile = std::getenv("USERPROFILE");
-  if (userprofile) return userprofile;
+  if (userprofile)
+    return userprofile;
   const char* homedrive = std::getenv("HOMEDRIVE");
   const char* homepath = std::getenv("HOMEPATH");
-  if (homedrive && homepath) return std::string(homedrive) + homepath;
+  if (homedrive && homepath)
+    return std::string(homedrive) + homepath;
   return "C:\\";
 }
 

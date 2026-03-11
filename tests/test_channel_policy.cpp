@@ -1,10 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include "quantclaw/channels/channel_policy.hpp"
+
+#include <gtest/gtest.h>
 
 static std::shared_ptr<spdlog::logger> make_null_logger() {
   auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
@@ -15,27 +17,37 @@ static std::shared_ptr<spdlog::logger> make_null_logger() {
 
 TEST(ChannelPolicyEnumsTest, DmPolicyFromString) {
   EXPECT_EQ(quantclaw::DmPolicyFromString("open"), quantclaw::DmPolicy::kOpen);
-  EXPECT_EQ(quantclaw::DmPolicyFromString("pairing"), quantclaw::DmPolicy::kPairing);
-  EXPECT_EQ(quantclaw::DmPolicyFromString("unknown"), quantclaw::DmPolicy::kOpen);
+  EXPECT_EQ(quantclaw::DmPolicyFromString("pairing"),
+            quantclaw::DmPolicy::kPairing);
+  EXPECT_EQ(quantclaw::DmPolicyFromString("unknown"),
+            quantclaw::DmPolicy::kOpen);
 }
 
 TEST(ChannelPolicyEnumsTest, DmPolicyToString) {
   EXPECT_EQ(quantclaw::DmPolicyToString(quantclaw::DmPolicy::kOpen), "open");
-  EXPECT_EQ(quantclaw::DmPolicyToString(quantclaw::DmPolicy::kPairing), "pairing");
+  EXPECT_EQ(quantclaw::DmPolicyToString(quantclaw::DmPolicy::kPairing),
+            "pairing");
 }
 
 TEST(ChannelPolicyEnumsTest, DmScopeFromString) {
   EXPECT_EQ(quantclaw::DmScopeFromString("main"), quantclaw::DmScope::kMain);
-  EXPECT_EQ(quantclaw::DmScopeFromString("per-peer"), quantclaw::DmScope::kPerPeer);
-  EXPECT_EQ(quantclaw::DmScopeFromString("per-channel-peer"), quantclaw::DmScope::kPerChannelPeer);
-  EXPECT_EQ(quantclaw::DmScopeFromString("per-account-channel-peer"), quantclaw::DmScope::kPerAccountChannelPeer);
-  EXPECT_EQ(quantclaw::DmScopeFromString("garbage"), quantclaw::DmScope::kPerChannelPeer);
+  EXPECT_EQ(quantclaw::DmScopeFromString("per-peer"),
+            quantclaw::DmScope::kPerPeer);
+  EXPECT_EQ(quantclaw::DmScopeFromString("per-channel-peer"),
+            quantclaw::DmScope::kPerChannelPeer);
+  EXPECT_EQ(quantclaw::DmScopeFromString("per-account-channel-peer"),
+            quantclaw::DmScope::kPerAccountChannelPeer);
+  EXPECT_EQ(quantclaw::DmScopeFromString("garbage"),
+            quantclaw::DmScope::kPerChannelPeer);
 }
 
 TEST(ChannelPolicyEnumsTest, GroupActivationFromString) {
-  EXPECT_EQ(quantclaw::GroupActivationFromString("always"), quantclaw::GroupActivation::kAlways);
-  EXPECT_EQ(quantclaw::GroupActivationFromString("mention"), quantclaw::GroupActivation::kMention);
-  EXPECT_EQ(quantclaw::GroupActivationFromString("other"), quantclaw::GroupActivation::kMention);
+  EXPECT_EQ(quantclaw::GroupActivationFromString("always"),
+            quantclaw::GroupActivation::kAlways);
+  EXPECT_EQ(quantclaw::GroupActivationFromString("mention"),
+            quantclaw::GroupActivation::kMention);
+  EXPECT_EQ(quantclaw::GroupActivationFromString("other"),
+            quantclaw::GroupActivation::kMention);
 }
 
 // --- ChannelPolicyConfig ---
@@ -52,12 +64,9 @@ TEST(ChannelPolicyConfigTest, FromJsonDefaults) {
 
 TEST(ChannelPolicyConfigTest, FromJsonFull) {
   nlohmann::json j = {
-      {"dmPolicy", "pairing"},
-      {"dmScope", "per-peer"},
-      {"groupActivation", "always"},
-      {"groupChunkSize", 3000},
-      {"botName", "MyBot"},
-      {"allowFrom", {"user1", "user2"}},
+      {"dmPolicy", "pairing"},       {"dmScope", "per-peer"},
+      {"groupActivation", "always"}, {"groupChunkSize", 3000},
+      {"botName", "MyBot"},          {"allowFrom", {"user1", "user2"}},
   };
   auto c = quantclaw::ChannelPolicyConfig::FromJson(j);
   EXPECT_EQ(c.dm_policy, quantclaw::DmPolicy::kPairing);
@@ -149,15 +158,14 @@ TEST(SessionResolverTest, PerChannelPeerScope) {
 
 TEST(SessionResolverTest, PerAccountChannelPeerScope) {
   auto key = quantclaw::SessionResolver::ResolveSessionKey(
-      quantclaw::DmScope::kPerAccountChannelPeer, "main", "discord",
-      "user1", "acct1");
+      quantclaw::DmScope::kPerAccountChannelPeer, "main", "discord", "user1",
+      "acct1");
   EXPECT_EQ(key, "agent:main:acct1:discord:user1");
 }
 
 TEST(SessionResolverTest, PerAccountChannelPeerDefaultAccount) {
   auto key = quantclaw::SessionResolver::ResolveSessionKey(
-      quantclaw::DmScope::kPerAccountChannelPeer, "main", "discord",
-      "user1");
+      quantclaw::DmScope::kPerAccountChannelPeer, "main", "discord", "user1");
   EXPECT_EQ(key, "agent:main:default:discord:user1");
 }
 
@@ -186,8 +194,7 @@ TEST(GroupActivationTest, NoMentionNoActivation) {
 TEST(GroupActivationTest, CustomMentionPattern) {
   std::vector<std::string> patterns = {"<@\\d+>"};
   EXPECT_TRUE(quantclaw::SessionResolver::ShouldActivateGroup(
-      quantclaw::GroupActivation::kMention, "Hey <@12345> help",
-      "", patterns));
+      quantclaw::GroupActivation::kMention, "Hey <@12345> help", "", patterns));
 }
 
 TEST(GroupActivationTest, NoMatchWithEmptyBotName) {
