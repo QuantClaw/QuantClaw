@@ -34,16 +34,19 @@ FailoverResolver::Resolve(const std::string& model,
     return result;
 
   // Walk the fallback chain
-  std::lock_guard<std::mutex> lock(mu_);
-  for (const auto& fallback_model : fallback_chain_) {
+  // Snapshot the fallback chain under lock, then release lock before iterating
+  std::vector<std::string> chain_snapshot;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    chain_snapshot = fallback_chain_;
+  }
+
+  for (const auto& fallback_model : chain_snapshot) {
     // Skip if it's the same as primary
     if (fallback_model == model)
       continue;
 
-    // Need to unlock for try_resolve_model (it locks internally)
-    mu_.unlock();
     result = try_resolve_model(fallback_model, session_key);
-    mu_.lock();
 
     if (result) {
       result->is_fallback = true;
@@ -54,7 +57,7 @@ FailoverResolver::Resolve(const std::string& model,
   }
 
   logger_->error("All models exhausted (primary='{}', {} fallbacks)", model,
-                 fallback_chain_.size());
+                 chain_snapshot.size());
   return std::nullopt;
 }
 
