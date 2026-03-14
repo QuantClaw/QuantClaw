@@ -47,6 +47,10 @@ class WebServer {
   // Mount a directory for static file serving
   void SetMountPoint(const std::string& mount, const std::string& dir);
 
+  // SPA fallback: serve fallback_html for 404 requests under prefix
+  void SetSpaFallback(const std::string& prefix,
+                      const std::string& fallback_html);
+
   void Start();
   void Stop();
 
@@ -68,6 +72,8 @@ class WebServer {
   std::string cors_origin_;
   std::string auth_token_;
   std::vector<std::pair<std::string, std::string>> mount_points_;
+  std::string spa_prefix_;
+  std::string spa_fallback_html_;
 
   void server_loop();
   std::string create_error_response(const std::string& message,

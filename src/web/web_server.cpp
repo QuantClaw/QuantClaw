@@ -44,6 +44,12 @@ void WebServer::SetMountPoint(const std::string& mount,
   logger_->debug("Added mount point: {} -> {}", mount, dir);
 }
 
+void WebServer::SetSpaFallback(const std::string& prefix,
+                                const std::string& fallback_html) {
+  spa_prefix_ = prefix;
+  spa_fallback_html_ = fallback_html;
+}
+
 void WebServer::Start() {
   if (running_) {
     logger_->warn("WebServer already running");
@@ -105,6 +111,13 @@ void WebServer::server_loop() {
               req.path.find(".png") != std::string::npos ||
               req.path.find(".svg") != std::string::npos ||
               req.path.find(".woff") != std::string::npos) {
+            return httplib::Server::HandlerResponse::Unhandled;
+          }
+          // Skip auth for SPA routes (paths without file extension
+          // that aren't API calls) — they serve index.html via the
+          // error handler fallback.
+          if (req.path.rfind("/api/", 0) != 0 &&
+              req.path.find('.') == std::string::npos) {
             return httplib::Server::HandlerResponse::Unhandled;
           }
           std::string auth_header = req.get_header_value("Authorization");
@@ -184,6 +197,23 @@ void WebServer::server_loop() {
     } else {
       logger_->warn("Failed to mount static files: {} -> {}", mount, dir);
     }
+  }
+
+  // SPA fallback: serve index.html for 404s under the SPA prefix
+  // so client-side routing works on page refresh.
+  if (!spa_prefix_.empty() && !spa_fallback_html_.empty()) {
+    http_server_->set_error_handler(
+        [this](const httplib::Request& req, httplib::Response& res) {
+          if (res.status == 404 &&
+              req.path.rfind(spa_prefix_, 0) == 0 &&
+              req.path.find('.') == std::string::npos) {
+            res.status = 200;
+            res.set_content(spa_fallback_html_, "text/html");
+            return;
+          }
+          res.set_content(create_error_response("Not Found", 404),
+                          "application/json");
+        });
   }
 
   logger_->info("HTTP server listening on 0.0.0.0:{}", port_);

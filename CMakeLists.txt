@@ -13,8 +13,13 @@ endif()
 # LD_LIBRARY_PATH points elsewhere (e.g. miniconda).
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
-if(NOT APPLE)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath,/usr/lib/x86_64-linux-gnu")
+if(UNIX AND NOT APPLE)
+    # Derive the multiarch library directory from CMAKE_LIBRARY_ARCHITECTURE
+    # (e.g. "x86_64-linux-gnu" on Debian/Ubuntu, empty on some distros).
+    if(CMAKE_LIBRARY_ARCHITECTURE)
+        set(CMAKE_EXE_LINKER_FLAGS
+            "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath,/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
+    endif()
 endif()
 
 option(BUILD_TESTS "Build tests" ON)

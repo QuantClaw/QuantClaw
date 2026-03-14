@@ -160,7 +160,10 @@ struct ConnectHelloParams {
 
     // Accept both flat (QuantClaw) and nested (OpenClaw) param formats
     if (j.contains("client") && j["client"].is_object()) {
-      p.client_name = j["client"].value("name", "");
+      // OpenClaw UI uses "id" for client name, fall back to "name"
+      p.client_name = j["client"].value("id", "");
+      if (p.client_name.empty())
+        p.client_name = j["client"].value("name", "");
       p.client_version = j["client"].value("version", "");
     } else {
       p.client_name = j.value("clientName", "");

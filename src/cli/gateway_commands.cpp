@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <thread>
@@ -438,21 +439,25 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
         *http_server, session_manager, agent_loop, prompt_builder,
         tool_registry, config, server, logger_, reload_fn);
 
-    // Mount dashboard UI if available
+    // Mount dashboard UI if available (must contain index.html).
     // Search order: 1) ~/.quantclaw/ui/  2) <exe_dir>/ui/dist/  3)
     // <exe_dir>/../ui/dist/
+    auto has_index = [](const std::string& dir) {
+      return std::filesystem::exists(
+          std::filesystem::path(dir) / "index.html");
+    };
     std::string ui_dir;
     std::string candidate1 = (base_dir / "ui").string();
-    if (std::filesystem::exists(candidate1)) {
+    if (has_index(candidate1)) {
       ui_dir = candidate1;
     } else {
       auto exe_dir =
           std::filesystem::path(platform::executable_path()).parent_path();
       std::string candidate2 = (exe_dir / "ui" / "dist").string();
       std::string candidate3 = (exe_dir.parent_path() / "ui" / "dist").string();
-      if (std::filesystem::exists(candidate2)) {
+      if (has_index(candidate2)) {
         ui_dir = candidate2;
-      } else if (std::filesystem::exists(candidate3)) {
+      } else if (has_index(candidate3)) {
         ui_dir = candidate3;
       }
     }
@@ -460,22 +465,78 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       http_server->SetMountPoint("/__quantclaw__/control/", ui_dir);
       logger_->info("Dashboard UI mounted from {}", ui_dir);
 
-      // Redirect / to control UI
+      // Read index.html and inject gateway config so the UI auto-
+      // connects to the correct WebSocket port with auth token.
+      std::string index_html;
+      {
+        std::string index_path =
+            (std::filesystem::path(ui_dir) / "index.html").string();
+        std::ifstream ifs(index_path);
+        if (ifs.is_open()) {
+          index_html.assign(std::istreambuf_iterator<char>(ifs),
+                            std::istreambuf_iterator<char>());
+        }
+      }
+
+      if (!index_html.empty()) {
+        // Build a <script> that pre-configures localStorage with
+        // the correct gatewayUrl and auth token before the Lit app
+        // boots.  Token is injected at serve-time into the HTML
+        // rather than exposed via an API endpoint.
+        //
+        // Also inject <base href> so that relative asset paths
+        // (./assets/...) resolve via the /__quantclaw__/control/
+        // mount point regardless of the URL the page is served at.
+        std::string inject_block =
+            "<base href=\"/__quantclaw__/control/\">"
+            "<script>(function(){"
+            "var k='quantclaw.control.settings.v1';"
+            "try{var s=JSON.parse(localStorage.getItem(k)||'{}');"
+            "var u='ws://'+location.hostname+':'+" +
+            std::to_string(port) +
+            ";"
+            "if(!s.gatewayUrl||s.gatewayUrl==='ws://'+location.host"
+            "||s._qcAutoConfig){"
+            "s.gatewayUrl=u;s.token='" +
+            auth_token +
+            "';"
+            "s._qcAutoConfig=true;"
+            "localStorage.setItem(k,JSON.stringify(s));}"
+            "}catch(e){}"
+            "})()</script>";
+
+        // Inject right after <head>
+        auto head_pos = index_html.find("<head>");
+        if (head_pos == std::string::npos)
+          head_pos = index_html.find("<HEAD>");
+        if (head_pos != std::string::npos) {
+          index_html.insert(head_pos + 6, inject_block);
+        }
+
+        // SPA fallback for client-side routing (e.g. /chat, /overview).
+        http_server->SetSpaFallback("/", index_html);
+      }
+
+      // Serve patched index.html at / directly (no redirect).
+      // NOTE: httplib mount points take priority over Get() routes
+      // for paths where a file exists, so we must NOT mount "/" —
+      // only the /__quantclaw__/control/ mount is used for assets.
       http_server->AddRawRoute(
-          "/", "GET", [](const httplib::Request&, httplib::Response& res) {
-            res.set_redirect("/__quantclaw__/control/");
+          "/", "GET",
+          [index_html](const httplib::Request&, httplib::Response& res) {
+            res.set_content(index_html, "text/html");
           });
     }
 
-    // Gateway info endpoint for UI to discover WebSocket port and auth token.
-    // This endpoint is auth-exempt (served to the local dashboard).
+    // Gateway info endpoint for UI to discover WebSocket port.
+    // Does NOT expose auth token (token is injected into index.html
+    // at serve-time instead, avoiding credential leak over the network).
     http_server->AddRawRoute(
         "/api/gateway-info", "GET",
-        [port, &auth_token](const httplib::Request&, httplib::Response& res) {
+        [port](const httplib::Request&, httplib::Response& res) {
           nlohmann::json info = {
               {"wsUrl", "ws://localhost:" + std::to_string(port)},
               {"wsPort", port},
-              {"authToken", auth_token},
               {"version", quantclaw::kVersion}};
           res.status = 200;
           res.set_content(info.dump(), "application/json");
