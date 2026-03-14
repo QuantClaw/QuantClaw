@@ -31,6 +31,10 @@ export default defineConfig(() => {
       outDir: path.resolve(here, "dist"),
       emptyOutDir: true,
       sourcemap: true,
+      // es2022 ensures decorator syntax is transpiled (pre-TC39 decorators).
+      target: "es2022",
+      // Keep CI/onboard logs clean; current control UI chunking is intentionally above 500 kB.
+      chunkSizeWarningLimit: 1024,
     },
     server: {
       host: true,

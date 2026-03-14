@@ -1,4 +1,4 @@
-import { parseAgentSessionKey } from "../../../src/sessions/session-key-utils.js";
+import { parseAgentSessionKey } from "../vendor/sessions/session-key-utils.js";
 import { scheduleChatScroll } from "./app-scroll.ts";
 import { setLastActiveSessionKey } from "./app-settings.ts";
 import { resetToolStream } from "./app-tool-stream.ts";
