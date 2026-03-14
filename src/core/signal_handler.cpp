@@ -39,7 +39,12 @@ bool SignalHandler::ShouldShutdown() {
 
 void SignalHandler::signal_handler(int signum) {
   if (signum == SIGINT || signum == SIGTERM) {
-    shutdown_requested_ = true;
+    // Prevent re-entrant shutdown: if already requested, force-exit.
+    if (shutdown_requested_.exchange(true)) {
+      std::signal(signum, SIG_DFL);
+      std::raise(signum);
+      return;
+    }
     if (shutdown_callback_) {
       shutdown_callback_();
     }

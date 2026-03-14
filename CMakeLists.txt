@@ -9,6 +9,14 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Embed RPATH so the binary finds system libraries even when
+# LD_LIBRARY_PATH points elsewhere (e.g. miniconda).
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
+if(NOT APPLE)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath,/usr/lib/x86_64-linux-gnu")
+endif()
+
 option(BUILD_TESTS "Build tests" ON)
 
 # Sanitizer options (mutually exclusive: ASAN and TSAN cannot be combined)
