@@ -72,6 +72,7 @@ class MiniHTTPServer {
 
     if (bind(server_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
       CLOSE_SOCKET(server_fd_);
+      server_fd_ = kInvalidSocket;
       return -1;
     }
 

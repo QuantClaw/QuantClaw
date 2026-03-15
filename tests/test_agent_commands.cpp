@@ -304,10 +304,18 @@ TEST_F(AgentCommandsIntegrationTest, RequestWithPositionalArg) {
 TEST_F(AgentCommandsIntegrationTest, RequestJsonOutput) {
   // Use C++ stream redirection instead of fd-level dup2 to avoid
   // TSAN data race with background WebSocket threads.
+  // RAII guard: restores std::cout even if RequestCommand throws.
   std::ostringstream oss;
-  auto* old_buf = std::cout.rdbuf(oss.rdbuf());
+  std::streambuf* old_buf = std::cout.rdbuf(oss.rdbuf());
+  struct CoutGuard {
+    std::streambuf* buf;
+    ~CoutGuard() {
+      std::cout.flush();
+      std::cout.rdbuf(buf);
+    }
+  } guard{old_buf};
   int ret = agent_cmds_->RequestCommand({"-m", "json test", "--json"});
-  std::cout.rdbuf(old_buf);
+  std::cout.flush();
   std::string out = oss.str();
 
   EXPECT_EQ(ret, 0);

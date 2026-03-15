@@ -353,9 +353,13 @@ if(BUILD_TESTS)
         # to PATH so gtest_discover_tests can run the binary to list tests, and
         # so ctest can run the tests themselves.
         set(VCPKG_DLL_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/bin")
+        # ENVIRONMENT entries are a CMake semicolon-separated list, so the
+        # PATH value must have its semicolons escaped as \; to avoid being
+        # split into separate list items.
+        string(REPLACE ";" "\\;" _escaped_system_path "$ENV{PATH}")
         gtest_discover_tests(quantclaw_tests
             DISCOVERY_MODE PRE_TEST
-            PROPERTIES ENVIRONMENT "PATH=${VCPKG_DLL_DIR};$ENV{PATH}"
+            PROPERTIES ENVIRONMENT "PATH=${VCPKG_DLL_DIR}\\;${_escaped_system_path}"
         )
     else()
         gtest_discover_tests(quantclaw_tests)

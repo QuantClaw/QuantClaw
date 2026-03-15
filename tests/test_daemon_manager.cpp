@@ -10,10 +10,12 @@
 #include <process.h>
 #define test_getpid() _getpid()
 #define test_setenv(name, value) _putenv_s(name, value)
+#define test_unsetenv(name) _putenv_s(name, "")
 #else
 #include <unistd.h>
 #define test_getpid() getpid()
 #define test_setenv(name, value) setenv(name, value, 1)
+#define test_unsetenv(name) unsetenv(name)
 #endif
 
 #include <spdlog/sinks/null_sink.h>
@@ -32,13 +34,18 @@ class DaemonManagerTest : public ::testing::Test {
     // Use a temp directory as HOME so we don't touch the real system
     test_home_ = quantclaw::test::MakeTestDir("quantclaw_daemon_test");
 
+    // Save original values (empty string means the variable was unset)
+    auto get_or_empty = [](const char* name) -> std::string {
+      const char* v = std::getenv(name);
+      return v ? v : "";
+    };
 #ifdef _WIN32
-    original_home_ =
-        std::getenv("USERPROFILE") ? std::getenv("USERPROFILE") : "";
+    orig_userprofile_ = get_or_empty("USERPROFILE");
+    orig_home_ = get_or_empty("HOME");
     test_setenv("USERPROFILE", test_home_.string().c_str());
     test_setenv("HOME", test_home_.string().c_str());
 #else
-    original_home_ = std::getenv("HOME") ? std::getenv("HOME") : "";
+    orig_home_ = get_or_empty("HOME");
     test_setenv("HOME", test_home_.string().c_str());
 #endif
 
@@ -50,13 +57,25 @@ class DaemonManagerTest : public ::testing::Test {
 
   void TearDown() override {
     daemon_.reset();
-    // Restore HOME
-    if (!original_home_.empty()) {
+    // Restore each variable independently
 #ifdef _WIN32
-      test_setenv("USERPROFILE", original_home_.c_str());
-#endif
-      test_setenv("HOME", original_home_.c_str());
+    if (!orig_userprofile_.empty()) {
+      test_setenv("USERPROFILE", orig_userprofile_.c_str());
+    } else {
+      test_unsetenv("USERPROFILE");
     }
+    if (!orig_home_.empty()) {
+      test_setenv("HOME", orig_home_.c_str());
+    } else {
+      test_unsetenv("HOME");
+    }
+#else
+    if (!orig_home_.empty()) {
+      test_setenv("HOME", orig_home_.c_str());
+    } else {
+      test_unsetenv("HOME");
+    }
+#endif
     if (std::filesystem::exists(test_home_)) {
       std::filesystem::remove_all(test_home_);
     }
@@ -72,7 +91,10 @@ class DaemonManagerTest : public ::testing::Test {
   }
 
   std::filesystem::path test_home_;
-  std::string original_home_;
+  std::string orig_home_;
+#ifdef _WIN32
+  std::string orig_userprofile_;
+#endif
   std::shared_ptr<spdlog::logger> logger_;
   std::unique_ptr<DaemonManager> daemon_;
 };
