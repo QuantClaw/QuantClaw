@@ -70,6 +70,8 @@ FetchContent_Declare(
     GIT_TAG        v11.4.5
 )
 set(USE_TLS ON CACHE BOOL "" FORCE)
+set(USE_OPEN_SSL ON CACHE BOOL "" FORCE)
+set(USE_MBED_TLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(ixwebsocket)
 
 FetchContent_Declare(
