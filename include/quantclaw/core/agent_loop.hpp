@@ -14,6 +14,7 @@
 
 #include "quantclaw/common/noncopyable.hpp"
 #include "quantclaw/config.hpp"
+#include "quantclaw/core/context_engine.hpp"
 #include "quantclaw/core/usage_accumulator.hpp"
 #include "quantclaw/providers/llm_provider.hpp"
 
@@ -96,6 +97,11 @@ class AgentLoop : public Noncopyable {
     failover_resolver_ = resolver;
   }
 
+  // Set custom context engine (default: DefaultContextEngine)
+  void SetContextEngine(std::shared_ptr<ContextEngine> engine) {
+    context_engine_ = std::move(engine);
+  }
+
   // Set session key for failover session pinning
   void SetSessionKey(const std::string& key) {
     session_key_ = key;
@@ -129,6 +135,7 @@ class AgentLoop : public Noncopyable {
   SubagentManager* subagent_manager_ = nullptr;          // Non-owning, optional
   FailoverResolver* failover_resolver_ = nullptr;        // Non-owning, optional
   std::shared_ptr<UsageAccumulator> usage_accumulator_;  // Shared ownership
+  std::shared_ptr<ContextEngine> context_engine_;        // Pluggable engine
   std::string session_key_;  // For failover session pinning
   std::shared_ptr<spdlog::logger> logger_;
   AgentConfig agent_config_;

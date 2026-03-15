@@ -11,6 +11,11 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
+#include "quantclaw/core/mmr_reranker.hpp"
+#include "quantclaw/core/temporal_decay.hpp"
+#include "quantclaw/core/vector_index.hpp"
+#include "quantclaw/providers/embedding_provider.hpp"
+
 namespace quantclaw {
 
 struct MemorySearchResult {
@@ -20,8 +25,20 @@ struct MemorySearchResult {
   int line_number;      // line number in source
 };
 
+// Hybrid memory search options.
+struct HybridSearchOptions {
+  double bm25_weight = 0.5;    // Weight for BM25 scores
+  double vector_weight = 0.5;  // Weight for vector similarity scores
+  bool use_temporal_decay = true;
+  bool use_mmr = true;
+  double mmr_lambda = 0.7;  // MMR relevance/diversity trade-off
+  int max_results = 10;
+};
+
 // Full-text memory search across workspace memory files.
 // Supports keyword matching with BM25 scoring (Okapi BM25).
+// Optionally supports hybrid search: BM25 + vector similarity + temporal
+// decay + MMR re-ranking.
 class MemorySearch {
  public:
   explicit MemorySearch(std::shared_ptr<spdlog::logger> logger);
@@ -32,9 +49,21 @@ class MemorySearch {
   // Add a single file to the index
   void IndexFile(const std::filesystem::path& file);
 
-  // Search for relevant memory entries
+  // Search for relevant memory entries (BM25 only)
   std::vector<MemorySearchResult> Search(const std::string& query,
                                          int max_results = 10) const;
+
+  // Hybrid search: BM25 + vector + temporal decay + MMR.
+  // Falls back to BM25-only if no embedding provider is set.
+  std::vector<MemorySearchResult>
+  HybridSearch(const std::string& query,
+               const HybridSearchOptions& opts = {}) const;
+
+  // Set embedding provider for vector search
+  void SetEmbeddingProvider(std::shared_ptr<EmbeddingProvider> provider);
+
+  // Build vector index for all indexed entries (requires embedding provider)
+  void BuildVectorIndex();
 
   // Get index stats
   nlohmann::json Stats() const;
@@ -68,6 +97,11 @@ class MemorySearch {
   // BM25 parameters
   static constexpr double kBM25_k1 = 1.2;
   static constexpr double kBM25_b = 0.75;
+
+  // Hybrid search components
+  std::shared_ptr<EmbeddingProvider> embedding_provider_;
+  VectorIndex vector_index_;
+  TemporalDecay temporal_decay_;
 };
 
 }  // namespace quantclaw

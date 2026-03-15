@@ -136,10 +136,208 @@ nlohmann::json MemorySearch::Stats() const {
   };
 }
 
+void MemorySearch::SetEmbeddingProvider(
+    std::shared_ptr<EmbeddingProvider> provider) {
+  embedding_provider_ = std::move(provider);
+}
+
+void MemorySearch::BuildVectorIndex() {
+  if (!embedding_provider_) {
+    logger_->warn("No embedding provider set, cannot build vector index");
+    return;
+  }
+
+  vector_index_.Clear();
+
+  // Batch embed all entries
+  std::vector<std::string> texts;
+  texts.reserve(entries_.size());
+  for (const auto& entry : entries_) {
+    texts.push_back(entry.content);
+  }
+
+  if (texts.empty())
+    return;
+
+  EmbeddingRequest req;
+  req.texts = texts;
+  auto resp = embedding_provider_->Embed(req);
+
+  if (resp.embeddings.size() != entries_.size()) {
+    logger_->error("Embedding count mismatch: got {} for {} entries",
+                   resp.embeddings.size(), entries_.size());
+    return;
+  }
+
+  for (size_t i = 0; i < entries_.size(); ++i) {
+    VectorEntry ve;
+    ve.id =
+        entries_[i].filepath + ":" + std::to_string(entries_[i].line_number);
+    ve.embedding = std::move(resp.embeddings[i]);
+    ve.content = entries_[i].content;
+    ve.source = entries_[i].filepath;
+    ve.line_number = entries_[i].line_number;
+    vector_index_.Add(std::move(ve));
+  }
+
+  logger_->info("Built vector index with {} entries", vector_index_.Size());
+}
+
+std::vector<MemorySearchResult>
+MemorySearch::HybridSearch(const std::string& query,
+                           const HybridSearchOptions& opts) const {
+  // Get BM25 results
+  auto bm25_results = Search(query, opts.max_results * 3);
+
+  // If no embedding provider or empty vector index, fall back to BM25-only
+  if (!embedding_provider_ || vector_index_.Size() == 0) {
+    // Apply temporal decay and MMR even without vector search
+    if (!opts.use_temporal_decay && !opts.use_mmr) {
+      bm25_results.resize(
+          std::min(static_cast<int>(bm25_results.size()), opts.max_results));
+      return bm25_results;
+    }
+
+    // Apply temporal decay
+    if (opts.use_temporal_decay) {
+      for (auto& r : bm25_results) {
+        double decay = temporal_decay_.Score(std::filesystem::path(r.source));
+        r.score *= decay;
+      }
+      std::sort(bm25_results.begin(), bm25_results.end(),
+                [](const auto& a, const auto& b) { return a.score > b.score; });
+    }
+
+    // Apply MMR
+    if (opts.use_mmr &&
+        static_cast<int>(bm25_results.size()) > opts.max_results) {
+      std::vector<RankedItem> items;
+      for (const auto& r : bm25_results) {
+        items.push_back({r.source + ":" + std::to_string(r.line_number),
+                         r.content, r.source, r.line_number, r.score});
+      }
+      auto reranked =
+          MMRReranker::Rerank(items, opts.max_results, opts.mmr_lambda);
+      std::vector<MemorySearchResult> final_results;
+      for (const auto& item : reranked) {
+        final_results.push_back(
+            {item.source, item.content, item.score, item.line_number});
+      }
+      return final_results;
+    }
+
+    bm25_results.resize(
+        std::min(static_cast<int>(bm25_results.size()), opts.max_results));
+    return bm25_results;
+  }
+
+  // Embed query
+  EmbeddingRequest req;
+  req.texts = {query};
+  auto resp = embedding_provider_->Embed(req);
+  if (resp.embeddings.empty()) {
+    // Embedding failed, fall back to BM25
+    bm25_results.resize(
+        std::min(static_cast<int>(bm25_results.size()), opts.max_results));
+    return bm25_results;
+  }
+
+  // Get vector search results
+  auto vec_results =
+      vector_index_.Search(resp.embeddings[0], opts.max_results * 3);
+
+  // Merge: normalize and combine scores
+  // Build a map of id -> combined score
+  struct MergedEntry {
+    std::string source;
+    std::string content;
+    int line_number;
+    double bm25_score = 0;
+    double vec_score = 0;
+    double combined = 0;
+  };
+
+  std::unordered_map<std::string, MergedEntry> merged;
+
+  // Normalize BM25 scores to [0,1]
+  double max_bm25 = 0;
+  for (const auto& r : bm25_results) {
+    if (r.score > max_bm25)
+      max_bm25 = r.score;
+  }
+  for (const auto& r : bm25_results) {
+    std::string key = r.source + ":" + std::to_string(r.line_number);
+    auto& m = merged[key];
+    m.source = r.source;
+    m.content = r.content;
+    m.line_number = r.line_number;
+    m.bm25_score = max_bm25 > 0 ? r.score / max_bm25 : 0;
+  }
+
+  // Normalize vector scores (cosine sim already in [-1,1], shift to [0,1])
+  for (const auto& r : vec_results) {
+    std::string key = r.source + ":" + std::to_string(r.line_number);
+    auto& m = merged[key];
+    if (m.source.empty()) {
+      m.source = r.source;
+      m.content = r.content;
+      m.line_number = r.line_number;
+    }
+    m.vec_score = (r.score + 1.0) / 2.0;  // Map [-1,1] to [0,1]
+  }
+
+  // Combine scores with weights
+  std::vector<MergedEntry> all_entries;
+  for (auto& [key, m] : merged) {
+    m.combined =
+        opts.bm25_weight * m.bm25_score + opts.vector_weight * m.vec_score;
+
+    // Apply temporal decay
+    if (opts.use_temporal_decay) {
+      double decay = temporal_decay_.Score(std::filesystem::path(m.source));
+      m.combined *= decay;
+    }
+
+    all_entries.push_back(std::move(m));
+  }
+
+  // Sort by combined score
+  std::sort(
+      all_entries.begin(), all_entries.end(),
+      [](const auto& a, const auto& b) { return a.combined > b.combined; });
+
+  // Apply MMR
+  if (opts.use_mmr && static_cast<int>(all_entries.size()) > opts.max_results) {
+    std::vector<RankedItem> items;
+    for (const auto& e : all_entries) {
+      items.push_back({e.source + ":" + std::to_string(e.line_number),
+                       e.content, e.source, e.line_number, e.combined});
+    }
+    auto reranked =
+        MMRReranker::Rerank(items, opts.max_results, opts.mmr_lambda);
+    std::vector<MemorySearchResult> final_results;
+    for (const auto& item : reranked) {
+      final_results.push_back(
+          {item.source, item.content, item.score, item.line_number});
+    }
+    return final_results;
+  }
+
+  // Return top results
+  std::vector<MemorySearchResult> results;
+  int count = std::min(opts.max_results, static_cast<int>(all_entries.size()));
+  for (int i = 0; i < count; ++i) {
+    results.push_back({all_entries[i].source, all_entries[i].content,
+                       all_entries[i].combined, all_entries[i].line_number});
+  }
+  return results;
+}
+
 void MemorySearch::Clear() {
   entries_.clear();
   total_documents_ = 0;
   avg_doc_length_ = 0;
+  vector_index_.Clear();
 }
 
 std::vector<std::string> MemorySearch::tokenize(const std::string& text) {

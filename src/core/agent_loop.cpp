@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/core/context_pruner.hpp"
+#include "quantclaw/core/default_context_engine.hpp"
 #include "quantclaw/core/memory_manager.hpp"
 #include "quantclaw/core/session_compaction.hpp"
 #include "quantclaw/core/skill_loader.hpp"
@@ -24,21 +25,6 @@
 namespace events = quantclaw::gateway::events;
 
 namespace quantclaw {
-
-// Estimate token count for a message list (rough: 4 chars ≈ 1 token)
-static int estimate_tokens(const std::vector<Message>& messages) {
-  int chars = 0;
-  for (const auto& msg : messages) {
-    chars += static_cast<int>(msg.role.size());
-    for (const auto& block : msg.content) {
-      chars += static_cast<int>(block.text.size());
-      chars += static_cast<int>(block.content.size());
-      if (!block.input.is_null())
-        chars += static_cast<int>(block.input.dump().size());
-    }
-  }
-  return chars / 4;
-}
 
 // Truncate a tool result if it exceeds the limit (head + tail with ellipsis)
 static std::string truncate_tool_result(const std::string& result,
@@ -169,82 +155,20 @@ std::vector<Message> AgentLoop::ProcessMessage(
 
   std::vector<Message> new_messages;
 
-  // --- Auto-compaction: truncate history if too large ---
-  std::vector<Message> effective_history = history;
-  if (agent_config_.auto_compact && static_cast<int>(effective_history.size()) >
-                                        agent_config_.compact_max_messages) {
-    int keep = agent_config_.compact_keep_recent;
-    int total = static_cast<int>(effective_history.size());
-    if (total > keep) {
-      int removed = total - keep;
-      effective_history.assign(history.end() - keep, history.end());
-      // Prepend truncation notice with context refresh instruction
-      effective_history.insert(
-          effective_history.begin(),
-          Message{"system", "[Context compaction: " + std::to_string(removed) +
-                                " earlier messages were removed. "
-                                "Your system instructions remain active. "
-                                "Refer to the system prompt for your identity "
-                                "and capabilities.]"});
-      logger_->info("Auto-compacted history: {} -> {} messages", total,
-                    static_cast<int>(effective_history.size()));
-    }
-  }
-
-  // --- Tool result pruning ---
-  ContextPruner::Options prune_opts;
-  effective_history = ContextPruner::Prune(effective_history, prune_opts);
-
-  // Build context: system + history + new user message
-  std::vector<Message> context;
-
-  // System message (always first, re-injected after compaction)
-  if (!system_prompt.empty()) {
-    context.push_back(Message{"system", system_prompt});
-  }
-
-  // History
-  for (const auto& msg : effective_history) {
-    context.push_back(msg);
-  }
-
-  // New user message
-  context.push_back(Message{"user", message});
-
-  // --- Context window guard: check estimated tokens vs limit ---
+  // --- Context assembly via pluggable engine ---
+  auto engine =
+      context_engine_
+          ? context_engine_
+          : std::make_shared<DefaultContextEngine>(agent_config_, logger_);
   int ctx_window = agent_config_.context_window > 0
                        ? agent_config_.context_window
                        : get_context_window(agent_config_.model);
-  int estimated = estimate_tokens(context);
-  if (estimated + agent_config_.max_tokens >
-      ctx_window - kContextWindowMinTokens) {
-    logger_->warn(
-        "Context window guard: estimated {} tokens + {} max_tokens exceeds "
-        "window {} (min reserve {}). Forcing compaction.",
-        estimated, agent_config_.max_tokens, ctx_window,
-        kContextWindowMinTokens);
-    // Force aggressive compaction: keep only last few messages
-    int keep = std::min(agent_config_.compact_keep_recent,
-                        static_cast<int>(context.size()));
-    if (keep < static_cast<int>(context.size())) {
-      std::vector<Message> compacted;
-      if (!system_prompt.empty()) {
-        compacted.push_back(Message{"system", system_prompt});
-      }
-      compacted.push_back(
-          Message{"system",
-                  "[Context compaction forced: context window nearly full. "
-                  "Earlier messages removed.]"});
-      for (auto it = context.end() - keep; it != context.end(); ++it) {
-        compacted.push_back(*it);
-      }
-      context = std::move(compacted);
-    }
-  }
+  auto assembled = engine->Assemble(history, system_prompt, message, ctx_window,
+                                    agent_config_.max_tokens);
 
   // Create LLM request
   ChatCompletionRequest request;
-  request.messages = context;
+  request.messages = assembled.messages;
   request.model = agent_config_.model;
   request.temperature = agent_config_.temperature;
   request.max_tokens = agent_config_.max_tokens;
@@ -353,19 +277,8 @@ std::vector<Message> AgentLoop::ProcessMessage(
         logger_->warn(
             "Context overflow (attempt {}/{}), compacting and retrying",
             overflow_retries, kOverflowCompactionMaxRetries);
-        // Aggressively compact: keep only recent messages
-        int keep = std::max(2, static_cast<int>(request.messages.size()) / 2);
-        std::vector<Message> compacted;
-        if (!system_prompt.empty()) {
-          compacted.push_back(Message{"system", system_prompt});
-        }
-        compacted.push_back(Message{
-            "system", "[Context overflow recovery: older messages removed.]"});
-        for (auto it = request.messages.end() - keep;
-             it != request.messages.end(); ++it) {
-          compacted.push_back(*it);
-        }
-        request.messages = std::move(compacted);
+        request.messages =
+            engine->CompactOverflow(request.messages, system_prompt, 0);
         continue;
       }
 
@@ -446,70 +359,19 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
 
   std::vector<Message> new_messages;
 
-  // --- Auto-compaction: truncate history if too large ---
-  std::vector<Message> effective_history = history;
-  if (agent_config_.auto_compact && static_cast<int>(effective_history.size()) >
-                                        agent_config_.compact_max_messages) {
-    int keep = agent_config_.compact_keep_recent;
-    int total = static_cast<int>(effective_history.size());
-    if (total > keep) {
-      int removed = total - keep;
-      effective_history.assign(history.end() - keep, history.end());
-      effective_history.insert(
-          effective_history.begin(),
-          Message{"system", "[Context compaction: " + std::to_string(removed) +
-                                " earlier messages were removed. "
-                                "Your system instructions remain active. "
-                                "Refer to the system prompt for your identity "
-                                "and capabilities.]"});
-      logger_->info("Auto-compacted streaming history: {} -> {} messages",
-                    total, static_cast<int>(effective_history.size()));
-    }
-  }
-
-  // --- Tool result pruning ---
-  ContextPruner::Options prune_opts;
-  effective_history = ContextPruner::Prune(effective_history, prune_opts);
-
-  // Build context (system prompt always re-injected first)
-  std::vector<Message> context;
-  if (!system_prompt.empty()) {
-    context.push_back(Message{"system", system_prompt});
-  }
-  for (const auto& msg : effective_history) {
-    context.push_back(msg);
-  }
-  context.push_back(Message{"user", message});
-
-  // --- Context window guard ---
+  // --- Context assembly via pluggable engine ---
+  auto engine =
+      context_engine_
+          ? context_engine_
+          : std::make_shared<DefaultContextEngine>(agent_config_, logger_);
   int ctx_window = agent_config_.context_window > 0
                        ? agent_config_.context_window
                        : get_context_window(agent_config_.model);
-  int estimated = estimate_tokens(context);
-  if (estimated + agent_config_.max_tokens >
-      ctx_window - kContextWindowMinTokens) {
-    logger_->warn("Streaming context window guard triggered: {} + {} > {} - {}",
-                  estimated, agent_config_.max_tokens, ctx_window,
-                  kContextWindowMinTokens);
-    int keep = std::min(agent_config_.compact_keep_recent,
-                        static_cast<int>(context.size()));
-    if (keep < static_cast<int>(context.size())) {
-      std::vector<Message> compacted;
-      if (!system_prompt.empty()) {
-        compacted.push_back(Message{"system", system_prompt});
-      }
-      compacted.push_back(
-          Message{"system",
-                  "[Context compaction forced: context window nearly full.]"});
-      for (auto it = context.end() - keep; it != context.end(); ++it) {
-        compacted.push_back(*it);
-      }
-      context = std::move(compacted);
-    }
-  }
+  auto assembled = engine->Assemble(history, system_prompt, message, ctx_window,
+                                    agent_config_.max_tokens);
 
   ChatCompletionRequest request;
-  request.messages = context;
+  request.messages = assembled.messages;
   request.model = agent_config_.model;
   request.temperature = agent_config_.temperature;
   request.max_tokens = agent_config_.max_tokens;
@@ -651,18 +513,8 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
         overflow_retries_stream++;
         logger_->warn("Streaming context overflow (attempt {}/{}), compacting",
                       overflow_retries_stream, kOverflowCompactionMaxRetries);
-        int keep = std::max(2, static_cast<int>(request.messages.size()) / 2);
-        std::vector<Message> compacted;
-        if (!system_prompt.empty()) {
-          compacted.push_back(Message{"system", system_prompt});
-        }
-        compacted.push_back(Message{
-            "system", "[Context overflow recovery: older messages removed.]"});
-        for (auto it = request.messages.end() - keep;
-             it != request.messages.end(); ++it) {
-          compacted.push_back(*it);
-        }
-        request.messages = std::move(compacted);
+        request.messages =
+            engine->CompactOverflow(request.messages, system_prompt, 0);
         continue;
       }
 

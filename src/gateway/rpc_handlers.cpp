@@ -334,6 +334,13 @@ void register_rpc_handlers(
           } else {
             row["kind"] = "direct";
           }
+          // Parent/subagent metadata (only if set)
+          if (!s.spawned_by.empty())
+            row["spawnedBy"] = s.spawned_by;
+          if (s.spawn_depth > 0)
+            row["spawnDepth"] = s.spawn_depth;
+          if (!s.subagent_role.empty())
+            row["subagentRole"] = s.subagent_role;
           session_rows.push_back(row);
         }
 

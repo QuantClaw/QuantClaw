@@ -34,7 +34,8 @@ struct SpawnParams {
   std::string thinking;       // Thinking level: off|low|medium|high
   int timeout_seconds = 300;  // Run timeout
   SpawnMode mode = SpawnMode::kRun;
-  bool cleanup = true;  // Auto-delete session on completion
+  bool cleanup = true;        // Auto-delete session on completion
+  std::string subagent_role;  // "" | "orchestrator" | "leaf"
 };
 
 // Spawn result

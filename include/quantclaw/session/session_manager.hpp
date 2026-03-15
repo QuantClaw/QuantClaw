@@ -79,6 +79,20 @@ struct SessionInfo {
   std::string created_at;
   std::string display_name;
   std::string channel;
+
+  // Parent/subagent fields
+  std::string spawned_by;     // Parent session key (empty for root sessions)
+  int spawn_depth = 0;        // 0 = root, 1 = sub, 2 = sub-sub, ...
+  std::string subagent_role;  // "" | "orchestrator" | "leaf"
+};
+
+// Options for creating a session with extended metadata
+struct SessionCreateOptions {
+  std::string display_name;
+  std::string channel = "cli";
+  std::string spawned_by;
+  int spawn_depth = 0;
+  std::string subagent_role;
 };
 
 // --- Session Handle ---
@@ -100,6 +114,10 @@ class SessionManager : public Noncopyable {
   SessionHandle GetOrCreate(const std::string& session_key,
                             const std::string& display_name = "",
                             const std::string& channel = "cli");
+
+  // Get or create a session with extended options (parent/subagent metadata)
+  SessionHandle GetOrCreate(const std::string& session_key,
+                            const SessionCreateOptions& opts);
 
   // Append a message to the session transcript
   void AppendMessage(const std::string& session_key, const std::string& role,

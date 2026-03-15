@@ -591,6 +591,123 @@ TEST_F(FailoverResolverTest, ProbeOnCooldownAllowsOneAttempt) {
   }
 }
 
+// ================================================================
+// Auth Profile Rotation: Round-robin + Priority
+// ================================================================
+
+TEST_F(FailoverResolverTest, RoundRobinRotation) {
+  // Three profiles with same priority — should rotate based on last_used
+  std::vector<AuthProfile> profiles = {
+      {"a", "sk-a", "", 0},
+      {"b", "sk-b", "", 0},
+      {"c", "sk-c", "", 0},
+  };
+  resolver_->SetProfiles("anthropic", profiles);
+
+  // First resolve: picks "a" (lowest last_used = 0)
+  auto r1 = resolver_->Resolve("anthropic/claude-sonnet-4-6");
+  ASSERT_TRUE(r1.has_value());
+  EXPECT_EQ(r1->profile_id, "a");
+
+  // Record success to update last_used for "a"
+  resolver_->RecordSuccess("anthropic", "a");
+
+  // Second resolve: picks "b" (a was just used)
+  auto r2 = resolver_->Resolve("anthropic/claude-sonnet-4-6");
+  ASSERT_TRUE(r2.has_value());
+  EXPECT_EQ(r2->profile_id, "b");
+
+  // Record success for "b"
+  resolver_->RecordSuccess("anthropic", "b");
+
+  // Third resolve: picks "c"
+  auto r3 = resolver_->Resolve("anthropic/claude-sonnet-4-6");
+  ASSERT_TRUE(r3.has_value());
+  EXPECT_EQ(r3->profile_id, "c");
+
+  // Record success for "c"
+  resolver_->RecordSuccess("anthropic", "c");
+
+  // Fourth resolve: back to "a" (round-robin complete)
+  auto r4 = resolver_->Resolve("anthropic/claude-sonnet-4-6");
+  ASSERT_TRUE(r4.has_value());
+  EXPECT_EQ(r4->profile_id, "a");
+}
+
+TEST_F(FailoverResolverTest, PriorityOverridesRoundRobin) {
+  // Profile "high" has priority 0 (highest), "low" has priority 10
+  std::vector<AuthProfile> profiles = {
+      {"low", "sk-low", "", 10},
+      {"high", "sk-high", "", 0},
+  };
+  resolver_->SetProfiles("anthropic", profiles);
+
+  // Should always pick "high" first (lower priority number = higher priority)
+  auto r1 = resolver_->Resolve("anthropic/claude-sonnet-4-6");
+  ASSERT_TRUE(r1.has_value());
+  EXPECT_EQ(r1->profile_id, "high");
+
+  // Even after recording success (updating last_used), "high" still wins
+  // because it has a lower priority number
+  resolver_->RecordSuccess("anthropic", "high");
+
+  auto r2 = resolver_->Resolve("anthropic/claude-sonnet-4-6");
+  ASSERT_TRUE(r2.has_value());
+  EXPECT_EQ(r2->profile_id, "high");
+}
+
+TEST_F(FailoverResolverTest, CooldownAwarePoolSeparation) {
+  // Profile "a" in cooldown, "b" available — should use "b"
+  std::vector<AuthProfile> profiles = {
+      {"a", "sk-a", "", 0},
+      {"b", "sk-b", "", 0},
+  };
+  resolver_->SetProfiles("anthropic", profiles);
+
+  // Put "a" in cooldown
+  resolver_->RecordFailure("anthropic", "a", ProviderErrorKind::kRateLimit);
+
+  // Should pick "b" even though "a" would be first in round-robin
+  auto r = resolver_->Resolve("anthropic/claude-sonnet-4-6");
+  ASSERT_TRUE(r.has_value());
+  EXPECT_EQ(r->profile_id, "b");
+}
+
+// ================================================================
+// Config profile parsing
+// ================================================================
+
+TEST(FailoverConfigTest, ParseProviderProfiles) {
+  nlohmann::json j = {
+      {"providers",
+       {{"anthropic",
+         {{"apiKey", "default-key"},
+          {"profiles",
+           {{{"id", "prod"}, {"apiKey", "sk-prod"}, {"priority", 0}},
+            {{"id", "backup"},
+             {"apiKey", "sk-backup"},
+             {"priority", 10}}}}}}}}};
+  auto config = QuantClawConfig::FromJson(j);
+  auto it = config.providers.find("anthropic");
+  ASSERT_NE(it, config.providers.end());
+  ASSERT_EQ(it->second.profiles.size(), 2u);
+  EXPECT_EQ(it->second.profiles[0].id, "prod");
+  EXPECT_EQ(it->second.profiles[0].api_key, "sk-prod");
+  EXPECT_EQ(it->second.profiles[0].priority, 0);
+  EXPECT_EQ(it->second.profiles[1].id, "backup");
+  EXPECT_EQ(it->second.profiles[1].api_key, "sk-backup");
+  EXPECT_EQ(it->second.profiles[1].priority, 10);
+}
+
+TEST(FailoverConfigTest, NoProfilesFallsBackToSingleKey) {
+  nlohmann::json j = {{"providers", {{"openai", {{"apiKey", "sk-test"}}}}}};
+  auto config = QuantClawConfig::FromJson(j);
+  auto it = config.providers.find("openai");
+  ASSERT_NE(it, config.providers.end());
+  EXPECT_TRUE(it->second.profiles.empty());
+  EXPECT_EQ(it->second.api_key, "sk-test");
+}
+
 TEST_F(FailoverResolverTest, SessionPinClearedOnCooldownExtended) {
   std::vector<AuthProfile> profiles = {
       {"prod", "sk-prod-key", ""},

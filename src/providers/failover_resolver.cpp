@@ -3,6 +3,8 @@
 
 #include "quantclaw/providers/failover_resolver.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <optional>
 
 #include "quantclaw/providers/provider_registry.hpp"
@@ -64,11 +66,20 @@ FailoverResolver::Resolve(const std::string& model,
 void FailoverResolver::RecordSuccess(const std::string& provider_id,
                                      const std::string& profile_id,
                                      const std::string& session_key) {
-  cooldown_.RecordSuccess(cooldown_key(provider_id, profile_id));
+  auto key = cooldown_key(provider_id, profile_id);
+  cooldown_.RecordSuccess(key);
 
-  if (!session_key.empty()) {
+  {
     std::lock_guard<std::mutex> lock(mu_);
-    session_pins_[session_key] = {provider_id, profile_id};
+    // Update last-used timestamp for round-robin ordering
+    auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::steady_clock::now().time_since_epoch())
+                   .count();
+    profile_last_used_[key] = now;
+
+    if (!session_key.empty()) {
+      session_pins_[session_key] = {provider_id, profile_id};
+    }
   }
 }
 
@@ -140,34 +151,74 @@ FailoverResolver::try_resolve_model(const std::string& model,
   // Check if this provider has auth profiles
   auto prof_it = profiles_.find(provider_id);
   if (prof_it != profiles_.end() && !prof_it->second.empty()) {
-    // Try each profile in order
+    // Build sorted candidate list: available pool first, then cooldown pool.
+    // Within available pool: sort by priority (asc), then last_used (asc) for
+    // round-robin among same-priority profiles.
+    struct Candidate {
+      const AuthProfile* profile;
+      bool in_cooldown;
+      int priority;
+      int64_t last_used;
+      int index;  // Original index for stable tie-breaking
+    };
+    std::vector<Candidate> available;
+    std::vector<Candidate> cooled_down;
+
+    int idx = 0;
     for (const auto& profile : prof_it->second) {
       auto key = cooldown_key(provider_id, profile.id);
-      if (cooldown_.IsInCooldown(key)) {
-        continue;
-      }
+      auto lu_it = profile_last_used_.find(key);
+      int64_t last_used =
+          (lu_it != profile_last_used_.end()) ? lu_it->second : 0;
 
+      if (cooldown_.IsInCooldown(key)) {
+        cooled_down.push_back(
+            {&profile, true, profile.priority, last_used, idx});
+      } else {
+        available.push_back(
+            {&profile, false, profile.priority, last_used, idx});
+      }
+      idx++;
+    }
+
+    // Sort available: priority ascending, then last_used ascending (LRU
+    // first), then original index for deterministic tie-breaking.
+    std::sort(available.begin(), available.end(),
+              [](const Candidate& a, const Candidate& b) {
+                if (a.priority != b.priority)
+                  return a.priority < b.priority;
+                if (a.last_used != b.last_used)
+                  return a.last_used < b.last_used;
+                return a.index < b.index;
+              });
+
+    // Try available profiles first
+    for (const auto& c : available) {
       auto provider =
-          registry_->GetProviderWithKey(provider_id, profile.api_key);
+          registry_->GetProviderWithKey(provider_id, c.profile->api_key);
       if (provider) {
-        return ResolvedProvider{provider, provider_id, profile.id, ref.model,
+        // Update last_used timestamp for round-robin
+        auto key = cooldown_key(provider_id, c.profile->id);
+        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now().time_since_epoch())
+                       .count();
+        profile_last_used_[key] = now;
+        return ResolvedProvider{provider, provider_id, c.profile->id, ref.model,
                                 false};
       }
     }
 
     // All profiles in cooldown — try probe throttling on the first profile.
-    // If enough time has passed since the last probe, allow one attempt
-    // so the system can detect recovery without waiting for full cooldown.
-    {
-      auto probe_key = cooldown_key(provider_id, prof_it->second[0].id);
+    if (!cooled_down.empty()) {
+      auto probe_key = cooldown_key(provider_id, cooled_down[0].profile->id);
       if (cooldown_.TryProbe(probe_key)) {
         logger_->info("Probing cooled-down profile {}:{} (probe throttle)",
-                      provider_id, prof_it->second[0].id);
+                      provider_id, cooled_down[0].profile->id);
         auto provider = registry_->GetProviderWithKey(
-            provider_id, prof_it->second[0].api_key);
+            provider_id, cooled_down[0].profile->api_key);
         if (provider) {
-          return ResolvedProvider{provider, provider_id, prof_it->second[0].id,
-                                  ref.model, false};
+          return ResolvedProvider{provider, provider_id,
+                                  cooled_down[0].profile->id, ref.model, false};
         }
       }
     }

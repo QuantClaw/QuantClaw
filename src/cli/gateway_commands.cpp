@@ -467,13 +467,24 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
           });
     }
 
-    // Gateway info endpoint for UI to discover WebSocket port
+    // Gateway info endpoint for UI to discover WebSocket port and auth token.
+    // Auth-exempt but restricted to loopback requests only for security.
     http_server->AddRawRoute(
         "/api/gateway-info", "GET",
-        [port](const httplib::Request&, httplib::Response& res) {
+        [port, auth_token](const httplib::Request& req,
+                           httplib::Response& res) {
+          // Only serve to loopback clients to prevent token leakage
+          const auto& remote = req.remote_addr;
+          if (remote != "127.0.0.1" && remote != "::1" &&
+              remote != "localhost") {
+            res.status = 403;
+            res.set_content(R"({"error":"forbidden"})", "application/json");
+            return;
+          }
           nlohmann::json info = {
               {"wsUrl", "ws://localhost:" + std::to_string(port)},
               {"wsPort", port},
+              {"authToken", auth_token},
               {"version", quantclaw::kVersion}};
           res.status = 200;
           res.set_content(info.dump(), "application/json");

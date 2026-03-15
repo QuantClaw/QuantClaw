@@ -505,3 +505,53 @@ TEST_F(SessionManagerTest, AppendCustomMessageDefaultArgs) {
   }
   EXPECT_TRUE(found);
 }
+
+// --- Session parentId branching ---
+
+TEST_F(SessionManagerTest, CreateSessionWithParentInfo) {
+  quantclaw::SessionCreateOptions opts;
+  opts.display_name = "Child Session";
+  opts.channel = "cli";
+  opts.spawned_by = "agent:main:parent";
+  opts.spawn_depth = 1;
+  opts.subagent_role = "leaf";
+
+  auto handle = session_mgr_->GetOrCreate("agent:main:child-1", opts);
+  EXPECT_EQ(handle.session_key, "agent:main:child-1");
+
+  auto sessions = session_mgr_->ListSessions();
+  ASSERT_EQ(sessions.size(), 1u);
+  EXPECT_EQ(sessions[0].spawned_by, "agent:main:parent");
+  EXPECT_EQ(sessions[0].spawn_depth, 1);
+  EXPECT_EQ(sessions[0].subagent_role, "leaf");
+}
+
+TEST_F(SessionManagerTest, ParentInfoPersistedAcrossReload) {
+  quantclaw::SessionCreateOptions opts;
+  opts.display_name = "Sub";
+  opts.spawned_by = "agent:main:root";
+  opts.spawn_depth = 2;
+  opts.subagent_role = "orchestrator";
+
+  session_mgr_->GetOrCreate("agent:main:sub-persist", opts);
+
+  // Reload
+  session_mgr_.reset();
+  session_mgr_ =
+      std::make_unique<quantclaw::SessionManager>(test_dir_, logger_);
+
+  auto sessions = session_mgr_->ListSessions();
+  ASSERT_EQ(sessions.size(), 1u);
+  EXPECT_EQ(sessions[0].spawned_by, "agent:main:root");
+  EXPECT_EQ(sessions[0].spawn_depth, 2);
+  EXPECT_EQ(sessions[0].subagent_role, "orchestrator");
+}
+
+TEST_F(SessionManagerTest, RootSessionHasNoParentInfo) {
+  auto handle = session_mgr_->GetOrCreate("agent:main:root-session", "Root");
+  auto sessions = session_mgr_->ListSessions();
+  ASSERT_EQ(sessions.size(), 1u);
+  EXPECT_TRUE(sessions[0].spawned_by.empty());
+  EXPECT_EQ(sessions[0].spawn_depth, 0);
+  EXPECT_TRUE(sessions[0].subagent_role.empty());
+}

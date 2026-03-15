@@ -216,6 +216,14 @@ SessionManager::SessionManager(const std::filesystem::path& sessions_dir,
 SessionHandle SessionManager::GetOrCreate(const std::string& session_key,
                                           const std::string& display_name,
                                           const std::string& channel) {
+  SessionCreateOptions opts;
+  opts.display_name = display_name;
+  opts.channel = channel;
+  return GetOrCreate(session_key, opts);
+}
+
+SessionHandle SessionManager::GetOrCreate(const std::string& session_key,
+                                          const SessionCreateOptions& opts) {
   std::unique_lock<std::shared_mutex> lock(mutex_);
 
   // Normalize session key to OpenClaw format: agent:<agentId>:<rest>
@@ -235,8 +243,12 @@ SessionHandle SessionManager::GetOrCreate(const std::string& session_key,
   info.session_id = sid;
   info.updated_at = now;
   info.created_at = now;
-  info.display_name = display_name.empty() ? normalized : display_name;
-  info.channel = channel;
+  info.display_name =
+      opts.display_name.empty() ? normalized : opts.display_name;
+  info.channel = opts.channel;
+  info.spawned_by = opts.spawned_by;
+  info.spawn_depth = opts.spawn_depth;
+  info.subagent_role = opts.subagent_role;
 
   store_[normalized] = info;
   SaveStore();
@@ -451,11 +463,19 @@ void SessionManager::SaveStore() {
   auto store_path = sessions_dir_ / "sessions.json";
   nlohmann::json j = nlohmann::json::object();
   for (const auto& [key, info] : store_) {
-    j[key] = {{"sessionId", info.session_id},
-              {"updatedAt", info.updated_at},
-              {"createdAt", info.created_at},
-              {"displayName", info.display_name},
-              {"channel", info.channel}};
+    nlohmann::json entry = {{"sessionId", info.session_id},
+                            {"updatedAt", info.updated_at},
+                            {"createdAt", info.created_at},
+                            {"displayName", info.display_name},
+                            {"channel", info.channel}};
+    // Only persist parent/subagent fields if set (avoid JSON bloat)
+    if (!info.spawned_by.empty())
+      entry["spawnedBy"] = info.spawned_by;
+    if (info.spawn_depth > 0)
+      entry["spawnDepth"] = info.spawn_depth;
+    if (!info.subagent_role.empty())
+      entry["subagentRole"] = info.subagent_role;
+    j[key] = entry;
   }
   std::ofstream file(store_path);
   if (file.is_open()) {
@@ -484,6 +504,9 @@ void SessionManager::LoadStore() {
       info.created_at = value.value("createdAt", "");
       info.display_name = value.value("displayName", "");
       info.channel = value.value("channel", "cli");
+      info.spawned_by = value.value("spawnedBy", "");
+      info.spawn_depth = value.value("spawnDepth", 0);
+      info.subagent_role = value.value("subagentRole", "");
       store_[key] = info;
     }
 

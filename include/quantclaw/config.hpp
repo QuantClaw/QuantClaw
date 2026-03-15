@@ -68,12 +68,23 @@ struct ModelEntryConfig {
   static ModelEntryConfig FromJson(const nlohmann::json& json);
 };
 
+// Auth profile: one API key entry within a provider's "profiles" array.
+struct AuthProfileConfig {
+  std::string id;           // e.g. "prod", "backup"
+  std::string api_key;      // Direct key value
+  std::string api_key_env;  // Env var name (resolved at startup)
+  int priority = 0;         // Lower = higher priority (0 is highest)
+
+  static AuthProfileConfig FromJson(const nlohmann::json& json);
+};
+
 struct ProviderConfig {
   std::string api_key;
   std::string base_url;
   std::string api;  // "openai-completions", "anthropic-messages"
   int timeout = kDefaultProviderTimeoutSec;
-  std::vector<ModelDefinition> models;  // Per-provider model definitions
+  std::vector<ModelDefinition> models;      // Per-provider model definitions
+  std::vector<AuthProfileConfig> profiles;  // Multi-key rotation
 
   static ProviderConfig FromJson(const nlohmann::json& json);
 };

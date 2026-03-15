@@ -27,6 +27,7 @@ struct AuthProfile {
   std::string id;           // e.g. "prod", "backup"
   std::string api_key;      // Direct key value
   std::string api_key_env;  // Env var name (resolved at startup)
+  int priority = 0;         // Lower = higher priority (0 is highest)
 };
 
 // Result of a failover resolution attempt.
@@ -103,6 +104,9 @@ class FailoverResolver {
 
   // provider_id → auth profiles
   std::unordered_map<std::string, std::vector<AuthProfile>> profiles_;
+
+  // cooldown_key → last-used timestamp (ms since epoch) for round-robin
+  std::unordered_map<std::string, int64_t> profile_last_used_;
 
   // session_key → {provider_id, profile_id}
   struct SessionPin {

@@ -90,9 +90,9 @@ void WebServer::server_loop() {
     http_server_->set_pre_routing_handler(
         [this](const httplib::Request& req,
                httplib::Response& res) -> httplib::Server::HandlerResponse {
-          // Skip auth for health and OPTIONS preflight
+          // Skip auth for health, gateway-info (loopback-guarded), and OPTIONS
           if (req.path == "/health" || req.path == "/api/health" ||
-              req.method == "OPTIONS") {
+              req.path == "/api/gateway-info" || req.method == "OPTIONS") {
             return httplib::Server::HandlerResponse::Unhandled;
           }
           // Skip auth for static file paths (UI assets) and control UI

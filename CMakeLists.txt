@@ -9,6 +9,19 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Embed RPATH so the binary finds system libraries even when
+# LD_LIBRARY_PATH points elsewhere (e.g. miniconda).
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
+if(UNIX AND NOT APPLE)
+    # Add architecture-specific system lib path (Debian/Ubuntu multiarch)
+    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath,/usr/lib/x86_64-linux-gnu")
+    elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath,/usr/lib/aarch64-linux-gnu")
+    endif()
+endif()
+
 option(BUILD_TESTS "Build tests" ON)
 
 # Sanitizer options (mutually exclusive: ASAN and TSAN cannot be combined)
@@ -83,6 +96,11 @@ set(QUANTCLAW_CORE_SOURCES
     src/core/usage_accumulator.cpp
     src/core/message_commands.cpp
     src/core/subagent.cpp
+    src/core/default_context_engine.cpp
+    src/core/multi_stage_compaction.cpp
+    src/core/vector_index.cpp
+    src/core/mmr_reranker.cpp
+    src/core/temporal_decay.cpp
     # Providers
     src/providers/curl_raii.cpp
     src/providers/openai_provider.cpp
@@ -277,6 +295,9 @@ if(BUILD_TESTS)
         tests/test_message_commands.cpp
         tests/test_builtin_skills.cpp
         tests/test_agent_commands.cpp
+        tests/test_context_engine.cpp
+        tests/test_multi_stage_compaction.cpp
+        tests/test_hybrid_memory_search.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})
