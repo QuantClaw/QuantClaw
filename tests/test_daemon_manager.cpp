@@ -33,7 +33,8 @@ class DaemonManagerTest : public ::testing::Test {
     test_home_ = quantclaw::test::MakeTestDir("quantclaw_daemon_test");
 
 #ifdef _WIN32
-    original_home_ = std::getenv("USERPROFILE") ? std::getenv("USERPROFILE") : "";
+    original_home_ =
+        std::getenv("USERPROFILE") ? std::getenv("USERPROFILE") : "";
     test_setenv("USERPROFILE", test_home_.string().c_str());
     test_setenv("HOME", test_home_.string().c_str());
 #else
