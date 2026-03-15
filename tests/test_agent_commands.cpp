@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <thread>
 
 #include <spdlog/sinks/null_sink.h>
@@ -253,10 +254,14 @@ TEST_F(AgentCommandsIntegrationTest, RequestWithPositionalArg) {
 // ========== Scenario 4: --json output ==========
 
 TEST_F(AgentCommandsIntegrationTest, RequestJsonOutput) {
-  int ret = -1;
-  auto out = capture_stdout([&]() {
-    ret = agent_cmds_->RequestCommand({"-m", "json test", "--json"});
-  });
+  // Use C++ stream redirection instead of fd-level dup2 to avoid
+  // TSAN data race with background WebSocket threads.
+  std::ostringstream oss;
+  auto* old_buf = std::cout.rdbuf(oss.rdbuf());
+  int ret = agent_cmds_->RequestCommand({"-m", "json test", "--json"});
+  std::cout.rdbuf(old_buf);
+  std::string out = oss.str();
+
   EXPECT_EQ(ret, 0);
   // JSON output should be valid and contain response/sessionKey
   auto json = nlohmann::json::parse(out, nullptr, false);
