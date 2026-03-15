@@ -43,7 +43,8 @@ TEST(PlatformProcess, ExecCaptureFail) {
 TEST(PlatformProcess, SpawnAndWait) {
   // Spawn a short-lived process
 #ifdef _WIN32
-  std::vector<std::string> args = {"cmd", "/c", "ping -n 1 127.0.0.1 >nul"};
+  // Use timeout /t 1 which always succeeds and gives the process time to run
+  std::vector<std::string> args = {"cmd", "/c", "timeout /t 1 /nobreak"};
 #else
   std::vector<std::string> args = {"sleep", "0.1"};
 #endif

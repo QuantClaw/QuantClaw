@@ -21,7 +21,7 @@ MemoryManager::MemoryManager(const std::filesystem::path& workspace_path,
   // Determine base dir from workspace path
   // Expected: ~/.quantclaw/agents/{agentId}/workspace
   // Or legacy: ~/.quantclaw/workspace
-  if (workspace_path_.string().find("/agents/") != std::string::npos) {
+  if (workspace_path_.generic_string().find("/agents/") != std::string::npos) {
     // New layout: base_dir is 3 levels up from workspace
     base_dir_ = workspace_path_.parent_path().parent_path().parent_path();
   } else {
