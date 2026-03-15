@@ -113,7 +113,7 @@ TEST_F(MemoryManagerTest, GetWorkspacePath) {
 
 TEST_F(MemoryManagerTest, GetSessionsDir) {
   auto sessions_dir = memory_manager_->GetSessionsDir("main");
-  EXPECT_TRUE(sessions_dir.string().find("agents/main/sessions") !=
+  EXPECT_TRUE(sessions_dir.generic_string().find("agents/main/sessions") !=
               std::string::npos);
 }
 

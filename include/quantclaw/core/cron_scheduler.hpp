@@ -15,6 +15,12 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
+// Windows SDK defines AddJob as AddJobA (print spooler API); undefine to
+// prevent collision with CronScheduler::AddJob.
+#ifdef AddJob
+#undef AddJob
+#endif
+
 namespace quantclaw {
 
 struct CronJob {

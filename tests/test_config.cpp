@@ -2,9 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <thread>
+
+#ifdef _WIN32
+#define test_setenv(name, value) _putenv_s(name, value)
+#define test_unsetenv(name) _putenv_s(name, "")
+#else
+#define test_setenv(name, value) setenv(name, value, 1)
+#define test_unsetenv(name) unsetenv(name)
+#endif
 
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
@@ -506,7 +515,7 @@ TEST_F(ConfigTest, SetValue_OnNonexistentFile) {
 // --- Environment variable substitution ---
 
 TEST_F(ConfigTest, EnvVarSubstitutionInApiKey) {
-  setenv("QC_TEST_API_KEY", "sk-from-env-42", 1);
+  test_setenv("QC_TEST_API_KEY", "sk-from-env-42");
 
   nlohmann::json json_config = {
       {"providers",
@@ -517,11 +526,11 @@ TEST_F(ConfigTest, EnvVarSubstitutionInApiKey) {
   auto config = quantclaw::QuantClawConfig::FromJson(json_config);
   EXPECT_EQ(config.providers.at("openai").api_key, "sk-from-env-42");
 
-  unsetenv("QC_TEST_API_KEY");
+  test_unsetenv("QC_TEST_API_KEY");
 }
 
 TEST_F(ConfigTest, EnvVarSubstitutionMissing) {
-  unsetenv("QC_TEST_NONEXISTENT_VAR");
+  test_unsetenv("QC_TEST_NONEXISTENT_VAR");
 
   nlohmann::json json_config = {
       {"providers", {{"openai", {{"apiKey", "${QC_TEST_NONEXISTENT_VAR}"}}}}}};
@@ -532,8 +541,8 @@ TEST_F(ConfigTest, EnvVarSubstitutionMissing) {
 }
 
 TEST_F(ConfigTest, EnvVarSubstitutionMultiple) {
-  setenv("QC_TEST_HOST", "api.example.com", 1);
-  setenv("QC_TEST_VERSION", "v2", 1);
+  test_setenv("QC_TEST_HOST", "api.example.com");
+  test_setenv("QC_TEST_VERSION", "v2");
 
   nlohmann::json json_config = {
       {"providers",
@@ -544,12 +553,12 @@ TEST_F(ConfigTest, EnvVarSubstitutionMultiple) {
   EXPECT_EQ(config.providers.at("openai").base_url,
             "https://api.example.com/v2");
 
-  unsetenv("QC_TEST_HOST");
-  unsetenv("QC_TEST_VERSION");
+  test_unsetenv("QC_TEST_HOST");
+  test_unsetenv("QC_TEST_VERSION");
 }
 
 TEST_F(ConfigTest, EnvVarSubstitutionInNestedArrays) {
-  setenv("QC_TEST_SCOPE", "admin.read", 1);
+  test_setenv("QC_TEST_SCOPE", "admin.read");
 
   nlohmann::json json_config = {
       {"tools", {{"allow", {"group:fs", "${QC_TEST_SCOPE}"}}}}};
@@ -558,7 +567,7 @@ TEST_F(ConfigTest, EnvVarSubstitutionInNestedArrays) {
   ASSERT_EQ(config.tools_permission.allow.size(), 2u);
   EXPECT_EQ(config.tools_permission.allow[1], "admin.read");
 
-  unsetenv("QC_TEST_SCOPE");
+  test_unsetenv("QC_TEST_SCOPE");
 }
 
 // --- JSON5 support (comments + trailing commas) ---

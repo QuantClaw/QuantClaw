@@ -14,6 +14,12 @@
 #include "test_helpers.hpp"
 #include <gtest/gtest.h>
 
+// Windows SDK defines AddJob as AddJobA (print spooler API); undefine to
+// allow calling quantclaw::CronScheduler::AddJob.
+#ifdef AddJob
+#undef AddJob
+#endif
+
 namespace fs = std::filesystem;
 
 static std::shared_ptr<spdlog::logger>

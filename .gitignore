@@ -1,5 +1,6 @@
 # Build output
 build/
+build-win/
 build_test/
 cmake-build-*/
 Testing/
@@ -16,6 +17,7 @@ compile_commands.json
 
 # IDE / editor
 .vscode/
+.vs/
 .idea/
 *.swp
 *.swo

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/quantclaw-logo-transparent.png" alt="QuantClaw" width="180" />
+  <img src="assets/quantclaw-logo-white-0307.png" alt="QuantClaw" width="180" />
 </p>
 
 <h1 align="center">QuantClaw</h1>
@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml"><img src="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus&logoColor=white" alt="C++17">
-  <img src="https://img.shields.io/badge/tests-886%20passing-brightgreen.svg" alt="886 tests passing">
+  <img src="https://img.shields.io/badge/tests-996%20passing-brightgreen.svg" alt="996 tests passing">
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey.svg" alt="Linux | Windows">
   <a href="https://github.com/openclaw/openclaw"><img src="https://img.shields.io/badge/OpenClaw-compatible-orange.svg" alt="OpenClaw Compatible"></a>
 </p>

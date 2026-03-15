@@ -402,3 +402,59 @@ jobs:
       with:
         name: sanitizer-${{ matrix.sanitizer }}-results
         path: build/Testing/
+
+  build-test-windows:
+    name: Build & Test Windows (MSVC)
+    runs-on: windows-latest
+    env:
+      VCPKG_DEFAULT_TRIPLET: x64-windows
+      # Direct vcpkg binary cache to a workspace-local dir so actions/cache
+      # can persist it across runs (avoids re-compiling all vcpkg packages).
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg-bincache,readwrite"
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Cache vcpkg binary packages
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/vcpkg-bincache
+        # Bust the cache when manifest dependencies change.
+        key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
+        restore-keys: vcpkg-x64-windows-
+
+    - name: Update and bootstrap vcpkg
+      run: |
+        git -C "$env:VCPKG_INSTALLATION_ROOT" fetch --depth=1
+        git -C "$env:VCPKG_INSTALLATION_ROOT" checkout FETCH_HEAD
+        & "$env:VCPKG_INSTALLATION_ROOT\bootstrap-vcpkg.bat" -disableMetrics
+
+    - name: Configure CMake
+      run: |
+        cmake -B build `
+          -A x64 `
+          -DCMAKE_CXX_STANDARD=17 `
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+
+    - name: Build
+      run: cmake --build build --config Release --parallel
+
+    - name: Add vcpkg DLLs to PATH
+      # Prepend vcpkg DLL dir to the runner's PATH so both the test binary
+      # and any child processes it spawns (e.g. cmd.exe, ping) can find
+      # system tools alongside vcpkg DLLs.
+      run: |
+        $vcpkgBin = Join-Path $env:GITHUB_WORKSPACE "build\vcpkg_installed\x64-windows\bin"
+        echo $vcpkgBin >> $env:GITHUB_PATH
+
+    - name: Run Tests
+      working-directory: build
+      run: ctest --output-on-failure --parallel -C Release
+
+    - name: Upload test results
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: test-results-windows-msvc
+        path: build/Testing/

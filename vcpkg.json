@@ -1,0 +1,14 @@
+{
+  "name": "quantclaw",
+  "version-string": "0.3.0",
+  "builtin-baseline": "4b77da7fed37817f124936239197833469f1b9a8",
+  "dependencies": [
+    "spdlog",
+    "nlohmann-json",
+    "curl",
+    "openssl",
+    "ixwebsocket",
+    "gtest",
+    "cpp-httplib"
+  ]
+}

@@ -445,7 +445,10 @@ void SessionManager::ResetSession(const std::string& session_key) {
   auto old_path = transcript_path(it->second.session_id);
   if (std::filesystem::exists(old_path)) {
     auto archive_path = old_path;
-    archive_path += ".reset." + get_timestamp();
+    // Windows filenames cannot contain ':'; replace with '-' in timestamp
+    auto ts = get_timestamp();
+    std::replace(ts.begin(), ts.end(), ':', '-');
+    archive_path += ".reset." + ts;
     std::filesystem::rename(old_path, archive_path);
     logger_->info("Archived transcript: {}", archive_path.string());
   }

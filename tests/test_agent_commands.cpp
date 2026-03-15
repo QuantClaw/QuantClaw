@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <thread>
 
 #include <spdlog/sinks/null_sink.h>
@@ -60,6 +61,53 @@ void register_rpc_handlers(
 
 // --- Capture helpers ---
 
+#ifdef _WIN32
+#include <fcntl.h>
+
+#include <io.h>
+static std::string capture_stdout(std::function<void()> fn) {
+  fflush(stdout);
+  int pipefd[2];
+  if (_pipe(pipefd, 65536, _O_BINARY) == -1)
+    return "";
+  int saved = _dup(_fileno(stdout));
+  _dup2(pipefd[1], _fileno(stdout));
+  _close(pipefd[1]);
+  fn();
+  fflush(stdout);
+  _dup2(saved, _fileno(stdout));
+  _close(saved);
+  std::string result;
+  char buf[4096];
+  int n;
+  while ((n = _read(pipefd[0], buf, sizeof(buf))) > 0)
+    result.append(buf, n);
+  _close(pipefd[0]);
+  return result;
+}
+
+static std::string capture_stderr(std::function<void()> fn) {
+  fflush(stderr);
+  int pipefd[2];
+  if (_pipe(pipefd, 65536, _O_BINARY) == -1)
+    return "";
+  int saved = _dup(_fileno(stderr));
+  _dup2(pipefd[1], _fileno(stderr));
+  _close(pipefd[1]);
+  fn();
+  fflush(stderr);
+  _dup2(saved, _fileno(stderr));
+  _close(saved);
+  std::string result;
+  char buf[4096];
+  int n;
+  while ((n = _read(pipefd[0], buf, sizeof(buf))) > 0)
+    result.append(buf, n);
+  _close(pipefd[0]);
+  return result;
+}
+#else
+#include <unistd.h>
 static std::string capture_stdout(std::function<void()> fn) {
   fflush(stdout);
   int pipefd[2];
@@ -101,6 +149,7 @@ static std::string capture_stderr(std::function<void()> fn) {
   close(pipefd[0]);
   return result;
 }
+#endif
 
 // --- Mock LLM Provider ---
 
@@ -253,10 +302,22 @@ TEST_F(AgentCommandsIntegrationTest, RequestWithPositionalArg) {
 // ========== Scenario 4: --json output ==========
 
 TEST_F(AgentCommandsIntegrationTest, RequestJsonOutput) {
-  int ret = -1;
-  auto out = capture_stdout([&]() {
-    ret = agent_cmds_->RequestCommand({"-m", "json test", "--json"});
-  });
+  // Use C++ stream redirection instead of fd-level dup2 to avoid
+  // TSAN data race with background WebSocket threads.
+  // RAII guard: restores std::cout even if RequestCommand throws.
+  std::ostringstream oss;
+  std::streambuf* old_buf = std::cout.rdbuf(oss.rdbuf());
+  struct CoutGuard {
+    std::streambuf* buf;
+    ~CoutGuard() {
+      std::cout.flush();
+      std::cout.rdbuf(buf);
+    }
+  } guard{old_buf};
+  int ret = agent_cmds_->RequestCommand({"-m", "json test", "--json"});
+  std::cout.flush();
+  std::string out = oss.str();
+
   EXPECT_EQ(ret, 0);
   // JSON output should be valid and contain response/sessionKey
   auto json = nlohmann::json::parse(out, nullptr, false);

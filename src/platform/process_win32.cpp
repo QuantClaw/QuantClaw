@@ -10,8 +10,10 @@
 
 #include "quantclaw/platform/process.hpp"
 
+// clang-format off
+#include <windows.h>  // must precede psapi.h
 #include <psapi.h>
-#include <windows.h>
+// clang-format on
 
 namespace quantclaw::platform {
 

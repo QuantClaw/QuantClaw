@@ -62,23 +62,45 @@ find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-# IXWebSocket via FetchContent
-include(FetchContent)
-FetchContent_Declare(
-    ixwebsocket
-    GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
-    GIT_TAG        v11.4.5
-)
+# IXWebSocket: try vcpkg first, fallback to FetchContent
 set(USE_TLS ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(ixwebsocket)
+set(USE_OPEN_SSL ON CACHE BOOL "" FORCE)
+set(USE_MBED_TLS OFF CACHE BOOL "" FORCE)
+find_package(ixwebsocket CONFIG QUIET)
+if(ixwebsocket_FOUND)
+    # vcpkg provides ixwebsocket::ixwebsocket
+    set(IXWEBSOCKET_TARGET ixwebsocket::ixwebsocket)
+else()
+    include(FetchContent)
+    FetchContent_Declare(
+        ixwebsocket
+        GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
+        GIT_TAG        v11.4.6
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(ixwebsocket)
+    # FetchContent provides just ixwebsocket
+    set(IXWEBSOCKET_TARGET ixwebsocket)
+endif()
 
-FetchContent_Declare(
-    cpp-httplib
-    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-    GIT_TAG        v0.18.3
-)
+# cpp-httplib: try vcpkg first, fallback to FetchContent
 set(HTTPLIB_COMPILE OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(cpp-httplib)
+find_package(httplib CONFIG QUIET)
+if(NOT httplib_FOUND)
+    if(NOT DEFINED fetchcontent_included)
+        include(FetchContent)
+        set(fetchcontent_included TRUE)
+    endif()
+    set(HTTPLIB_REQUIRE_OPENSSL ON CACHE BOOL "" FORCE)
+    set(HTTPLIB_REQUIRE_ZLIB ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        httplib
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG        v0.18.3
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(httplib)
+endif()
 
 # Source files - explicitly listed
 set(QUANTCLAW_CORE_SOURCES
@@ -151,7 +173,7 @@ set(QUANTCLAW_CORE_SOURCES
     # Web
     src/web/web_server.cpp
     src/web/api_routes.cpp
-    # IPC — single TCP implementation for all platforms
+    # IPC - single TCP implementation for all platforms
     src/platform/ipc_tcp.cpp
 )
 
@@ -168,7 +190,7 @@ else()
     )
 endif()
 
-# ── Build-time metadata ────────────────────────────────────────────────────
+# --- Build-time metadata ---
 # Git commit hash (short, 7 chars).  Falls back to "unknown" outside a repo.
 execute_process(
     COMMAND git rev-parse --short HEAD
@@ -192,12 +214,16 @@ target_include_directories(quantclaw_core
 )
 
 target_compile_definitions(quantclaw_core PUBLIC
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
     QUANTCLAW_VERSION="${PROJECT_VERSION}"
     QUANTCLAW_BUILD_DATE="${QC_BUILD_DATE}"
     QUANTCLAW_GIT_COMMIT="${QC_GIT_COMMIT}"
 )
 
 target_compile_definitions(quantclaw_core PUBLIC
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
     CPPHTTPLIB_OPENSSL_SUPPORT
 )
 
@@ -205,7 +231,7 @@ target_link_libraries(quantclaw_core
     PUBLIC
         spdlog::spdlog
         nlohmann_json::nlohmann_json
-        ixwebsocket
+        ${IXWEBSOCKET_TARGET}
         httplib::httplib
     PRIVATE
         CURL::libcurl
@@ -213,9 +239,9 @@ target_link_libraries(quantclaw_core
         OpenSSL::Crypto
 )
 
-# WinSock2 required by ipc_tcp.cpp on Windows
+# WinSock2 and BCrypt (needed by mbedtls) required on Windows
 if(WIN32)
-    target_link_libraries(quantclaw_core PUBLIC ws2_32)
+    target_link_libraries(quantclaw_core PUBLIC ws2_32 bcrypt)
 endif()
 
 add_executable(quantclaw src/main.cpp)
@@ -231,11 +257,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(quantclaw PRIVATE -Wall -Wextra -O2)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_options(quantclaw_core PRIVATE /W4 /Od /RTC1)
-        target_compile_options(quantclaw PRIVATE /W4 /Od /RTC1)
+        target_compile_options(quantclaw_core PRIVATE /W4 /Od /RTC1 /EHsc)
+        target_compile_options(quantclaw PRIVATE /W4 /Od /RTC1 /EHsc)
     else()
-        target_compile_options(quantclaw_core PRIVATE /W4 /O2)
-        target_compile_options(quantclaw PRIVATE /W4 /O2)
+        target_compile_options(quantclaw_core PRIVATE /W4 /O2 /EHsc)
+        target_compile_options(quantclaw PRIVATE /W4 /O2 /EHsc)
     endif()
 endif()
 
@@ -243,13 +269,19 @@ install(TARGETS quantclaw DESTINATION bin)
 
 # --- Tests ---
 if(BUILD_TESTS)
-    FetchContent_Declare(
-        googletest
-        GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG        v1.14.0
-    )
+    # googletest: try vcpkg/system first, fallback to FetchContent
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(googletest)
+    find_package(GTest CONFIG QUIET)
+    if(NOT GTest_FOUND)
+        include(FetchContent)
+        FetchContent_Declare(
+            googletest
+            GIT_REPOSITORY https://github.com/google/googletest.git
+            GIT_TAG        v1.15.2
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(googletest)
+    endif()
 
     enable_testing()
 
@@ -316,5 +348,23 @@ if(BUILD_TESTS)
     )
 
     include(GoogleTest)
-    gtest_discover_tests(quantclaw_tests)
+    if(WIN32)
+        # On Windows, vcpkg DLLs are in vcpkg_installed/<triplet>/bin; add them
+        # to PATH so gtest_discover_tests can run the binary to list tests, and
+        # so ctest can run the tests themselves.
+        set(VCPKG_DLL_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/bin")
+        # ENVIRONMENT entries are a CMake semicolon-separated list, so the
+        # PATH value must have its semicolons escaped as \; to avoid being
+        # split into separate list items.
+        string(REPLACE ";" "\\;" _escaped_system_path "$ENV{PATH}")
+        gtest_discover_tests(quantclaw_tests
+            DISCOVERY_MODE PRE_TEST
+            PROPERTIES ENVIRONMENT "PATH=${VCPKG_DLL_DIR}\\;${_escaped_system_path}"
+        )
+    else()
+        gtest_discover_tests(quantclaw_tests)
+    endif()
 endif()
+
+
+

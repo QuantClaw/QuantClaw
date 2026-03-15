@@ -17,6 +17,15 @@
 #include "test_helpers.hpp"
 #include <gtest/gtest.h>
 
+// Windows SDK defines StartService/StopService as macros; undefine them
+// to allow calling quantclaw::PluginSystem::StartService/StopService.
+#ifdef StartService
+#undef StartService
+#endif
+#ifdef StopService
+#undef StopService
+#endif
+
 namespace fs = std::filesystem;
 
 static std::shared_ptr<spdlog::logger>
