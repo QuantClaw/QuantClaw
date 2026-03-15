@@ -412,8 +412,10 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Bootstrap vcpkg
+    - name: Update and bootstrap vcpkg
       run: |
+        git -C "$env:VCPKG_INSTALLATION_ROOT" fetch --depth=1
+        git -C "$env:VCPKG_INSTALLATION_ROOT" checkout FETCH_HEAD
         & "$env:VCPKG_INSTALLATION_ROOT\bootstrap-vcpkg.bat" -disableMetrics
         & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install --triplet x64-windows
 
