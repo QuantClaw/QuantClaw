@@ -61,6 +61,52 @@ void register_rpc_handlers(
 
 // --- Capture helpers ---
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+static std::string capture_stdout(std::function<void()> fn) {
+  fflush(stdout);
+  int pipefd[2];
+  if (_pipe(pipefd, 65536, _O_BINARY) == -1)
+    return "";
+  int saved = _dup(_fileno(stdout));
+  _dup2(pipefd[1], _fileno(stdout));
+  _close(pipefd[1]);
+  fn();
+  fflush(stdout);
+  _dup2(saved, _fileno(stdout));
+  _close(saved);
+  std::string result;
+  char buf[4096];
+  int n;
+  while ((n = _read(pipefd[0], buf, sizeof(buf))) > 0)
+    result.append(buf, n);
+  _close(pipefd[0]);
+  return result;
+}
+
+static std::string capture_stderr(std::function<void()> fn) {
+  fflush(stderr);
+  int pipefd[2];
+  if (_pipe(pipefd, 65536, _O_BINARY) == -1)
+    return "";
+  int saved = _dup(_fileno(stderr));
+  _dup2(pipefd[1], _fileno(stderr));
+  _close(pipefd[1]);
+  fn();
+  fflush(stderr);
+  _dup2(saved, _fileno(stderr));
+  _close(saved);
+  std::string result;
+  char buf[4096];
+  int n;
+  while ((n = _read(pipefd[0], buf, sizeof(buf))) > 0)
+    result.append(buf, n);
+  _close(pipefd[0]);
+  return result;
+}
+#else
+#include <unistd.h>
 static std::string capture_stdout(std::function<void()> fn) {
   fflush(stdout);
   int pipefd[2];
@@ -102,6 +148,7 @@ static std::string capture_stderr(std::function<void()> fn) {
   close(pipefd[0]);
   return result;
 }
+#endif
 
 // --- Mock LLM Provider ---
 

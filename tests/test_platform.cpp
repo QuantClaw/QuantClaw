@@ -32,13 +32,21 @@ TEST(PlatformProcess, ExecCaptureEcho) {
 }
 
 TEST(PlatformProcess, ExecCaptureFail) {
+#ifdef _WIN32
+  auto result = exec_capture("cmd /c exit 1", 5);
+#else
   auto result = exec_capture("false", 5);
+#endif
   EXPECT_NE(result.exit_code, 0);
 }
 
 TEST(PlatformProcess, SpawnAndWait) {
   // Spawn a short-lived process
+#ifdef _WIN32
+  std::vector<std::string> args = {"cmd", "/c", "ping -n 1 127.0.0.1 >nul"};
+#else
   std::vector<std::string> args = {"sleep", "0.1"};
+#endif
   auto pid = spawn_process(args);
   ASSERT_NE(pid, kInvalidPid);
   EXPECT_TRUE(is_process_alive(pid));
@@ -52,15 +60,24 @@ TEST(PlatformProcess, SpawnAndWait) {
 TEST(PlatformProcess, SpawnInvalidBinary) {
   std::vector<std::string> args = {"/nonexistent/binary_xyz_123"};
   auto pid = spawn_process(args);
+#ifdef _WIN32
+  // On Windows, CreateProcess fails and returns kInvalidPid
+  EXPECT_EQ(pid, kInvalidPid);
+#else
   // On Unix, fork succeeds but exec fails — child exits with 127
   if (pid != kInvalidPid) {
     int exit_code = wait_process(pid, 2000);
     EXPECT_EQ(exit_code, 127);
   }
+#endif
 }
 
 TEST(PlatformProcess, TerminateProcess) {
+#ifdef _WIN32
+  std::vector<std::string> args = {"cmd", "/c", "ping -n 60 127.0.0.1 >nul"};
+#else
   std::vector<std::string> args = {"sleep", "60"};
+#endif
   auto pid = spawn_process(args);
   ASSERT_NE(pid, kInvalidPid);
   EXPECT_TRUE(is_process_alive(pid));
@@ -73,7 +90,11 @@ TEST(PlatformProcess, TerminateProcess) {
 }
 
 TEST(PlatformProcess, KillProcess) {
+#ifdef _WIN32
+  std::vector<std::string> args = {"cmd", "/c", "ping -n 60 127.0.0.1 >nul"};
+#else
   std::vector<std::string> args = {"sleep", "60"};
+#endif
   auto pid = spawn_process(args);
   ASSERT_NE(pid, kInvalidPid);
 
@@ -83,7 +104,11 @@ TEST(PlatformProcess, KillProcess) {
 }
 
 TEST(PlatformProcess, SpawnWithEnv) {
+#ifdef _WIN32
+  std::vector<std::string> args = {"cmd", "/c", "set"};
+#else
   std::vector<std::string> args = {"env"};
+#endif
   std::vector<std::string> env = {"TEST_PLATFORM_VAR=hello123"};
   auto pid = spawn_process(args, env);
   ASSERT_NE(pid, kInvalidPid);
@@ -91,7 +116,11 @@ TEST(PlatformProcess, SpawnWithEnv) {
 }
 
 TEST(PlatformProcess, WaitNonBlockingNotExited) {
+#ifdef _WIN32
+  std::vector<std::string> args = {"cmd", "/c", "ping -n 60 127.0.0.1 >nul"};
+#else
   std::vector<std::string> args = {"sleep", "60"};
+#endif
   auto pid = spawn_process(args);
   ASSERT_NE(pid, kInvalidPid);
 

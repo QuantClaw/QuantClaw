@@ -1,12 +1,20 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <unistd.h>
-
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+
+#ifdef _WIN32
+#include <process.h>
+#define test_getpid() _getpid()
+#define test_setenv(name, value) _putenv_s(name, value)
+#else
+#include <unistd.h>
+#define test_getpid() getpid()
+#define test_setenv(name, value) setenv(name, value, 1)
+#endif
 
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
@@ -24,8 +32,14 @@ class DaemonManagerTest : public ::testing::Test {
     // Use a temp directory as HOME so we don't touch the real system
     test_home_ = quantclaw::test::MakeTestDir("quantclaw_daemon_test");
 
+#ifdef _WIN32
+    original_home_ = std::getenv("USERPROFILE") ? std::getenv("USERPROFILE") : "";
+    test_setenv("USERPROFILE", test_home_.string().c_str());
+    test_setenv("HOME", test_home_.string().c_str());
+#else
     original_home_ = std::getenv("HOME") ? std::getenv("HOME") : "";
-    setenv("HOME", test_home_.c_str(), 1);
+    test_setenv("HOME", test_home_.string().c_str());
+#endif
 
     auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
     logger_ = std::make_shared<spdlog::logger>("test_daemon", null_sink);
@@ -37,7 +51,10 @@ class DaemonManagerTest : public ::testing::Test {
     daemon_.reset();
     // Restore HOME
     if (!original_home_.empty()) {
-      setenv("HOME", original_home_.c_str(), 1);
+#ifdef _WIN32
+      test_setenv("USERPROFILE", original_home_.c_str());
+#endif
+      test_setenv("HOME", original_home_.c_str());
     }
     if (std::filesystem::exists(test_home_)) {
       std::filesystem::remove_all(test_home_);
@@ -110,7 +127,7 @@ TEST_F(DaemonManagerTest, IsRunningNoPidFile) {
 
 TEST_F(DaemonManagerTest, IsRunningCurrentProcess) {
   // Write our own PID — the current process is definitely running
-  write_pid_file(getpid());
+  write_pid_file(test_getpid());
   EXPECT_TRUE(daemon_->IsRunning());
 }
 
@@ -133,7 +150,7 @@ TEST_F(DaemonManagerTest, IsRunningZeroPid) {
 // --- Multiple constructions ---
 
 TEST_F(DaemonManagerTest, MultipleInstancesSharePidFile) {
-  write_pid_file(getpid());
+  write_pid_file(test_getpid());
 
   auto daemon2 = std::make_unique<DaemonManager>(logger_);
   EXPECT_EQ(daemon_->GetPid(), daemon2->GetPid());

@@ -7,12 +7,13 @@
 #include "quantclaw/security/sandbox.hpp"
 
 #include <gtest/gtest.h>
+
+#include "test_helpers.hpp"
+
 #ifdef __linux__
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
-#include "test_helpers.hpp"
 #endif
 
 class SandboxTest : public ::testing::Test {
