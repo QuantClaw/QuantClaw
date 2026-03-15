@@ -408,9 +408,20 @@ jobs:
     runs-on: windows-latest
     env:
       VCPKG_DEFAULT_TRIPLET: x64-windows
+      # Direct vcpkg binary cache to a workspace-local dir so actions/cache
+      # can persist it across runs (avoids re-compiling all vcpkg packages).
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg-bincache,readwrite"
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Cache vcpkg binary packages
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/vcpkg-bincache
+        # Bust the cache when manifest dependencies change.
+        key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
+        restore-keys: vcpkg-x64-windows-
 
     - name: Update and bootstrap vcpkg
       run: |
