@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/quantclaw-logo-transparent.png" alt="QuantClaw" width="180" />
+  <img src="assets/quantclaw-logo-white-0307.png" alt="QuantClaw" width="180" />
 </p>
 
 <h1 align="center">QuantClaw</h1>
@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/协议-Apache%202.0-blue.svg" alt="Apache 2.0 协议"></a>
   <a href="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml"><img src="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml/badge.svg" alt="CI 构建"></a>
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus&logoColor=white" alt="C++17">
-  <img src="https://img.shields.io/badge/单测-886%20通过-brightgreen.svg" alt="886 项单测通过">
+  <img src="https://img.shields.io/badge/单测-996%20通过-brightgreen.svg" alt="996 项单测通过">
   <img src="https://img.shields.io/badge/平台-Linux%20%7C%20Windows-lightgrey.svg" alt="Linux | Windows">
   <a href="https://github.com/openclaw/openclaw"><img src="https://img.shields.io/badge/OpenClaw-兼容-orange.svg" alt="OpenClaw 兼容"></a>
 </p>

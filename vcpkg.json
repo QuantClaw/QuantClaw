@@ -1,0 +1,10 @@
+{
+  "name": "quantclaw",
+  "version-string": "0.3.0",
+  "dependencies": [
+    "spdlog",
+    "nlohmann-json",
+    "curl",
+    "openssl"
+  ]
+}
