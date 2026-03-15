@@ -85,23 +85,40 @@ void GatewayServer::BroadcastEvent(const std::string& event,
   evt.payload = payload;
   std::string msg = evt.ToJson().dump();
 
-  std::lock_guard<std::mutex> lock(connections_mutex_);
-  for (auto& [id, ws] : ws_connections_) {
-    if (ws && connections_.count(id)) {
-      ws->send(msg);
+  // Snapshot WebSocket pointers under the mutex, then send outside it.
+  // Prevents lock-order inversion: connections_mutex_ -> ixwebsocket internal
+  // (from ws->send) vs ixwebsocket internal -> connections_mutex_ (from the
+  // on_connection callback invoked by the ixwebsocket server thread).
+  std::vector<ix::WebSocket*> targets;
+  {
+    std::lock_guard<std::mutex> lock(connections_mutex_);
+    targets.reserve(ws_connections_.size());
+    for (auto& [id, ws] : ws_connections_) {
+      if (ws && connections_.count(id)) {
+        targets.push_back(ws);
+      }
     }
+  }
+  for (auto* ws : targets) {
+    ws->send(msg);
   }
 }
 
 void GatewayServer::SendEventTo(const std::string& connection_id,
                                 const RpcEvent& event) {
-  std::lock_guard<std::mutex> lock(connections_mutex_);
-  if (connections_.count(connection_id) == 0) {
-    return;
+  ix::WebSocket* target = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(connections_mutex_);
+    if (connections_.count(connection_id) == 0) {
+      return;
+    }
+    auto it = ws_connections_.find(connection_id);
+    if (it != ws_connections_.end()) {
+      target = it->second;
+    }
   }
-  auto it = ws_connections_.find(connection_id);
-  if (it != ws_connections_.end() && it->second) {
-    it->second->send(event.ToJson().dump());
+  if (target) {
+    target->send(event.ToJson().dump());
   }
 }
 
@@ -120,12 +137,19 @@ void GatewayServer::SendResponseTo(const std::string& connection_id,
     resp.error.retry_after_ms = payload_or_error.value("retryAfterMs", 0);
   }
 
-  std::lock_guard<std::mutex> lock(connections_mutex_);
-  if (connections_.count(connection_id) == 0)
-    return;
-  auto it = ws_connections_.find(connection_id);
-  if (it != ws_connections_.end() && it->second) {
-    it->second->send(resp.ToJson().dump());
+  std::string payload_str = resp.ToJson().dump();
+  ix::WebSocket* target = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(connections_mutex_);
+    if (connections_.count(connection_id) == 0)
+      return;
+    auto it = ws_connections_.find(connection_id);
+    if (it != ws_connections_.end()) {
+      target = it->second;
+    }
+  }
+  if (target) {
+    target->send(payload_str);
   }
 }
 
@@ -147,6 +171,15 @@ int64_t GatewayServer::GetUptimeSeconds() const {
 
 nlohmann::json GatewayServer::BuildSnapshot() const {
   nlohmann::json snapshot;
+
+  // Read auth mode first. Lock ordering convention: auth_mutex_ must always be
+  // acquired before connections_mutex_ (same order as handle_hello) to prevent
+  // a lock-order-inversion TSAN warning.
+  std::string current_auth_mode;
+  {
+    std::lock_guard<std::mutex> lock(auth_mutex_);
+    current_auth_mode = auth_mode_;
+  }
 
   // Presence: list of connected, authenticated clients
   nlohmann::json presence = nlohmann::json::array();
@@ -174,12 +207,7 @@ nlohmann::json GatewayServer::BuildSnapshot() const {
   snapshot["health"] = nlohmann::json::object();
   snapshot["stateVersion"] = {{"presence", 1}, {"health", 0}};
   snapshot["uptimeMs"] = GetUptimeSeconds() * 1000;
-
-  // Auth mode
-  {
-    std::lock_guard<std::mutex> lock(auth_mutex_);
-    snapshot["authMode"] = auth_mode_;
-  }
+  snapshot["authMode"] = current_auth_mode;
 
   // Session defaults
   snapshot["sessionDefaults"] = {{"defaultAgentId", "main"},
@@ -291,13 +319,15 @@ void GatewayServer::handle_rpc_request(const std::string& conn_id,
   {
     std::lock_guard<std::mutex> lock(handlers_mutex_);
     auto it = handlers_.find(request.method);
-    if (it == handlers_.end()) {
-      auto resp = RpcResponse::failure(
-          request.id, "Unknown method: " + request.method, "METHOD_NOT_FOUND");
-      ws.send(resp.ToJson().dump());
-      return;
+    if (it != handlers_.end()) {
+      handler = it->second;
     }
-    handler = it->second;
+  }
+  if (!handler) {
+    auto resp = RpcResponse::failure(
+        request.id, "Unknown method: " + request.method, "METHOD_NOT_FOUND");
+    ws.send(resp.ToJson().dump());
+    return;
   }
 
   ClientConnection* client = nullptr;
