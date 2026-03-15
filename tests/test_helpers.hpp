@@ -14,6 +14,7 @@
 #include <process.h>
 #include <winsock2.h>
 #pragma comment(lib, "ws2_32.lib")
+typedef int socklen_t;
 #else
 #include <netinet/in.h>
 #include <sys/socket.h>

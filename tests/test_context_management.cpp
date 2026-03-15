@@ -5,6 +5,10 @@
 #include <filesystem>
 #include <fstream>
 
+#ifdef _WIN32
+#include <process.h>
+#endif
+
 #include <nlohmann/json.hpp>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
@@ -200,11 +204,18 @@ class BM25SearchTest : public ::testing::Test {
 
     // Create a unique temp directory to avoid conflicts when ctest --parallel
     // runs each GTest case as a separate process sharing the same /tmp path.
+#ifdef _WIN32
+    int pid = _getpid();
+    temp_dir_ = std::filesystem::temp_directory_path() /
+                ("bm25_test_" + std::to_string(pid));
+    std::filesystem::create_directories(temp_dir_);
+#else
     std::string tmpl =
         (std::filesystem::temp_directory_path() / "bm25_test_XXXXXX").string();
     char* result = mkdtemp(tmpl.data());
     ASSERT_NE(result, nullptr) << "mkdtemp failed";
     temp_dir_ = result;
+#endif
   }
 
   void TearDown() override {

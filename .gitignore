@@ -1,5 +1,6 @@
 # Build output
 build/
+build-win/
 build_test/
 cmake-build-*/
 Testing/

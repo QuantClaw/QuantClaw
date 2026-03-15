@@ -10,6 +10,12 @@
 #include "quantclaw/plugins/plugin_registry.hpp"
 #include "quantclaw/plugins/sidecar_manager.hpp"
 
+// Windows SDK defines StartService as StartServiceA/StartServiceW macros.
+// Undefine them to avoid collision with our PluginSystem::StartService method.
+#ifdef StartService
+#undef StartService
+#endif
+
 namespace quantclaw {
 
 // Top-level facade that ties together the plugin registry, sidecar, and hooks.

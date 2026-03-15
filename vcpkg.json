@@ -6,6 +6,9 @@
     "spdlog",
     "nlohmann-json",
     "curl",
-    "openssl"
+    "openssl",
+    "ixwebsocket",
+    "gtest",
+    "cpp-httplib"
   ]
 }

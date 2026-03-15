@@ -412,12 +412,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Update and bootstrap vcpkg
+    - name: Bootstrap vcpkg
       run: |
-        git -C "$env:VCPKG_INSTALLATION_ROOT" fetch --depth=1
-        git -C "$env:VCPKG_INSTALLATION_ROOT" checkout FETCH_HEAD
         & "$env:VCPKG_INSTALLATION_ROOT\bootstrap-vcpkg.bat" -disableMetrics
-        & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install --triplet x64-windows
 
     - name: Configure CMake
       run: |

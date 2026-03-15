@@ -10,8 +10,8 @@
 
 #include "quantclaw/platform/process.hpp"
 
-#include <windows.h>
 #include <psapi.h>
+#include <windows.h>
 
 namespace quantclaw::platform {
 

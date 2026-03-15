@@ -38,7 +38,9 @@ struct WinsockInit {
     WSADATA data;
     WSAStartup(MAKEWORD(2, 2), &data);
   }
-  ~WinsockInit() { WSACleanup(); }
+  ~WinsockInit() {
+    WSACleanup();
+  }
 };
 static WinsockInit winsock_init_;
 #endif

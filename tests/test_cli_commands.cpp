@@ -39,6 +39,7 @@ struct ArgHelper {
 // Capture stdout during a callable
 #ifdef _WIN32
 #include <fcntl.h>
+
 #include <io.h>
 static std::string capture_stdout(std::function<void()> fn) {
   fflush(stdout);
