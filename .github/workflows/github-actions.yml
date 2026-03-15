@@ -440,6 +440,14 @@ jobs:
     - name: Build
       run: cmake --build build --config Release --parallel
 
+    - name: Add vcpkg DLLs to PATH
+      # Prepend vcpkg DLL dir to the runner's PATH so both the test binary
+      # and any child processes it spawns (e.g. cmd.exe, ping) can find
+      # system tools alongside vcpkg DLLs.
+      run: |
+        $vcpkgBin = Join-Path $env:GITHUB_WORKSPACE "build\vcpkg_installed\x64-windows\bin"
+        echo $vcpkgBin >> $env:GITHUB_PATH
+
     - name: Run Tests
       working-directory: build
       run: ctest --output-on-failure --parallel -C Release
