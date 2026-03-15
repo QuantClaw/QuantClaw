@@ -8,8 +8,8 @@
 namespace quantclaw {
 
 TemporalDecay::TemporalDecay(double half_life_days)
-    : half_life_days_(half_life_days),
-      lambda_(std::log(2.0) / half_life_days) {}
+    : half_life_days_(half_life_days > 0 ? half_life_days : 30.0),
+      lambda_(std::log(2.0) / half_life_days_) {}
 
 double TemporalDecay::ScoreFromAge(double age_days) const {
   if (age_days <= 0.0)

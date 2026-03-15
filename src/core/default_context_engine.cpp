@@ -90,13 +90,26 @@ DefaultContextEngine::CompactOverflow(const std::vector<Message>& messages,
   // If we have a summary function, try multi-stage compaction for better
   // context preservation. Only for larger histories where it makes sense.
   if (summary_fn_ && static_cast<int>(messages.size()) >= 8) {
+    // Strip leading system messages before summarization to avoid
+    // duplicating the system prompt in the output.
+    std::vector<Message> non_system;
+    for (const auto& m : messages) {
+      if (m.role != "system") {
+        non_system.push_back(m);
+      }
+    }
+
     CompactionOptions opts;
     opts.target_tokens = config_.context_window / 4;  // Target 25% of window
     opts.max_chunk_tokens = 16384;
-    auto result = compactor_.CompactMultiStage(messages, opts, summary_fn_);
-    // Prepend system prompt if provided
+    std::vector<Message> result;
+    // Always prepend system prompt first
     if (!system_prompt.empty()) {
-      result.insert(result.begin(), Message{"system", system_prompt});
+      result.push_back(Message{"system", system_prompt});
+    }
+    auto summary = compactor_.CompactMultiStage(non_system, opts, summary_fn_);
+    for (auto& m : summary) {
+      result.push_back(std::move(m));
     }
     // Keep recent messages after the summary for continuity
     int keep = std::max(

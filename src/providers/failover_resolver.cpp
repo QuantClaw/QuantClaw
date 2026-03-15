@@ -159,10 +159,12 @@ FailoverResolver::try_resolve_model(const std::string& model,
       bool in_cooldown;
       int priority;
       int64_t last_used;
+      int index;  // Original index for stable tie-breaking
     };
     std::vector<Candidate> available;
     std::vector<Candidate> cooled_down;
 
+    int idx = 0;
     for (const auto& profile : prof_it->second) {
       auto key = cooldown_key(provider_id, profile.id);
       auto lu_it = profile_last_used_.find(key);
@@ -170,18 +172,24 @@ FailoverResolver::try_resolve_model(const std::string& model,
           (lu_it != profile_last_used_.end()) ? lu_it->second : 0;
 
       if (cooldown_.IsInCooldown(key)) {
-        cooled_down.push_back({&profile, true, profile.priority, last_used});
+        cooled_down.push_back(
+            {&profile, true, profile.priority, last_used, idx});
       } else {
-        available.push_back({&profile, false, profile.priority, last_used});
+        available.push_back(
+            {&profile, false, profile.priority, last_used, idx});
       }
+      idx++;
     }
 
-    // Sort available: priority ascending, then last_used ascending (LRU first)
+    // Sort available: priority ascending, then last_used ascending (LRU
+    // first), then original index for deterministic tie-breaking.
     std::sort(available.begin(), available.end(),
               [](const Candidate& a, const Candidate& b) {
                 if (a.priority != b.priority)
                   return a.priority < b.priority;
-                return a.last_used < b.last_used;
+                if (a.last_used != b.last_used)
+                  return a.last_used < b.last_used;
+                return a.index < b.index;
               });
 
     // Try available profiles first

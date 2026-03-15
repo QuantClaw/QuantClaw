@@ -214,8 +214,12 @@ class HybridSearchTest : public ::testing::Test {
     auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
     logger_ = std::make_shared<spdlog::logger>("test", null_sink);
 
-    // Create temp directory with test files
-    tmp_dir_ = std::filesystem::temp_directory_path() / "qc_hybrid_test";
+    // Create unique temp directory per test instance
+    tmp_dir_ =
+        std::filesystem::temp_directory_path() /
+        ("qc_hybrid_test_" +
+         std::to_string(
+             std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(tmp_dir_);
 
     // Create test memory files
@@ -229,7 +233,8 @@ class HybridSearchTest : public ::testing::Test {
   }
 
   void TearDown() override {
-    std::filesystem::remove_all(tmp_dir_);
+    std::error_code ec;
+    std::filesystem::remove_all(tmp_dir_, ec);
   }
 
   void write_file(const std::filesystem::path& path,

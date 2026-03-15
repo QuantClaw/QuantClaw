@@ -19,11 +19,9 @@ using SummaryFn = std::function<std::string(const std::vector<Message>&)>;
 
 // Options for multi-stage compaction.
 struct CompactionOptions {
-  int target_tokens = 0;              // Target token budget for output
-  int max_chunk_tokens = 16384;       // Max tokens per chunk before splitting
-  double chunk_ratio = 0.4;           // Target summary/original ratio per chunk
-  double safety_margin = 1.2;         // Over-estimate factor for token counting
-  int summarization_overhead = 4096;  // Token overhead per summarization call
+  int target_tokens = 0;         // Target token budget for output
+  int max_chunk_tokens = 16384;  // Max tokens per chunk before splitting
+  double safety_margin = 1.2;    // Over-estimate factor for token counting
   int min_messages_for_multistage = 8;  // Below this, use single-pass
 };
 

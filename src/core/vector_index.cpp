@@ -32,6 +32,9 @@ float VectorIndex::CosineSimilarity(const std::vector<float>& a,
 
 std::vector<VectorSearchResult>
 VectorIndex::Search(const std::vector<float>& query, int top_k) const {
+  if (top_k <= 0)
+    return {};
+
   std::vector<VectorSearchResult> results;
   results.reserve(entries_.size());
 

@@ -3,12 +3,9 @@
 
 #pragma once
 
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 #include "quantclaw/providers/llm_provider.hpp"
 
@@ -19,19 +16,6 @@ struct AssembleResult {
   std::vector<Message> messages;
   int estimated_tokens = 0;
 };
-
-// Result of context compaction.
-struct CompactResult {
-  bool compacted = false;
-  std::string reason;
-  int messages_before = 0;
-  int messages_after = 0;
-};
-
-// Summary function type: given a list of JSON messages, return a summary
-// string.
-using CompactionSummaryFn =
-    std::function<std::string(const std::vector<nlohmann::json>&)>;
 
 // Abstract context engine interface.
 //
