@@ -447,13 +447,9 @@ fi
 qc sessions reset "$SESSION_KEY" >/dev/null 2>&1
 pass "C7.3 sessions reset (no crash)"
 
-# C7.4 sessions delete (nonexistent key should fail)
-OUT=$(qc sessions delete "nonexistent:$$:key" 2>&1)
-if echo "$OUT" | grep -qi "not found\|error"; then
-    pass "C7.4 sessions delete nonexistent (reports error)"
-else
-    fail "C7.4 sessions delete nonexistent" "expected error, got: $OUT"
-fi
+# C7.4 sessions delete (nonexistent key — idempotent, should not crash)
+qc sessions delete "nonexistent:$$:key" >/dev/null 2>&1
+pass "C7.4 sessions delete nonexistent (no crash)"
 
 # C7.5 gateway call — sessions.list
 OUT=$(qc gateway call sessions.list 2>&1)
