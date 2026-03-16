@@ -71,6 +71,7 @@ class GatewayClient {
   std::mutex hello_mutex_;
   std::condition_variable hello_cv_;
   bool hello_done_ = false;
+  std::string hello_request_id_;  // tracks the hello RPC id for completion
 };
 
 }  // namespace quantclaw::gateway

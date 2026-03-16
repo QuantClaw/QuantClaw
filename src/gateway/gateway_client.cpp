@@ -193,6 +193,10 @@ void GatewayClient::handle_frame(const nlohmann::json& frame) {
                       {"role", "operator"},
                       {"scopes", {"operator.read", "operator.write"}},
                       {"authToken", token_}};
+      {
+        std::lock_guard<std::mutex> lock(hello_mutex_);
+        hello_request_id_ = hello.id;
+      }
       ws_.send(hello.ToJson().dump());
       return;
     }
@@ -215,15 +219,16 @@ void GatewayClient::handle_frame(const nlohmann::json& frame) {
   } else if (type_str == "res") {
     auto id = frame.value("id", "");
 
-    // Check if this is the hello response
-    if (frame.value("ok", false)) {
-      auto payload = frame.value("payload", nlohmann::json::object());
-      if (payload.contains("protocol")) {
-        authenticated_ = true;
-        {
-          std::lock_guard<std::mutex> lock(hello_mutex_);
-          hello_done_ = true;
+    // Check if this is the hello response (success OR failure).
+    // Complete the handshake either way so Connect() returns promptly
+    // instead of waiting the full timeout on auth rejection.
+    {
+      std::lock_guard<std::mutex> lock(hello_mutex_);
+      if (!hello_done_ && id == hello_request_id_) {
+        if (frame.value("ok", false)) {
+          authenticated_ = true;
         }
+        hello_done_ = true;
         hello_cv_.notify_all();
       }
     }
