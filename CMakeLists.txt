@@ -359,7 +359,7 @@ if(BUILD_TESTS)
         string(REPLACE ";" "\\;" _escaped_system_path "$ENV{PATH}")
         gtest_discover_tests(quantclaw_tests
             DISCOVERY_MODE PRE_TEST
-            PROPERTIES ENVIRONMENT "PATH=${VCPKG_DLL_DIR}\\;${_escaped_system_path}"
+            PROPERTIES ENVIRONMENT "PATH=${VCPKG_DLL_DIR}\;${_escaped_system_path}"
         )
     else()
         gtest_discover_tests(quantclaw_tests)
