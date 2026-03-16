@@ -3,12 +3,14 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <mutex>
 #include <set>
 #include <string>
+#include <thread>
 
 #ifdef _WIN32
 #include <process.h>
@@ -109,6 +111,42 @@ inline std::filesystem::path MakeTestDir(const std::string& base_name) {
               (base_name + "_" + std::to_string(pid));
   std::filesystem::create_directories(path);
   return path;
+}
+
+/// Blocks until a TCP connection to localhost:port succeeds or timeout_ms
+/// elapses.  Used in test fixtures to wait for a server to be fully ready
+/// instead of a blind sleep_for(), which is unreliable under CI load or
+/// TSan slowdown.
+///
+/// @return true if the server accepted a probe connection within the timeout.
+inline bool WaitForServerReady(int port, int timeout_ms = 5000) {
+  auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+
+  while (std::chrono::steady_clock::now() < deadline) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0)
+      return false;
+
+    struct sockaddr_in addr;
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = htons(static_cast<uint16_t>(port));
+
+    int rc =
+        connect(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr));
+#ifdef _WIN32
+    closesocket(sock);
+#else
+    close(sock);
+#endif
+    if (rc == 0) {
+      return true;  // Server is accepting connections
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+  }
+  return false;
 }
 
 }  // namespace quantclaw::test

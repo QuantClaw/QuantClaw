@@ -26,11 +26,15 @@ class AgentCommands {
   void SetAuthToken(const std::string& token) {
     auth_token_ = token;
   }
+  void SetDefaultTimeoutMs(int ms) {
+    default_timeout_ms_ = ms;
+  }
 
  private:
   std::shared_ptr<spdlog::logger> logger_;
   std::string gateway_url_ = kDefaultGatewayUrl;
   std::string auth_token_;
+  int default_timeout_ms_ = 120000;
 };
 
 }  // namespace quantclaw::cli

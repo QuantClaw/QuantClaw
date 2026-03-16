@@ -60,96 +60,36 @@ void register_rpc_handlers(
 }  // namespace quantclaw::gateway
 
 // --- Capture helpers ---
+// Use C++ stream redirection instead of fd-level dup2 to avoid
+// TSAN data races with background WebSocket threads.
 
-#ifdef _WIN32
-#include <fcntl.h>
-
-#include <io.h>
 static std::string capture_stdout(std::function<void()> fn) {
-  fflush(stdout);
-  int pipefd[2];
-  if (_pipe(pipefd, 65536, _O_BINARY) == -1)
-    return "";
-  int saved = _dup(_fileno(stdout));
-  _dup2(pipefd[1], _fileno(stdout));
-  _close(pipefd[1]);
-  fn();
-  fflush(stdout);
-  _dup2(saved, _fileno(stdout));
-  _close(saved);
-  std::string result;
-  char buf[4096];
-  int n;
-  while ((n = _read(pipefd[0], buf, sizeof(buf))) > 0)
-    result.append(buf, n);
-  _close(pipefd[0]);
-  return result;
+  std::ostringstream oss;
+  std::streambuf* saved = std::cout.rdbuf(oss.rdbuf());
+  try {
+    fn();
+  } catch (...) {
+    std::cout.rdbuf(saved);
+    throw;
+  }
+  std::cout.flush();
+  std::cout.rdbuf(saved);
+  return oss.str();
 }
 
 static std::string capture_stderr(std::function<void()> fn) {
-  fflush(stderr);
-  int pipefd[2];
-  if (_pipe(pipefd, 65536, _O_BINARY) == -1)
-    return "";
-  int saved = _dup(_fileno(stderr));
-  _dup2(pipefd[1], _fileno(stderr));
-  _close(pipefd[1]);
-  fn();
-  fflush(stderr);
-  _dup2(saved, _fileno(stderr));
-  _close(saved);
-  std::string result;
-  char buf[4096];
-  int n;
-  while ((n = _read(pipefd[0], buf, sizeof(buf))) > 0)
-    result.append(buf, n);
-  _close(pipefd[0]);
-  return result;
+  std::ostringstream oss;
+  std::streambuf* saved = std::cerr.rdbuf(oss.rdbuf());
+  try {
+    fn();
+  } catch (...) {
+    std::cerr.rdbuf(saved);
+    throw;
+  }
+  std::cerr.flush();
+  std::cerr.rdbuf(saved);
+  return oss.str();
 }
-#else
-#include <unistd.h>
-static std::string capture_stdout(std::function<void()> fn) {
-  fflush(stdout);
-  int pipefd[2];
-  if (pipe(pipefd) == -1)
-    return "";
-  int saved = dup(STDOUT_FILENO);
-  dup2(pipefd[1], STDOUT_FILENO);
-  close(pipefd[1]);
-  fn();
-  fflush(stdout);
-  dup2(saved, STDOUT_FILENO);
-  close(saved);
-  std::string result;
-  char buf[4096];
-  ssize_t n;
-  while ((n = read(pipefd[0], buf, sizeof(buf))) > 0)
-    result.append(buf, n);
-  close(pipefd[0]);
-  return result;
-}
-
-static std::string capture_stderr(std::function<void()> fn) {
-  fflush(stderr);
-  int pipefd[2];
-  if (pipe(pipefd) == -1)
-    return "";
-  int saved = dup(STDERR_FILENO);
-  dup2(pipefd[1], STDERR_FILENO);
-  close(pipefd[1]);
-  fn();
-  fflush(stderr);
-  dup2(saved, STDERR_FILENO);
-  close(saved);
-  std::string result;
-  char buf[4096];
-  ssize_t n;
-  while ((n = read(pipefd[0], buf, sizeof(buf))) > 0)
-    result.append(buf, n);
-  close(pipefd[0]);
-  return result;
-}
-#endif
 
 // --- Mock LLM Provider ---
 
@@ -233,11 +173,18 @@ class AgentCommandsIntegrationTest : public ::testing::Test {
                                               agent_loop_, prompt_builder_,
                                               tool_registry_, config_, logger_);
     server_->Start();
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-    // Prepare AgentCommands pointing at our mock gateway
+    // Wait until the server actually accepts connections instead of a
+    // blind sleep.  Under heavy CI load or TSan slowdown the previous
+    // 200 ms was sometimes not enough, causing flaky timeouts.
+    quantclaw::test::WaitForServerReady(port_, 5000);
+
+    // Prepare AgentCommands pointing at our mock gateway.
+    // Use a 30 s timeout instead of the production default (120 s) so that
+    // a stuck test fails fast rather than exhausting the ctest timeout.
     agent_cmds_ = std::make_unique<quantclaw::cli::AgentCommands>(logger_);
     agent_cmds_->SetGatewayUrl("ws://127.0.0.1:" + std::to_string(port_));
+    agent_cmds_->SetDefaultTimeoutMs(30000);
   }
 
   void TearDown() override {
@@ -302,21 +249,10 @@ TEST_F(AgentCommandsIntegrationTest, RequestWithPositionalArg) {
 // ========== Scenario 4: --json output ==========
 
 TEST_F(AgentCommandsIntegrationTest, RequestJsonOutput) {
-  // Use C++ stream redirection instead of fd-level dup2 to avoid
-  // TSAN data race with background WebSocket threads.
-  // RAII guard: restores std::cout even if RequestCommand throws.
-  std::ostringstream oss;
-  std::streambuf* old_buf = std::cout.rdbuf(oss.rdbuf());
-  struct CoutGuard {
-    std::streambuf* buf;
-    ~CoutGuard() {
-      std::cout.flush();
-      std::cout.rdbuf(buf);
-    }
-  } guard{old_buf};
-  int ret = agent_cmds_->RequestCommand({"-m", "json test", "--json"});
-  std::cout.flush();
-  std::string out = oss.str();
+  int ret = -1;
+  auto out = capture_stdout([&]() {
+    ret = agent_cmds_->RequestCommand({"-m", "json test", "--json"});
+  });
 
   EXPECT_EQ(ret, 0);
   // JSON output should be valid and contain response/sessionKey

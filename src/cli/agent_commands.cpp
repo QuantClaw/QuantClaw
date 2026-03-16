@@ -20,7 +20,7 @@ int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
   std::string model;
   bool json_output = false;
   bool no_session = false;
-  int timeout_ms = 120000;
+  int timeout_ms = default_timeout_ms_;
 
   for (size_t i = 0; i < args.size(); ++i) {
     const auto& arg = args[i];
