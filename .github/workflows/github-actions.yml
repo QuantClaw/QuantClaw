@@ -394,7 +394,9 @@ jobs:
         ASAN_OPTIONS: ${{ matrix.sanitizer == 'asan' && 'detect_leaks=1:halt_on_error=1' || '' }}
         TSAN_OPTIONS: ${{ matrix.sanitizer == 'tsan' && 'halt_on_error=1' || '' }}
         UBSAN_OPTIONS: ${{ matrix.sanitizer == 'ubsan' && 'halt_on_error=1:print_stacktrace=1' || '' }}
-      run: ctest --output-on-failure --parallel --timeout 120
+      # Sanitizers add 5-20x overhead; integration tests (WebSocket + RPC)
+      # need more than the default 120s to avoid flaky timeouts.
+      run: ctest --output-on-failure --parallel --timeout 300
 
     - name: Upload results on failure
       if: failure()

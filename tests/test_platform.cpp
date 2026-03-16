@@ -43,9 +43,10 @@ TEST(PlatformProcess, ExecCaptureFail) {
 TEST(PlatformProcess, SpawnAndWait) {
   // Spawn a short-lived process
 #ifdef _WIN32
-  // Use ping instead of timeout: timeout.exe fails in non-interactive CI
-  // environments (stdin redirected), while ping works without a TTY.
-  std::vector<std::string> args = {"cmd", "/c", "ping -n 2 127.0.0.1 >nul"};
+  // Use absolute paths: CMake's PROPERTIES ENVIRONMENT may restrict PATH,
+  // preventing cmd.exe from finding ping.exe via relative name.
+  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c",
+                                   "C:\\Windows\\System32\\PING.EXE -n 2 127.0.0.1 >nul"};
 #else
   std::vector<std::string> args = {"sleep", "0.1"};
 #endif
@@ -76,7 +77,8 @@ TEST(PlatformProcess, SpawnInvalidBinary) {
 
 TEST(PlatformProcess, TerminateProcess) {
 #ifdef _WIN32
-  std::vector<std::string> args = {"cmd", "/c", "ping -n 60 127.0.0.1 >nul"};
+  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c",
+                                   "C:\\Windows\\System32\\PING.EXE -n 60 127.0.0.1 >nul"};
 #else
   std::vector<std::string> args = {"sleep", "60"};
 #endif
@@ -93,7 +95,8 @@ TEST(PlatformProcess, TerminateProcess) {
 
 TEST(PlatformProcess, KillProcess) {
 #ifdef _WIN32
-  std::vector<std::string> args = {"cmd", "/c", "ping -n 60 127.0.0.1 >nul"};
+  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c",
+                                   "C:\\Windows\\System32\\PING.EXE -n 60 127.0.0.1 >nul"};
 #else
   std::vector<std::string> args = {"sleep", "60"};
 #endif
@@ -107,7 +110,7 @@ TEST(PlatformProcess, KillProcess) {
 
 TEST(PlatformProcess, SpawnWithEnv) {
 #ifdef _WIN32
-  std::vector<std::string> args = {"cmd", "/c", "set"};
+  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c", "set"};
 #else
   std::vector<std::string> args = {"env"};
 #endif
@@ -119,7 +122,8 @@ TEST(PlatformProcess, SpawnWithEnv) {
 
 TEST(PlatformProcess, WaitNonBlockingNotExited) {
 #ifdef _WIN32
-  std::vector<std::string> args = {"cmd", "/c", "ping -n 60 127.0.0.1 >nul"};
+  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c",
+                                   "C:\\Windows\\System32\\PING.EXE -n 60 127.0.0.1 >nul"};
 #else
   std::vector<std::string> args = {"sleep", "60"};
 #endif
