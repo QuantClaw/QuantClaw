@@ -417,6 +417,7 @@ description: Get weather forecast
 emoji: "⛅"
 homepage: "https://weather.example.com"
 skillKey: "weather-v2"
+always: true
 requires:
   bins:
     - curl

@@ -43,8 +43,9 @@ TEST(PlatformProcess, ExecCaptureFail) {
 TEST(PlatformProcess, SpawnAndWait) {
   // Spawn a short-lived process
 #ifdef _WIN32
-  // Use timeout /t 1 which always succeeds and gives the process time to run
-  std::vector<std::string> args = {"cmd", "/c", "timeout /t 1 /nobreak"};
+  // Use ping instead of timeout: timeout.exe fails in non-interactive CI
+  // environments (stdin redirected), while ping works without a TTY.
+  std::vector<std::string> args = {"cmd", "/c", "ping -n 2 127.0.0.1 >nul"};
 #else
   std::vector<std::string> args = {"sleep", "0.1"};
 #endif

@@ -75,7 +75,7 @@ jobs:
 
     - name: Run Tests
       working-directory: build
-      run: ctest --output-on-failure --parallel
+      run: ctest --output-on-failure --parallel --timeout 120
 
     - name: Upload test results
       if: failure()
@@ -394,7 +394,7 @@ jobs:
         ASAN_OPTIONS: ${{ matrix.sanitizer == 'asan' && 'detect_leaks=1:halt_on_error=1' || '' }}
         TSAN_OPTIONS: ${{ matrix.sanitizer == 'tsan' && 'halt_on_error=1' || '' }}
         UBSAN_OPTIONS: ${{ matrix.sanitizer == 'ubsan' && 'halt_on_error=1:print_stacktrace=1' || '' }}
-      run: ctest --output-on-failure --parallel
+      run: ctest --output-on-failure --parallel --timeout 120
 
     - name: Upload results on failure
       if: failure()
@@ -474,7 +474,7 @@ jobs:
 
     - name: Run Tests
       working-directory: build
-      run: ctest --output-on-failure --parallel -C Release
+      run: ctest --output-on-failure --parallel -C Release --timeout 120
 
     - name: Upload test results
       if: failure()
