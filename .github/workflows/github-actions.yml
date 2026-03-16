@@ -415,7 +415,31 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Cache vcpkg binary packages
+    - name: Restore vcpkg binary cache from resources repo (L1)
+      # Try to download pre-built packages from QuantClaw/resources release.
+      # This is the fastest path: no compilation at all.
+      # Falls back gracefully if the release does not exist yet.
+      run: |
+        $baseline = (Get-Content vcpkg.json | ConvertFrom-Json).'builtin-baseline'
+        $short = $baseline.Substring(0, 8)
+        $tag = "vcpkg-windows-x64-$short"
+        $asset = "vcpkg-bincache-windows-x64.tar.gz"
+        $url = "https://github.com/QuantClaw/resources/releases/download/$tag/$asset"
+        Write-Host "Trying to download pre-built cache from: $url"
+        try {
+          Invoke-WebRequest -Uri $url -OutFile $asset -ErrorAction Stop
+          New-Item -ItemType Directory -Force -Path vcpkg-bincache | Out-Null
+          tar -xzf $asset
+          Write-Host "Pre-built vcpkg cache restored from QuantClaw/resources."
+          echo "VCPKG_CACHE_HIT=1" >> $env:GITHUB_ENV
+        } catch {
+          Write-Host "Pre-built cache not available ($($_.Exception.Message)), will compile from source."
+        }
+
+    - name: Cache vcpkg binary packages (L2 fallback)
+      # Used only when the resources release is unavailable (e.g. first build
+      # after a baseline bump).  Persists the freshly-compiled packages so that
+      # the next run hits L1 once the resources workflow publishes the release.
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/vcpkg-bincache
