@@ -45,8 +45,9 @@ TEST(PlatformProcess, SpawnAndWait) {
 #ifdef _WIN32
   // Use absolute paths: CMake's PROPERTIES ENVIRONMENT may restrict PATH,
   // preventing cmd.exe from finding ping.exe via relative name.
-  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c",
-                                   "C:\\Windows\\System32\\PING.EXE -n 2 127.0.0.1 >nul"};
+  std::vector<std::string> args = {
+      "C:\\Windows\\System32\\cmd.exe", "/c",
+      "C:\\Windows\\System32\\PING.EXE -n 2 127.0.0.1 >nul"};
 #else
   std::vector<std::string> args = {"sleep", "0.1"};
 #endif
@@ -77,8 +78,9 @@ TEST(PlatformProcess, SpawnInvalidBinary) {
 
 TEST(PlatformProcess, TerminateProcess) {
 #ifdef _WIN32
-  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c",
-                                   "C:\\Windows\\System32\\PING.EXE -n 60 127.0.0.1 >nul"};
+  std::vector<std::string> args = {
+      "C:\\Windows\\System32\\cmd.exe", "/c",
+      "C:\\Windows\\System32\\PING.EXE -n 60 127.0.0.1 >nul"};
 #else
   std::vector<std::string> args = {"sleep", "60"};
 #endif
@@ -95,8 +97,9 @@ TEST(PlatformProcess, TerminateProcess) {
 
 TEST(PlatformProcess, KillProcess) {
 #ifdef _WIN32
-  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c",
-                                   "C:\\Windows\\System32\\PING.EXE -n 60 127.0.0.1 >nul"};
+  std::vector<std::string> args = {
+      "C:\\Windows\\System32\\cmd.exe", "/c",
+      "C:\\Windows\\System32\\PING.EXE -n 60 127.0.0.1 >nul"};
 #else
   std::vector<std::string> args = {"sleep", "60"};
 #endif
@@ -110,7 +113,8 @@ TEST(PlatformProcess, KillProcess) {
 
 TEST(PlatformProcess, SpawnWithEnv) {
 #ifdef _WIN32
-  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c", "set"};
+  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c",
+                                   "set"};
 #else
   std::vector<std::string> args = {"env"};
 #endif
@@ -122,8 +126,9 @@ TEST(PlatformProcess, SpawnWithEnv) {
 
 TEST(PlatformProcess, WaitNonBlockingNotExited) {
 #ifdef _WIN32
-  std::vector<std::string> args = {"C:\\Windows\\System32\\cmd.exe", "/c",
-                                   "C:\\Windows\\System32\\PING.EXE -n 60 127.0.0.1 >nul"};
+  std::vector<std::string> args = {
+      "C:\\Windows\\System32\\cmd.exe", "/c",
+      "C:\\Windows\\System32\\PING.EXE -n 60 127.0.0.1 >nul"};
 #else
   std::vector<std::string> args = {"sleep", "60"};
 #endif
