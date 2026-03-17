@@ -136,7 +136,7 @@ int SessionCommands::HistoryCommand(const std::vector<std::string>& args) {
             content = c.get<std::string>();
           } else if (c.is_array()) {
             for (const auto& block : c) {
-              if (block.value("type", "") == "text") {
+              if (block.is_object() && block.value("type", "") == "text") {
                 if (!content.empty()) {
                   content += "\n";
                 }

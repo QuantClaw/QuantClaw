@@ -655,15 +655,10 @@ TEST_F(RpcHandlersTest, SessionsDeleteExistingReturnsOk) {
   EXPECT_TRUE(result.value("ok", false));
   EXPECT_TRUE(result.value("deleted", false));
 
-  // Verify it's gone
+  // Verify it's gone — fresh fixture has no other sessions, so the list
+  // must be empty after deletion (stronger than searching for a specific key).
   auto list_result = client->Call("sessions.list", nlohmann::json::object());
-  bool found = false;
-  for (const auto& s : list_result["sessions"]) {
-    if (s.value("key", "") == "agent:del:test:main") {
-      found = true;
-    }
-  }
-  EXPECT_FALSE(found);
+  EXPECT_TRUE(list_result["sessions"].empty());
 
   client->Disconnect();
 }

@@ -27,7 +27,9 @@ class AgentCommands {
     auth_token_ = token;
   }
   void SetDefaultTimeoutMs(int ms) {
-    default_timeout_ms_ = ms;
+    if (ms > 0) {
+      default_timeout_ms_ = ms;
+    }
   }
 
  private:

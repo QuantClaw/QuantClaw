@@ -56,4 +56,12 @@ describe("parseAgentSessionKey", () => {
     expect(result?.agentId).toBe("coder");
     expect(result?.sessionName).toBe("task-42");
   });
+
+  it("returns null for empty agentId segment (agent::session)", () => {
+    expect(parseAgentSessionKey("agent::session")).toBeNull();
+  });
+
+  it("returns null for empty sessionName segment (agent:main:)", () => {
+    expect(parseAgentSessionKey("agent:main:")).toBeNull();
+  });
 });

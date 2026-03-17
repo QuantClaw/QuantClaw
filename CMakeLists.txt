@@ -96,6 +96,8 @@ if(NOT httplib_FOUND)
     find_package(ZLIB QUIET)
     if(ZLIB_FOUND)
         set(HTTPLIB_REQUIRE_ZLIB ON CACHE BOOL "" FORCE)
+    else()
+        set(HTTPLIB_REQUIRE_ZLIB OFF CACHE BOOL "" FORCE)
     endif()
     FetchContent_Declare(
         httplib

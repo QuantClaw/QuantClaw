@@ -40,14 +40,14 @@ inline void close_socket(socket_t s) {
 #endif
 }
 
-// Process-wide list of sockets held by FindFreePort().
+// Process-wide list of (port, socket) pairs held by FindFreePort().
 // Guarded by held_mutex().
 inline std::mutex& held_mutex() {
   static std::mutex mu;
   return mu;
 }
-inline std::vector<socket_t>& held_sockets() {
-  static std::vector<socket_t> v;
+inline std::vector<std::pair<int, socket_t>>& held_sockets() {
+  static std::vector<std::pair<int, socket_t>> v;
   return v;
 }
 
@@ -94,7 +94,7 @@ inline int FindFreePort() {
 
     // Keep the socket bound so the OS won't hand this port to another
     // parallel test process.
-    detail::held_sockets().push_back(sock);
+    detail::held_sockets().push_back({port, sock});
     return port;
   }
   return 0;
@@ -108,10 +108,27 @@ inline int FindFreePort() {
 /// TIME_WAIT — the port is immediately reusable.
 inline void ReleaseHeldPorts() {
   std::lock_guard<std::mutex> lock(detail::held_mutex());
-  for (socket_t s : detail::held_sockets()) {
+  for (auto& [port, s] : detail::held_sockets()) {
     detail::close_socket(s);
   }
   detail::held_sockets().clear();
+}
+
+/// Releases the socket held for a specific port.
+///
+/// Use this when you have multiple servers to start sequentially and want to
+/// release each port reservation only immediately before its server binds,
+/// keeping the others reserved to prevent parallel tests from grabbing them.
+inline void ReleaseHeldPort(int port) {
+  std::lock_guard<std::mutex> lock(detail::held_mutex());
+  auto& socks = detail::held_sockets();
+  for (auto it = socks.begin(); it != socks.end(); ++it) {
+    if (it->first == port) {
+      detail::close_socket(it->second);
+      socks.erase(it);
+      return;
+    }
+  }
 }
 
 /// Creates a temporary test directory that is unique to the current process.
@@ -157,11 +174,7 @@ inline bool WaitForServerReady(int port, int timeout_ms = 5000) {
 
     int rc =
         connect(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr));
-#ifdef _WIN32
-    closesocket(sock);
-#else
-    close(sock);
-#endif
+    detail::close_socket(sock);
     if (rc == 0) {
       return true;  // Server is accepting connections
     }

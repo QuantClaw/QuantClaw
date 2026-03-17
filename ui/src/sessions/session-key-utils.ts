@@ -18,8 +18,8 @@ export function parseAgentSessionKey(
   if (!key) return null;
   const parts = key.split(":");
   if (parts.length < 3 || parts[0] !== "agent") return null;
-  return {
-    agentId: parts[1],
-    sessionName: parts.slice(2).join(":"),
-  };
+  const agentId = parts[1];
+  const sessionName = parts.slice(2).join(":");
+  if (!agentId || !sessionName) return null;
+  return { agentId, sessionName };
 }

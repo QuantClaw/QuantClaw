@@ -1354,11 +1354,25 @@ int main(int argc, char* argv[]) {
          }
          return 0;
 #else
+         // Single-quote the path so spaces and shell metacharacters
+         // in the log file path don't break or inject into the command.
+         auto shell_quote = [](const std::string& s) {
+           std::string out = "'";
+           for (char ch : s) {
+             if (ch == '\'') {
+               out += "'\"'\"'";
+             } else {
+               out += ch;
+             }
+           }
+           out += "'";
+           return out;
+         };
          std::string cmd =
              follow
                  ? "tail -f "
                  : "tail -n " + std::to_string(lines) + " ";
-         cmd += log_file.string();
+         cmd += shell_quote(log_file.string());
          return std::system(cmd.c_str());
 #endif
        }});
