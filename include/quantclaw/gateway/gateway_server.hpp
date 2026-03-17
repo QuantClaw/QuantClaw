@@ -159,10 +159,12 @@ class GatewayServer : public quantclaw::Noncopyable {
 
   mutable std::mutex connections_mutex_;
   std::unordered_map<std::string, ClientConnection> connections_;
-  // Non-owning WebSocket pointers. Lifetime managed by ixwebsocket:
-  // valid from Open callback until Close callback. Always access under
-  // connections_mutex_ and verify key exists in connections_ first.
-  std::unordered_map<std::string, ix::WebSocket*> ws_connections_;
+  // Shared ownership of each WebSocket obtained from server_->getClients() at
+  // Open time. Shared_ptr keeps the object alive across the snapshot-then-send
+  // window in BroadcastEvent / SendEventTo / SendResponseTo, eliminating the
+  // potential use-after-free that existed with raw pointers.
+  std::unordered_map<std::string, std::shared_ptr<ix::WebSocket>>
+      ws_connections_;
 
   std::mutex handlers_mutex_;
   std::unordered_map<std::string, RpcHandler> handlers_;

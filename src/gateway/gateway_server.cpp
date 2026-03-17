@@ -85,28 +85,29 @@ void GatewayServer::BroadcastEvent(const std::string& event,
   evt.payload = payload;
   std::string msg = evt.ToJson().dump();
 
-  // Snapshot WebSocket pointers under the mutex, then send outside it.
-  // Prevents lock-order inversion: connections_mutex_ -> ixwebsocket internal
-  // (from ws->send) vs ixwebsocket internal -> connections_mutex_ (from the
-  // on_connection callback invoked by the ixwebsocket server thread).
-  std::vector<ix::WebSocket*> targets;
+  // Snapshot shared_ptrs under the mutex, then send outside it.
+  // Sending while holding connections_mutex_ risks lock-order inversion
+  // (connections_mutex_ -> ixwebsocket send-lock vs ixwebsocket callback-lock
+  // -> connections_mutex_). Shared_ptr snapshots guarantee the WebSocket
+  // objects remain alive across the send window.
+  std::vector<std::shared_ptr<ix::WebSocket>> targets;
   {
     std::lock_guard<std::mutex> lock(connections_mutex_);
     targets.reserve(ws_connections_.size());
-    for (auto& [id, ws] : ws_connections_) {
-      if (ws && connections_.count(id)) {
-        targets.push_back(ws);
+    for (auto& [id, ws_ptr] : ws_connections_) {
+      if (ws_ptr && connections_.count(id)) {
+        targets.push_back(ws_ptr);
       }
     }
   }
-  for (auto* ws : targets) {
-    ws->send(msg);
+  for (auto& ws_ptr : targets) {
+    ws_ptr->send(msg);
   }
 }
 
 void GatewayServer::SendEventTo(const std::string& connection_id,
                                 const RpcEvent& event) {
-  ix::WebSocket* target = nullptr;
+  std::shared_ptr<ix::WebSocket> target;
   {
     std::lock_guard<std::mutex> lock(connections_mutex_);
     if (connections_.count(connection_id) == 0) {
@@ -138,7 +139,7 @@ void GatewayServer::SendResponseTo(const std::string& connection_id,
   }
 
   std::string payload_str = resp.ToJson().dump();
-  ix::WebSocket* target = nullptr;
+  std::shared_ptr<ix::WebSocket> target;
   {
     std::lock_guard<std::mutex> lock(connections_mutex_);
     if (connections_.count(connection_id) == 0)
@@ -226,6 +227,22 @@ void GatewayServer::on_connection(std::shared_ptr<ix::ConnectionState> state,
     case ix::WebSocketMessageType::Open: {
       logger_->info("Client connected: {}", conn_id);
 
+      // Retrieve the shared_ptr for this connection from ixwebsocket's client
+      // set. Must be done before acquiring connections_mutex_ to avoid a
+      // lock-order inversion with ixwebsocket's internal _clientsMutex
+      // (path: _clientsMutex -> connections_mutex_ in on_connection vs.
+      //  connections_mutex_ -> _clientsMutex in getClients).
+      std::shared_ptr<ix::WebSocket> ws_ptr;
+      for (auto& c : server_->getClients()) {
+        if (c.get() == &ws) {
+          ws_ptr = c;
+          break;
+        }
+      }
+      if (!ws_ptr) {
+        logger_->warn("Could not find shared_ptr for connection {}", conn_id);
+      }
+
       {
         std::lock_guard<std::mutex> lock(connections_mutex_);
         ClientConnection client;
@@ -235,7 +252,7 @@ void GatewayServer::on_connection(std::shared_ptr<ix::ConnectionState> state,
                 std::chrono::system_clock::now().time_since_epoch())
                 .count();
         connections_[conn_id] = client;
-        ws_connections_[conn_id] = &ws;
+        ws_connections_[conn_id] = ws_ptr;  // may be null; sends dropped safely
       }
 
       // Send challenge
