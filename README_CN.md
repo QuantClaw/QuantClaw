@@ -349,7 +349,10 @@ quantclaw cron remove <id>                     # 按 ID 删除任务
 
 ```bash
 quantclaw health          # 健康检查
-quantclaw logs            # 实时查看网关日志
+quantclaw logs            # 查看网关日志（默认最后 50 行）
+quantclaw logs -n 100     # 查看最后 100 行
+quantclaw logs -f         # 实时跟踪日志
+quantclaw logs -n 20 -f   # 从最后 20 行开始实时跟踪
 quantclaw doctor          # 诊断检查
 quantclaw dashboard       # 在浏览器中打开 Web UI
 ```
@@ -807,7 +810,7 @@ quantclaw doctor                    # 运行诊断
 **无法连接到网关**
 ```bash
 quantclaw health    # 检查网关是否运行
-quantclaw logs      # 实时查看日志定位错误
+quantclaw logs -f   # 实时查看日志定位错误
 quantclaw status    # 查看连接数和会话数
 ```
 

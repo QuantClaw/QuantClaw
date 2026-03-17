@@ -285,11 +285,21 @@ quantclaw status
 
 ### logs
 
-Stream gateway logs.
+View gateway logs. Defaults to the last 50 lines.
 
 ```bash
-quantclaw logs
+quantclaw logs            # Show last 50 lines
+quantclaw logs -n 100     # Show last 100 lines
+quantclaw logs -f         # Follow logs in real-time
+quantclaw logs -n 20 -f   # Follow, starting from last 20 lines
 ```
+
+| Flag | Description |
+|------|-------------|
+| `-n <count>` | Number of lines to show (default: 50) |
+| `-f` | Follow mode — stream new log entries as they arrive |
+
+On Linux, falls back to `journalctl` if no log file is found. On Windows, follow mode (`-f`) is not supported.
 
 ### doctor
 
@@ -381,7 +391,7 @@ quantclaw health
 quantclaw status
 
 # 7. Stream logs
-quantclaw logs
+quantclaw logs -f
 ```
 
 ---

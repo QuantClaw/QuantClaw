@@ -40,6 +40,8 @@ sudo port install cmake openssl nlohmann_json spdlog
 - **CMake 3.15+**
 - **Git for Windows**
 
+> **Note:** The build system automatically defines `NOMINMAX` and links against `bcrypt` on Windows to avoid conflicts with Windows API macros and satisfy OpenSSL/spdlog dependencies. No manual configuration is required.
+
 ## Clone Repository
 
 ```bash
@@ -334,6 +336,15 @@ sudo apt-get install nlohmann-json3-dev
 brew install nlohmann-json
 
 # Or download header-only from github
+```
+
+**ZLIB / HTTPLIB compression errors**
+
+If your system has ZLIB installed in some configurations but not others (e.g., a fresh Docker image or minimal CI environment), CMake may cache a stale `HTTPLIB_REQUIRE_ZLIB=ON` value from a previous configure run. The build system now explicitly forces `HTTPLIB_REQUIRE_ZLIB` to `OFF` when ZLIB is not found, but if you see linker errors related to `z` or `zlib`, clear the CMake cache and reconfigure:
+
+```bash
+rm -rf build && mkdir build && cd build
+cmake ..
 ```
 
 ### Build Timeout

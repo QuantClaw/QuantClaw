@@ -41,6 +41,8 @@ sudo port install cmake openssl nlohmann_json spdlog
 - CMake 3.15+
 - Git for Windows
 
+> **说明：** 构建系统会自动定义 `NOMINMAX`（防止 Windows API 宏与 `std::min`/`std::max` 冲突），并自动链接 `bcrypt`（满足 OpenSSL 和 spdlog 在 Windows 上的依赖）。无需手动配置。
+
 ## 克隆仓库
 
 ```bash
@@ -205,6 +207,15 @@ cmake .. -DOPENSSL_DIR=$(brew --prefix openssl)
 # 安装 GCC 11
 sudo apt-get install gcc-11 g++-11
 cmake .. -DCMAKE_C_COMPILER=gcc-11 -DCMAKE_CXX_COMPILER=g++-11
+```
+
+### ZLIB / httplib 压缩链接错误
+
+如果系统在某些环境下有 ZLIB 但在其他环境（如最小化 Docker 镜像或 CI）下没有，CMake 可能缓存了旧的 `HTTPLIB_REQUIRE_ZLIB=ON`。构建系统现在在找不到 ZLIB 时会显式将其强制设为 `OFF`，但若仍遇到 `z` 或 `zlib` 相关链接错误，请清除 CMake 缓存后重新配置：
+
+```bash
+rm -rf build && mkdir build && cd build
+cmake ..
 ```
 
 ---

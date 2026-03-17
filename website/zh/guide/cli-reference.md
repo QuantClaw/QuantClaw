@@ -198,11 +198,21 @@ quantclaw status
 
 ### logs
 
-实时查看网关日志。
+查看网关日志，默认显示最后 50 行。
 
 ```bash
-quantclaw logs
+quantclaw logs            # 显示最后 50 行
+quantclaw logs -n 100     # 显示最后 100 行
+quantclaw logs -f         # 实时跟踪日志
+quantclaw logs -n 20 -f   # 从最后 20 行开始实时跟踪
 ```
+
+| 参数 | 说明 |
+|------|------|
+| `-n <count>` | 显示行数（默认：50） |
+| `-f` | 跟踪模式——实时输出新日志 |
+
+Linux 下若无日志文件则自动回退到 `journalctl`。Windows 不支持跟踪模式（`-f`）。
 
 ### doctor
 
@@ -294,7 +304,7 @@ quantclaw health
 quantclaw status
 
 # 7. 查看日志
-quantclaw logs
+quantclaw logs -f
 ```
 
 ---
