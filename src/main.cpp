@@ -16,11 +16,11 @@
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/cli/agent_commands.hpp"
-#include "quantclaw/common/parse_util.hpp"
 #include "quantclaw/cli/cli_manager.hpp"
 #include "quantclaw/cli/gateway_commands.hpp"
 #include "quantclaw/cli/onboard_commands.hpp"
 #include "quantclaw/cli/session_commands.hpp"
+#include "quantclaw/common/parse_util.hpp"
 #include "quantclaw/config.hpp"
 #include "quantclaw/core/memory_search.hpp"
 #include "quantclaw/core/skill_loader.hpp"
