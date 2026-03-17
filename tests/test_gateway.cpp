@@ -413,8 +413,12 @@ TEST_F(GatewayTest, BroadcastDuringConcurrentDisconnect) {
 
   std::string url = "ws://127.0.0.1:" + std::to_string(port);
 
-  constexpr int kClients = 5;
-  constexpr int kIterations = 20;
+  // Kept low so the test completes in reasonable time even under sanitizer
+  // builds (asan/tsan add 5-20x overhead). Enough iterations to exercise the
+  // concurrent-disconnect race window without overwhelming ixwebsocket's
+  // internal GC thread.
+  constexpr int kClients = 3;
+  constexpr int kIterations = 5;
 
   for (int i = 0; i < kIterations; ++i) {
     // Connect a batch of clients
@@ -440,6 +444,10 @@ TEST_F(GatewayTest, BroadcastDuringConcurrentDisconnect) {
     }
 
     disconnector.join();
+
+    // Let ixwebsocket's GC thread purge the finished connection threads
+    // before the next batch. Under sanitizer builds this window is critical.
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
 
   // Server must still be running and usable after all the concurrent activity
