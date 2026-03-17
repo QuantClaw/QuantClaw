@@ -442,7 +442,7 @@ jobs:
       # Used only when the resources release is unavailable (e.g. first build
       # after a baseline bump).  Persists the freshly-compiled packages so that
       # the next run hits L1 once the resources workflow publishes the release.
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ github.workspace }}/vcpkg-bincache
         # Bust the cache when manifest dependencies change.
