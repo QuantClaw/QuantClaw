@@ -24,18 +24,21 @@ namespace quantclaw::platform {
 ProcessId spawn_process(const std::vector<std::string>& args,
                         const std::vector<std::string>& env,
                         const std::string& working_dir) {
-  if (args.empty())
+  if (args.empty()) {
     return kInvalidPid;
+  }
 
   pid_t pid = fork();
-  if (pid < 0)
+  if (pid < 0) {
     return kInvalidPid;
+  }
 
   if (pid == 0) {
     // Child process
     if (!working_dir.empty()) {
-      if (chdir(working_dir.c_str()) != 0)
+      if (chdir(working_dir.c_str()) != 0) {
         _exit(1);
+      }
     }
     for (const auto& e : env) {
       auto eq = e.find('=');
@@ -56,36 +59,42 @@ ProcessId spawn_process(const std::vector<std::string>& args,
 }
 
 bool is_process_alive(ProcessId pid) {
-  if (pid <= 0)
+  if (pid <= 0) {
     return false;
+  }
   return kill(pid, 0) == 0;
 }
 
 void terminate_process(ProcessId pid) {
-  if (pid > 0)
+  if (pid > 0) {
     kill(pid, SIGTERM);
+  }
 }
 
 void kill_process(ProcessId pid) {
-  if (pid > 0)
+  if (pid > 0) {
     kill(pid, SIGKILL);
+  }
 }
 
 void reload_process(ProcessId pid) {
-  if (pid > 0)
+  if (pid > 0) {
     kill(pid, SIGHUP);
+  }
 }
 
 int wait_process(ProcessId pid, int timeout_ms) {
-  if (pid <= 0)
+  if (pid <= 0) {
     return -1;
+  }
 
   if (timeout_ms == 0) {
     // Non-blocking
     int status;
     pid_t r = waitpid(pid, &status, WNOHANG);
-    if (r <= 0)
+    if (r <= 0) {
       return -1;
+    }
     return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
   }
 
@@ -93,7 +102,9 @@ int wait_process(ProcessId pid, int timeout_ms) {
     // Wait forever
     int status;
     pid_t r = waitpid(pid, &status, 0);
-    if (r <= 0)
+    if (r <= 0) {
+      return -1;
+    }
       return -1;
     return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
   }
@@ -141,8 +152,9 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
 
     // Change working directory if requested.
     if (!working_dir.empty()) {
-      if (chdir(working_dir.c_str()) != 0)
+      if (chdir(working_dir.c_str()) != 0) {
         _exit(1);
+      }
     }
 
     // Apply resource limits in the child (not the host process).
@@ -205,8 +217,9 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
 
     int pr = poll(&pfd, 1, remaining_ms);
     if (pr < 0) {
-      if (errno == EINTR)
+      if (errno == EINTR) {
         continue;
+      }
       break;  // error
     }
     if (pr == 0) {
@@ -216,8 +229,9 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
 
     ssize_t n = read(pipefd[0], buffer, sizeof(buffer) - 1);
     if (n < 0) {
-      if (errno == EINTR)
+      if (errno == EINTR) {
         continue;
+      }
       break;  // read error
     }
     if (n == 0) {

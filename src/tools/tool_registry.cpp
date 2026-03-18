@@ -725,15 +725,18 @@ std::string ToolRegistry::exec_tool(const nlohmann::json& params) {
     }
   }
 
-  if (!quantclaw::SecuritySandbox::ValidateShellCommand(command))
+  if (!quantclaw::SecuritySandbox::ValidateShellCommand(command)) {
     throw std::runtime_error("Command not allowed: " + command);
+  }
 
   if (approval_manager_) {
     auto decision = approval_manager_->RequestApproval(command);
-    if (decision == ApprovalDecision::kDenied)
+    if (decision == ApprovalDecision::kDenied) {
       throw std::runtime_error("Command execution denied: " + command);
-    if (decision == ApprovalDecision::kTimeout)
+    }
+    if (decision == ApprovalDecision::kTimeout) {
       throw std::runtime_error("Approval timed out: " + command);
+    }
   }
 
   logger_->info("Executing command: {}", command);
