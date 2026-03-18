@@ -131,6 +131,7 @@ class E2ETest : public ::testing::Test {
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
     tool_registry_->RegisterChainTool();
+    tool_registry_->SetWorkspace(workspace_dir_.string());
 
     mock_llm_ = std::make_shared<E2EMockLLMProvider>();
 
@@ -419,6 +420,7 @@ class E2EAuthTest : public ::testing::Test {
     skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
+    tool_registry_->SetWorkspace(workspace_dir_.string());
 
     mock_llm_ = std::make_shared<E2EMockLLMProvider>();
     agent_loop_ = std::make_shared<quantclaw::AgentLoop>(

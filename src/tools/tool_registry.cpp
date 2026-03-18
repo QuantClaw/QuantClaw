@@ -552,6 +552,10 @@ void ToolRegistry::SetSessionManager(std::shared_ptr<SessionManager> mgr) {
       "Session manager set: sessions_list/history/send tools registered");
 }
 
+void ToolRegistry::SetWorkspace(const std::string& path) {
+  workspace_path_ = path;
+}
+
 // ---------------------------------------------------------------------------
 // RegisterExternalTool
 // ---------------------------------------------------------------------------
@@ -633,8 +637,7 @@ std::string ToolRegistry::read_file_tool(const nlohmann::json& params) {
   if (!params.contains("path"))
     throw std::runtime_error("Missing required parameter: path");
   std::string path = params["path"].get<std::string>();
-  if (!quantclaw::SecuritySandbox::ValidateFilePath(path,
-                                                    "~/.quantclaw/workspace"))
+  if (!quantclaw::SecuritySandbox::ValidateFilePath(path, workspace_path_))
     throw std::runtime_error("Access denied: path outside workspace: " + path);
   if (!std::filesystem::exists(path))
     throw std::runtime_error("File not found: " + path);
@@ -649,8 +652,7 @@ std::string ToolRegistry::write_file_tool(const nlohmann::json& params) {
     throw std::runtime_error("Missing required parameters: path, content");
   std::string path = params["path"].get<std::string>();
   std::string content = params["content"].get<std::string>();
-  if (!quantclaw::SecuritySandbox::ValidateFilePath(path,
-                                                    "~/.quantclaw/workspace"))
+  if (!quantclaw::SecuritySandbox::ValidateFilePath(path, workspace_path_))
     throw std::runtime_error("Access denied: path outside workspace: " + path);
   std::filesystem::create_directories(
       std::filesystem::path(path).parent_path());
@@ -669,8 +671,7 @@ std::string ToolRegistry::edit_file_tool(const nlohmann::json& params) {
   std::string path = params["path"].get<std::string>();
   std::string old_text = params["oldText"].get<std::string>();
   std::string new_text = params["newText"].get<std::string>();
-  if (!quantclaw::SecuritySandbox::ValidateFilePath(path,
-                                                    "~/.quantclaw/workspace"))
+  if (!quantclaw::SecuritySandbox::ValidateFilePath(path, workspace_path_))
     throw std::runtime_error("Access denied: path outside workspace: " + path);
   std::ifstream f(path);
   if (!f)
@@ -697,6 +698,12 @@ std::string ToolRegistry::exec_tool(const nlohmann::json& params) {
   std::string command = params["command"].get<std::string>();
   int timeout = params.value("timeout", 30);
   std::string workdir = params.value("workdir", "");
+
+  // Validate workdir stays inside the workspace if specified.
+  if (!workdir.empty() &&
+      !quantclaw::SecuritySandbox::ValidateFilePath(workdir, workspace_path_))
+    throw std::runtime_error("Access denied: workdir outside workspace: " +
+                             workdir);
 
   if (!quantclaw::SecuritySandbox::ValidateShellCommand(command))
     throw std::runtime_error("Command not allowed: " + command);

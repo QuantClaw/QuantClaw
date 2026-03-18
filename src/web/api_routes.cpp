@@ -388,8 +388,10 @@ void register_api_routes(
         if (limit < 0) limit = 0;
         if (offset < 0) offset = 0;
         if (offset > total) offset = total;
+        // Clamp limit to avoid integer overflow in offset + limit.
+        if (limit > total - offset) limit = total - offset;
         nlohmann::json result = nlohmann::json::array();
-        int end = std::min(offset + limit, total);
+        int end = offset + limit;
         for (int i = offset; i < end; ++i) {
           result.push_back({{"key", sessions[i].session_key},
                             {"id", sessions[i].session_id},

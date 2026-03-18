@@ -81,42 +81,48 @@ bool Sandbox::ValidateFilePath(const std::string& path,
   namespace fs = std::filesystem;
   std::error_code ec;
 
-  // Resolve the workspace root to an absolute canonical-ish form.
-  fs::path ws_abs = fs::absolute(workspace, ec);
+  // Resolve workspace and path to canonical form so symlinks are resolved
+  // for the existing prefix and ".." segments are collapsed.
+  fs::path ws_abs = fs::weakly_canonical(workspace, ec);
   if (ec)
     return false;
-  ws_abs = ws_abs.lexically_normal();
 
-  // Resolve the requested path.
-  fs::path path_abs = fs::absolute(path, ec);
+  // Resolve relative paths against the workspace root (not CWD).
+  fs::path input_path(path);
+  if (input_path.is_relative()) {
+    input_path = ws_abs / input_path;
+  }
+  fs::path path_abs = fs::weakly_canonical(input_path, ec);
   if (ec)
     return false;
-  path_abs = path_abs.lexically_normal();
 
-  // Basic traversal check.
+  // Basic traversal check on the normalized string.
   std::string path_str = path_abs.string();
   if (path_str.find("..") != std::string::npos) {
     return false;
   }
 
-  // Ensure the resolved path is inside the workspace.
-  std::string ws_str = ws_abs.string();
-  if (path_str.size() < ws_str.size()) {
-    return false;
-  }
-  // Prefix match (case-sensitive on Linux, case-insensitive on Windows).
+  // Ensure the resolved path is inside the workspace using component-level
+  // iteration so that "/tmp" does not match "/tmp2/...".
+  auto ws_it = ws_abs.begin();
+  auto path_it = path_abs.begin();
+  for (; ws_it != ws_abs.end(); ++ws_it, ++path_it) {
+    if (path_it == path_abs.end())
+      return false;  // path is shorter than workspace
 #ifdef _WIN32
-  auto to_lower = [](std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-    return s;
-  };
-  if (to_lower(path_str).rfind(to_lower(ws_str), 0) != 0)
-    return false;
+    // Case-insensitive comparison on Windows.
+    auto to_lower = [](std::string s) {
+      std::transform(s.begin(), s.end(), s.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
+      return s;
+    };
+    if (to_lower(ws_it->string()) != to_lower(path_it->string()))
+      return false;
 #else
-  if (path_str.rfind(ws_str, 0) != 0)
-    return false;
+    if (*ws_it != *path_it)
+      return false;
 #endif
+  }
 
   return true;
 }

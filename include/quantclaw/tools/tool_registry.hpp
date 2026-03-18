@@ -73,6 +73,9 @@ class ToolRegistry {
   mutable std::mutex bg_mu_;
   std::unordered_map<std::string, std::shared_ptr<BgSession>> bg_sessions_;
 
+  // Workspace root for file-tool path validation
+  std::string workspace_path_ = "~/.quantclaw/workspace";
+
  public:
   explicit ToolRegistry(std::shared_ptr<spdlog::logger> logger);
 
@@ -106,6 +109,9 @@ class ToolRegistry {
 
   // Set session manager and register session agent tools
   void SetSessionManager(std::shared_ptr<SessionManager> mgr);
+
+  // Set workspace root used for file-tool path validation
+  void SetWorkspace(const std::string& path);
 
   // Execute a tool by name (with permission check)
   std::string ExecuteTool(const std::string& tool_name,

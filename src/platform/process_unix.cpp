@@ -144,6 +144,8 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
     }
 
     // Apply resource limits in the child (not the host process).
+    // Only on Linux — macOS has different rlimit semantics for some resources.
+#ifdef __linux__
     struct rlimit cpu_lim = {30, 60};
     setrlimit(RLIMIT_CPU, &cpu_lim);
     struct rlimit mem_lim = {256ULL * 1024 * 1024, 512ULL * 1024 * 1024};
@@ -152,6 +154,7 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
     setrlimit(RLIMIT_FSIZE, &fsz_lim);
     struct rlimit nproc_lim = {32, 64};
     setrlimit(RLIMIT_NPROC, &nproc_lim);
+#endif
 
     execl("/bin/sh", "sh", "-c", command.c_str(), nullptr);
     _exit(127);

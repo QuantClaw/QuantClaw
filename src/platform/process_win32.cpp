@@ -7,7 +7,9 @@
 #include <cstdlib>
 #include <sstream>
 #include <thread>
+#include <vector>
 
+#include "quantclaw/common/defer.hpp"
 #include "quantclaw/platform/process.hpp"
 
 // clang-format off
@@ -144,8 +146,10 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
   // Ensure the read end is not inherited.
   SetHandleInformation(read_pipe, HANDLE_FLAG_INHERIT, 0);
 
-  // Build command line: "cmd /c <command>"
+  // Build command line into a mutable buffer — CreateProcessA may modify it.
   std::string cmd_line = "cmd /c " + command;
+  std::vector<char> cmd_buf(cmd_line.begin(), cmd_line.end());
+  cmd_buf.push_back('\0');
 
   STARTUPINFOA si = {};
   si.cb = sizeof(si);
@@ -156,10 +160,9 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
 
   PROCESS_INFORMATION pi = {};
   BOOL ok = CreateProcessA(
-      nullptr, const_cast<char*>(cmd_line.c_str()), nullptr, nullptr,
-      TRUE,   // inherit handles
-      CREATE_NO_WINDOW,
-      nullptr,
+      nullptr, cmd_buf.data(), nullptr, nullptr,
+      TRUE,  // inherit handles
+      CREATE_NO_WINDOW, nullptr,
       working_dir.empty() ? nullptr : working_dir.c_str(), &si, &pi);
 
   CloseHandle(write_pipe);  // parent closes write end
@@ -169,6 +172,13 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
     result.exit_code = -1;
     return result;
   }
+
+  // RAII cleanup for handles.
+  DEFER({
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+  });
+  DEFER(CloseHandle(read_pipe));
 
   // Read output with timeout awareness.
   DWORD wait_ms = (timeout_seconds > 0)
@@ -194,7 +204,7 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
     // Check if there is data or if process ended.
     DWORD avail = 0;
     if (!PeekNamedPipe(read_pipe, nullptr, 0, nullptr, &avail, nullptr)) {
-      break;  // pipe broken → child exited
+      break;  // pipe broken — child exited
     }
     if (avail == 0) {
       // No data; wait briefly for process or new data.
@@ -224,21 +234,18 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
     result.output += buffer;
   }
 
-  CloseHandle(read_pipe);
-
   if (timed_out) {
     TerminateProcess(pi.hProcess, 1);
     WaitForSingleObject(pi.hProcess, 3000);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
     result.exit_code = -2;
     return result;
   }
 
+  // Wait for process to fully exit before reading exit code, so
+  // GetExitCodeProcess does not return STILL_ACTIVE.
+  WaitForSingleObject(pi.hProcess, INFINITE);
   DWORD exit_code = 0;
   GetExitCodeProcess(pi.hProcess, &exit_code);
-  CloseHandle(pi.hProcess);
-  CloseHandle(pi.hThread);
   result.exit_code = static_cast<int>(exit_code);
   return result;
 }

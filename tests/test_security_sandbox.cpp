@@ -138,8 +138,7 @@ TEST_F(SandboxTest, ApplyResourceLimitsDoesNotThrow) {
 TEST_F(SandboxTest, ResourceLimitsAppliedInExecCapture) {
   // Verify that resource limits are applied in the child spawned by
   // exec_capture, not on the host process.
-  auto result = quantclaw::platform::exec_capture(
-      "cat /proc/self/limits | grep 'Max cpu time' | awk '{print $5}'", 5);
+  auto result = quantclaw::platform::exec_capture("ulimit -t", 5);
   // The child should see the CPU soft limit (30 seconds).
   EXPECT_EQ(result.exit_code, 0);
   // Trim trailing whitespace.

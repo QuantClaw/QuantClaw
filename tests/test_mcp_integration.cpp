@@ -38,6 +38,7 @@ class MCPIntegrationTest : public ::testing::Test {
 
     tool_registry_ = std::make_unique<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
+    tool_registry_->SetWorkspace(test_dir_.string());
 
     mcp_server_ = std::make_unique<quantclaw::mcp::MCPServer>(logger_);
 
