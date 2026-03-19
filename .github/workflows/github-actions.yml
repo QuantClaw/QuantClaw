@@ -452,9 +452,27 @@ jobs:
 
     - name: Update and bootstrap vcpkg
       run: |
-        git -C "$env:VCPKG_INSTALLATION_ROOT" fetch --depth=1
-        git -C "$env:VCPKG_INSTALLATION_ROOT" checkout FETCH_HEAD
-        & "$env:VCPKG_INSTALLATION_ROOT\bootstrap-vcpkg.bat" -disableMetrics
+        $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+        $baseline = (Get-Content vcpkg.json | ConvertFrom-Json).'builtin-baseline'
+
+        git -C "$vcpkgRoot" fetch --unshallow origin
+        if ($LASTEXITCODE -ne 0) {
+          git -C "$vcpkgRoot" fetch origin
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to fetch vcpkg repository history."
+          }
+        }
+
+        git -C "$vcpkgRoot" cat-file -e "$baseline`^{commit}" 2>$null
+        if ($LASTEXITCODE -ne 0) {
+          git -C "$vcpkgRoot" fetch origin "$baseline"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to fetch vcpkg baseline commit $baseline."
+          }
+        }
+
+        git -C "$vcpkgRoot" checkout origin/master
+        & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
 
     - name: Configure CMake
       run: |
@@ -477,7 +495,7 @@ jobs:
 
     - name: Run Tests
       working-directory: build
-      run: ctest --output-on-failure --parallel -C Release --timeout 240 --repeat until-pass:2
+      run: ctest --output-on-failure --parallel -C Release --timeout 120 --repeat until-pass:2
 
     - name: Upload test results
       if: failure()

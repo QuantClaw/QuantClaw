@@ -65,7 +65,7 @@ int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
   try {
     auto client = std::make_shared<gateway::GatewayClient>(
         gateway_url_, auth_token_, logger_);
-    if (!client->Connect()) {
+    if (!client->Connect(timeout_ms)) {
       std::cerr << "Error: Cannot connect to gateway at " << gateway_url_
                 << std::endl;
       std::cerr << "Is the gateway running? Start it with: quantclaw gateway"

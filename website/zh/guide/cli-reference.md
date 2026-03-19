@@ -304,7 +304,7 @@ quantclaw health
 quantclaw status
 
 # 7. 查看日志
-quantclaw logs -f
+quantclaw logs
 ```
 
 ---

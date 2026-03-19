@@ -23,6 +23,7 @@ class ToolRegistryTest : public ::testing::Test {
 
     tool_registry_ = std::make_unique<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
+    tool_registry_->SetWorkspace(test_dir_.string());
   }
 
   void TearDown() override {

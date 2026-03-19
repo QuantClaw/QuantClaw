@@ -58,9 +58,18 @@ endif()
 
 # Required dependencies
 find_package(spdlog REQUIRED)
-find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
+
+# nlohmann_json: use FetchContent to ensure consistent version across all environments
+include(FetchContent)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.11.3
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(nlohmann_json)
 
 # IXWebSocket: try vcpkg first, fallback to FetchContent
 set(USE_TLS ON CACHE BOOL "" FORCE)

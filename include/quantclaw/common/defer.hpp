@@ -64,7 +64,7 @@ class Defer {
 
  private:
   F action_;
-  bool active_;
+  bool active_ = false;
 };
 
 template <typename F>

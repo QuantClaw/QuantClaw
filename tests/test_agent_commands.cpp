@@ -422,8 +422,9 @@ TEST_F(AgentCommandsIntegrationTest, AuthTokenMismatchReturnsError) {
   // Don't set auth token
 
   int ret = -1;
-  auto err = capture_stderr(
-      [&]() { ret = no_auth_cmds->RequestCommand({"-m", "should fail"}); });
+  auto err = capture_stderr([&]() {
+    ret = no_auth_cmds->RequestCommand({"-m", "should fail", "--timeout", "5"});
+  });
   // Should fail — either connection refused or auth error
   EXPECT_EQ(ret, 1);
 }

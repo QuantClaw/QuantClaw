@@ -50,7 +50,9 @@ int wait_process(ProcessId pid, int timeout_ms = -1);
 
 // Execute a command and capture stdout. Blocks until complete.
 // `timeout_seconds` <= 0 means no timeout.
-ExecResult exec_capture(const std::string& command, int timeout_seconds = 30);
+// `working_dir` optionally sets the child's working directory.
+ExecResult exec_capture(const std::string& command, int timeout_seconds = 30,
+                        const std::string& working_dir = "");
 
 // Get the absolute path of the current executable.
 std::string executable_path();

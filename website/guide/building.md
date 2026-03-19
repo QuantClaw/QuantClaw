@@ -343,8 +343,16 @@ brew install nlohmann-json
 If your system has ZLIB installed in some configurations but not others (e.g., a fresh Docker image or minimal CI environment), CMake may cache a stale `HTTPLIB_REQUIRE_ZLIB=ON` value from a previous configure run. The build system now explicitly forces `HTTPLIB_REQUIRE_ZLIB` to `OFF` when ZLIB is not found, but if you see linker errors related to `z` or `zlib`, clear the CMake cache and reconfigure:
 
 ```bash
+# Linux/macOS
 rm -rf build && mkdir build && cd build
 cmake ..
+
+# Windows (PowerShell)
+Remove-Item -Recurse -Force build; mkdir build; cd build
+cmake ..
+
+# Windows (cmd)
+rmdir /s /q build && mkdir build && cd build && cmake ..
 ```
 
 ### Build Timeout

@@ -18,6 +18,8 @@
 
 #include "quantclaw/core/cron_scheduler.hpp"
 #include "quantclaw/core/memory_search.hpp"
+
+namespace fs = std::filesystem;
 #include "quantclaw/core/subagent.hpp"
 #include "quantclaw/mcp/mcp_tool_manager.hpp"
 #include "quantclaw/platform/process.hpp"
@@ -552,6 +554,10 @@ void ToolRegistry::SetSessionManager(std::shared_ptr<SessionManager> mgr) {
       "Session manager set: sessions_list/history/send tools registered");
 }
 
+void ToolRegistry::SetWorkspace(const std::string& path) {
+  workspace_path_ = path;
+}
+
 // ---------------------------------------------------------------------------
 // RegisterExternalTool
 // ---------------------------------------------------------------------------
@@ -633,8 +639,7 @@ std::string ToolRegistry::read_file_tool(const nlohmann::json& params) {
   if (!params.contains("path"))
     throw std::runtime_error("Missing required parameter: path");
   std::string path = params["path"].get<std::string>();
-  if (!quantclaw::SecuritySandbox::ValidateFilePath(path,
-                                                    "~/.quantclaw/workspace"))
+  if (!quantclaw::SecuritySandbox::ValidateFilePath(path, workspace_path_))
     throw std::runtime_error("Access denied: path outside workspace: " + path);
   if (!std::filesystem::exists(path))
     throw std::runtime_error("File not found: " + path);
@@ -649,8 +654,7 @@ std::string ToolRegistry::write_file_tool(const nlohmann::json& params) {
     throw std::runtime_error("Missing required parameters: path, content");
   std::string path = params["path"].get<std::string>();
   std::string content = params["content"].get<std::string>();
-  if (!quantclaw::SecuritySandbox::ValidateFilePath(path,
-                                                    "~/.quantclaw/workspace"))
+  if (!quantclaw::SecuritySandbox::ValidateFilePath(path, workspace_path_))
     throw std::runtime_error("Access denied: path outside workspace: " + path);
   std::filesystem::create_directories(
       std::filesystem::path(path).parent_path());
@@ -669,8 +673,7 @@ std::string ToolRegistry::edit_file_tool(const nlohmann::json& params) {
   std::string path = params["path"].get<std::string>();
   std::string old_text = params["oldText"].get<std::string>();
   std::string new_text = params["newText"].get<std::string>();
-  if (!quantclaw::SecuritySandbox::ValidateFilePath(path,
-                                                    "~/.quantclaw/workspace"))
+  if (!quantclaw::SecuritySandbox::ValidateFilePath(path, workspace_path_))
     throw std::runtime_error("Access denied: path outside workspace: " + path);
   std::ifstream f(path);
   if (!f)
@@ -696,22 +699,49 @@ std::string ToolRegistry::exec_tool(const nlohmann::json& params) {
     throw std::runtime_error("Missing required parameter: command");
   std::string command = params["command"].get<std::string>();
   int timeout = params.value("timeout", 30);
+  std::string workdir = params.value("workdir", "");
 
-  if (!quantclaw::SecuritySandbox::ValidateShellCommand(command))
+  // Validate workdir stays inside the workspace if specified.
+  std::string resolved_workdir = workdir;
+  if (!workdir.empty()) {
+    if (!quantclaw::SecuritySandbox::ValidateFilePath(workdir,
+                                                      workspace_path_)) {
+      throw std::runtime_error("Access denied: workdir outside workspace: " +
+                               workdir);
+    }
+    // Resolve relative workdir against workspace so exec_capture uses
+    // the correct directory (not gateway CWD).
+    std::error_code ec;
+    fs::path ws_abs = fs::weakly_canonical(workspace_path_, ec);
+    if (!ec) {
+      fs::path wd_path(workdir);
+      if (wd_path.is_relative()) {
+        wd_path = ws_abs / wd_path;
+      }
+      fs::path wd_abs = fs::weakly_canonical(wd_path, ec);
+      if (!ec) {
+        resolved_workdir = wd_abs.string();
+      }
+    }
+  }
+
+  if (!quantclaw::SecuritySandbox::ValidateShellCommand(command)) {
     throw std::runtime_error("Command not allowed: " + command);
+  }
 
   if (approval_manager_) {
     auto decision = approval_manager_->RequestApproval(command);
-    if (decision == ApprovalDecision::kDenied)
+    if (decision == ApprovalDecision::kDenied) {
       throw std::runtime_error("Command execution denied: " + command);
-    if (decision == ApprovalDecision::kTimeout)
+    }
+    if (decision == ApprovalDecision::kTimeout) {
       throw std::runtime_error("Approval timed out: " + command);
+    }
   }
 
-  quantclaw::SecuritySandbox::ApplyResourceLimits();
   logger_->info("Executing command: {}", command);
 
-  auto result = platform::exec_capture(command, timeout);
+  auto result = platform::exec_capture(command, timeout, resolved_workdir);
   if (result.exit_code == -1)
     throw std::runtime_error("Failed to execute: " + command);
   if (result.exit_code == -2)

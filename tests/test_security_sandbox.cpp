@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 
+#include "quantclaw/platform/process.hpp"
 #include "quantclaw/security/sandbox.hpp"
 
 #include "test_helpers.hpp"
@@ -83,8 +84,18 @@ TEST_F(SandboxTest, SanitizeNormalPath) {
 
 TEST_F(SandboxTest, ValidateFilePath) {
   EXPECT_TRUE(quantclaw::Sandbox::ValidateFilePath("/tmp/test.txt", "/tmp"));
+  EXPECT_TRUE(
+      quantclaw::Sandbox::ValidateFilePath("/tmp/sub/dir/file.txt", "/tmp"));
   EXPECT_FALSE(
       quantclaw::Sandbox::ValidateFilePath("../../etc/passwd", "/tmp"));
+  // Absolute path outside workspace must be rejected.
+  EXPECT_FALSE(quantclaw::Sandbox::ValidateFilePath("/etc/passwd", "/tmp"));
+#ifdef _WIN32
+  EXPECT_FALSE(quantclaw::Sandbox::ValidateFilePath(
+      "C:\\Windows\\win.ini", "C:\\Users\\test\\workspace"));
+  EXPECT_TRUE(quantclaw::Sandbox::ValidateFilePath(
+      "C:\\Users\\test\\workspace\\file.txt", "C:\\Users\\test\\workspace"));
+#endif
 }
 
 TEST_F(SandboxTest, ValidateShellCommandSafe) {
@@ -113,58 +124,23 @@ TEST_F(SandboxTest, DenyCommandByPattern) {
 // --- Resource limits ---
 
 TEST_F(SandboxTest, ApplyResourceLimitsDoesNotThrow) {
-#ifdef __linux__
-  // Run in a child process to avoid permanently restricting the test process
-  pid_t pid = fork();
-  ASSERT_NE(pid, -1) << "fork() failed";
-  if (pid == 0) {
-    quantclaw::Sandbox::ApplyResourceLimits();
-    _exit(0);  // No throw
-  }
-  int status;
-  waitpid(pid, &status, 0);
-  ASSERT_TRUE(WIFEXITED(status));
-  EXPECT_EQ(WEXITSTATUS(status), 0);
-#else
+  // ApplyResourceLimits is now intentionally a no-op (resource limits are
+  // applied inside exec_capture on the child process). Just verify it
+  // doesn't throw.
   EXPECT_NO_THROW(quantclaw::Sandbox::ApplyResourceLimits());
-#endif
 }
 
 #ifdef __linux__
-TEST_F(SandboxTest, ResourceLimitsAreSet) {
-  // Fork a child to test resource limits without affecting the test process.
-  // Hard limits can't be raised back without root privileges.
-  pid_t pid = fork();
-  ASSERT_NE(pid, -1) << "fork() failed";
-
-  if (pid == 0) {
-    // Child process: apply limits and verify
-    quantclaw::Sandbox::ApplyResourceLimits();
-
-    struct rlimit cpu_limit;
-    getrlimit(RLIMIT_CPU, &cpu_limit);
-    if (cpu_limit.rlim_cur != 30 || cpu_limit.rlim_max != 60)
-      _exit(1);
-
-    struct rlimit fsize_limit;
-    getrlimit(RLIMIT_FSIZE, &fsize_limit);
-    if (fsize_limit.rlim_cur != 64u * 1024 * 1024 ||
-        fsize_limit.rlim_max != 128u * 1024 * 1024)
-      _exit(2);
-
-    struct rlimit nproc_limit;
-    getrlimit(RLIMIT_NPROC, &nproc_limit);
-    if (nproc_limit.rlim_cur != 32 || nproc_limit.rlim_max != 64)
-      _exit(3);
-
-    _exit(0);  // All checks passed
-  }
-
-  // Parent: wait for child and check exit status
-  int status;
-  waitpid(pid, &status, 0);
-  ASSERT_TRUE(WIFEXITED(status));
-  EXPECT_EQ(WEXITSTATUS(status), 0)
-      << "Child exit code indicates resource limit mismatch";
+TEST_F(SandboxTest, ResourceLimitsAppliedInExecCapture) {
+  // Verify that resource limits are applied in the child spawned by
+  // exec_capture, not on the host process.
+  auto result = quantclaw::platform::exec_capture("ulimit -t", 5);
+  // The child should see the CPU soft limit (30 seconds).
+  EXPECT_EQ(result.exit_code, 0);
+  // Trim trailing whitespace.
+  std::string out = result.output;
+  while (!out.empty() && (out.back() == '\n' || out.back() == ' '))
+    out.pop_back();
+  EXPECT_EQ(out, "30");
 }
 #endif

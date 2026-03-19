@@ -214,8 +214,16 @@ cmake .. -DCMAKE_C_COMPILER=gcc-11 -DCMAKE_CXX_COMPILER=g++-11
 如果系统在某些环境下有 ZLIB 但在其他环境（如最小化 Docker 镜像或 CI）下没有，CMake 可能缓存了旧的 `HTTPLIB_REQUIRE_ZLIB=ON`。构建系统现在在找不到 ZLIB 时会显式将其强制设为 `OFF`，但若仍遇到 `z` 或 `zlib` 相关链接错误，请清除 CMake 缓存后重新配置：
 
 ```bash
+# Linux/macOS
 rm -rf build && mkdir build && cd build
 cmake ..
+
+# Windows (PowerShell)
+Remove-Item -Recurse -Force build; mkdir build; cd build
+cmake ..
+
+# Windows (cmd)
+rmdir /s /q build && mkdir build && cd build && cmake ..
 ```
 
 ---

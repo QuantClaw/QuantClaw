@@ -3,6 +3,8 @@
 
 #include "quantclaw/security/sandbox.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <regex>
 
@@ -75,13 +77,53 @@ std::string Sandbox::SanitizePath(const std::string& path) const {
 }
 
 bool Sandbox::ValidateFilePath(const std::string& path,
-                               const std::string& /*workspace*/) {
-  // Basic path traversal check
-  std::filesystem::path clean = std::filesystem::path(path).lexically_normal();
-  std::string path_str = clean.string();
+                               const std::string& workspace) {
+  namespace fs = std::filesystem;
+  std::error_code ec;
+
+  // Resolve workspace and path to canonical form so symlinks are resolved
+  // for the existing prefix and ".." segments are collapsed.
+  fs::path ws_abs = fs::weakly_canonical(workspace, ec);
+  if (ec)
+    return false;
+
+  // Resolve relative paths against the workspace root (not CWD).
+  fs::path input_path(path);
+  if (input_path.is_relative()) {
+    input_path = ws_abs / input_path;
+  }
+  fs::path path_abs = fs::weakly_canonical(input_path, ec);
+  if (ec)
+    return false;
+
+  // Basic traversal check on the normalized string.
+  std::string path_str = path_abs.string();
   if (path_str.find("..") != std::string::npos) {
     return false;
   }
+
+  // Ensure the resolved path is inside the workspace using component-level
+  // iteration so that "/tmp" does not match "/tmp2/...".
+  auto ws_it = ws_abs.begin();
+  auto path_it = path_abs.begin();
+  for (; ws_it != ws_abs.end(); ++ws_it, ++path_it) {
+    if (path_it == path_abs.end())
+      return false;  // path is shorter than workspace
+#ifdef _WIN32
+    // Case-insensitive comparison on Windows.
+    auto to_lower = [](std::string s) {
+      std::transform(s.begin(), s.end(), s.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
+      return s;
+    };
+    if (to_lower(ws_it->string()) != to_lower(path_it->string()))
+      return false;
+#else
+    if (*ws_it != *path_it)
+      return false;
+#endif
+  }
+
   return true;
 }
 
@@ -102,32 +144,11 @@ bool Sandbox::ValidateShellCommand(const std::string& command) {
 }
 
 void Sandbox::ApplyResourceLimits() {
-#ifdef __linux__
-  // Limit CPU time (30s soft, 60s hard)
-  struct rlimit cpu_limit;
-  cpu_limit.rlim_cur = 30;
-  cpu_limit.rlim_max = 60;
-  setrlimit(RLIMIT_CPU, &cpu_limit);
-
-  // Limit virtual memory (256 MB soft, 512 MB hard)
-  struct rlimit mem_limit;
-  mem_limit.rlim_cur = 256ULL * 1024 * 1024;
-  mem_limit.rlim_max = 512ULL * 1024 * 1024;
-  setrlimit(RLIMIT_AS, &mem_limit);
-
-  // Limit file size (64 MB soft, 128 MB hard)
-  struct rlimit fsize_limit;
-  fsize_limit.rlim_cur = 64ULL * 1024 * 1024;
-  fsize_limit.rlim_max = 128ULL * 1024 * 1024;
-  setrlimit(RLIMIT_FSIZE, &fsize_limit);
-
-  // Limit child processes (32 soft, 64 hard)
-  struct rlimit nproc_limit;
-  nproc_limit.rlim_cur = 32;
-  nproc_limit.rlim_max = 64;
-  setrlimit(RLIMIT_NPROC, &nproc_limit);
-#endif
-  // macOS / Windows: no-op (macOS setrlimit semantics differ, not implemented)
+  // Resource limits are now applied inside exec_capture() on the child
+  // process (via fork + setrlimit before exec on Linux). Calling setrlimit
+  // on the host process would permanently cap the gateway itself.
+  // This function is intentionally a no-op; the actual enforcement lives
+  // in process_unix.cpp.
 }
 
 }  // namespace quantclaw

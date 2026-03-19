@@ -153,6 +153,13 @@ void GatewayClient::on_message(const ix::WebSocketMessagePtr& msg) {
       connected_ = false;
       authenticated_ = false;
       logger_->info("WebSocket connection closed");
+      {
+        std::lock_guard<std::mutex> lock(hello_mutex_);
+        if (!hello_done_) {
+          hello_done_ = true;
+          hello_cv_.notify_all();
+        }
+      }
       break;
 
     case ix::WebSocketMessageType::Message: {
