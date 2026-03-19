@@ -104,6 +104,10 @@ quantclaw gateway
 ### 4. 打开仪表板
 
 ```bash
+# 打包ui
+./scripts/build_ui.sh
+
+# 打开仪表板
 quantclaw dashboard
 ```
 
