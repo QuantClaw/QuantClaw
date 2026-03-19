@@ -61,14 +61,22 @@ ProcessId spawn_process(const std::vector<std::string>& args,
     env_block += '\0';
   }
 
+  // CreateProcessA may modify the command-line buffer; use mutable copies.
+  std::vector<char> cmd_buf(cmd_str.begin(), cmd_str.end());
+  cmd_buf.push_back('\0');
+  std::vector<char> env_buf;
+  if (!env_block.empty()) {
+    env_buf.assign(env_block.begin(), env_block.end());
+  }
+
   STARTUPINFOA si = {};
   si.cb = sizeof(si);
   PROCESS_INFORMATION pi = {};
 
   BOOL ok = CreateProcessA(
-      nullptr, const_cast<char*>(cmd_str.c_str()), nullptr, nullptr, FALSE,
+      nullptr, cmd_buf.data(), nullptr, nullptr, FALSE,
       env.empty() ? 0 : 0,
-      env.empty() ? nullptr : const_cast<char*>(env_block.c_str()),
+      env.empty() ? nullptr : env_buf.data(),
       working_dir.empty() ? nullptr : working_dir.c_str(), &si, &pi);
 
   if (!ok)
