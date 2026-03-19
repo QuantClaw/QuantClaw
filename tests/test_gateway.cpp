@@ -29,6 +29,11 @@ class GatewayTest : public ::testing::Test {
 
   void TearDown() override {
     if (server_) {
+      // Brief pause to let ixwebsocket finish processing any pending
+      // close/disconnect callbacks before tearing down the server.
+      // Prevents "bad function call" on Windows where the callback
+      // thread may still be running when Stop() clears handlers.
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
       server_->Stop();
       server_.reset();
     }
