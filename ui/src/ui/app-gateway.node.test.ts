@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GATEWAY_EVENT_UPDATE_AVAILABLE } from "../../../src/gateway/events.js";
+import { GATEWAY_EVENT_UPDATE_AVAILABLE } from "../gateway/events.js";
 import { connectGateway } from "./app-gateway.ts";
 
 type GatewayClientMock = {
