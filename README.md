@@ -104,6 +104,10 @@ quantclaw gateway
 ### 4. Open Dashboard
 
 ```bash
+# Build UI
+./scripts/build_ui.sh
+
+# Open Dashboard
 quantclaw dashboard
 ```
 
