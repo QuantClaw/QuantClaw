@@ -33,8 +33,8 @@ Thumbs.db
 
 # Node dependencies and build output
 node_modules/
-adapters/node_modules/
-adapters/package-lock.json
+src/adapters/node_modules/
+src/adapters/package-lock.json
 sidecar/node_modules/
 sidecar/dist/
 ui/dist/
