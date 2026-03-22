@@ -78,8 +78,13 @@ bool ChannelAdapterManager::launch_adapter(AdapterProcess& adapter,
   auto script_dir =
       std::filesystem::path(adapter.script_path).parent_path().string();
 
+#ifdef _WIN32
+  // On Windows, npx is a batch script and must be run through cmd /c
+  std::vector<std::string> args = {"cmd", "/c", "npx", "tsx", adapter.script_path};
+#else
   // Try npx tsx first
   std::vector<std::string> args = {"npx", "tsx", adapter.script_path};
+#endif
   auto pid = platform::spawn_process(args, env, script_dir);
 
   if (pid == platform::kInvalidPid) {
@@ -89,7 +94,11 @@ bool ChannelAdapterManager::launch_adapter(AdapterProcess& adapter,
     if (dot != std::string::npos) {
       js_path.replace(dot, 3, ".js");
     }
+#ifdef _WIN32
     args = {"node", js_path};
+#else
+    args = {"node", js_path};
+#endif
     pid = platform::spawn_process(args, env, script_dir);
   }
 

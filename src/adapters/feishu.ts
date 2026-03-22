@@ -35,6 +35,7 @@ class FeishuAdapter extends ChannelAdapter {
   private groupPolicy: string;
   private requireMention: boolean;
   private botName: string = "";
+  private server: ReturnType<typeof import("http").createServer> | null = null;
 
   constructor() {
     super();
@@ -52,7 +53,7 @@ class FeishuAdapter extends ChannelAdapter {
     this.client = new Client({
       appId: cfg.appId || process.env.FEISHU_APP_ID || "",
       appSecret: cfg.appSecret || process.env.FEISHU_APP_SECRET || "",
-      domain: cfg.domain || "feishu",
+      domain: cfg.domain || "https://open.feishu.cn",
     });
   }
 
@@ -146,11 +147,7 @@ class FeishuAdapter extends ChannelAdapter {
   }
 
   protected async startPlatform(): Promise<void> {
-    console.log("[feishu] Starting Feishu bot with WebSocket event subscription...");
-
-    // Feishu uses WebSocket long-connection for event subscription
-    // The gateway handles the long-connection setup via RPC
-    // Here we just need to verify the connection works
+    console.log("[feishu] Starting Feishu bot...");
 
     const cfg = this.channelConfig as FeishuConfig;
     if (!cfg.appId || !cfg.appSecret) {
@@ -159,11 +156,15 @@ class FeishuAdapter extends ChannelAdapter {
       );
     }
 
-    // Verify credentials by making a simple API call
+    // Verify credentials by getting tenant_access_token via POST
     try {
       const res = await this.client.request({
-        method: "GET",
-        url: "/open-apis/auth/v3/app_access_token/internal",
+        method: "POST",
+        url: "/open-apis/auth/v3/tenant_access_token/internal",
+        data: {
+          app_id: cfg.appId,
+          app_secret: cfg.appSecret,
+        },
       });
       if (res.code !== 0) {
         throw new Error(`Feishu auth failed: ${res.msg}`);
@@ -174,15 +175,59 @@ class FeishuAdapter extends ChannelAdapter {
       throw new Error(`Feishu connection failed: ${err.msg || err.message}`);
     }
 
-    // Start WebSocket long-connection
-    // The gateway calls chat.startLongConn to establish the connection
-    console.log("[feishu] Waiting for gateway to start long connection...");
+    // Start HTTP server for webhook events
+    const port = parseInt(process.env.FEISHU_WEBHOOK_PORT || "9200", 10);
+    const webhookPath = process.env.FEISHU_WEBHOOK_PATH || "/webhook/feishu";
+
+    const http = await import("http");
+    const server = http.createServer((req, res) => {
+      if (req.method === "POST" && req.url === webhookPath) {
+        let body = "";
+        req.on("data", (chunk) => (body += chunk));
+        req.on("end", () => {
+          try {
+            const data = JSON.parse(body);
+            // Handle challenge verification
+            if (data.type === "url_verification" && data.challenge) {
+              console.log("[feishu] URL verification challenge received");
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ challenge: data.challenge }));
+              return;
+            }
+            // Handle message events
+            if (data.header?.event_type === "im.message.receive_v1") {
+              this.onMessageReceive(data as EventPayload<"im.message.receive_v1">).catch((e) => {
+                console.error("[feishu] Error handling message:", e);
+              });
+            }
+            res.writeHead(200);
+            res.end("{}");
+          } catch (e) {
+            console.error("[feishu] Error parsing webhook body:", e);
+            res.writeHead(400);
+            res.end("Bad Request");
+          }
+        });
+      } else {
+        res.writeHead(404);
+        res.end("Not Found");
+      }
+    });
+
+    server.listen(port, () => {
+      console.log(`[feishu] Webhook server listening on port ${port}, path: ${webhookPath}`);
+    });
+
+    this.server = server;
+    console.log(`[feishu] Bot ready. Configure webhook URL: http://your-server:${port}${webhookPath}`);
   }
 
   protected async stopPlatform(): Promise<void> {
     console.log("[feishu] Stopping Feishu bot...");
-    // The WebSocket connection is managed by the gateway
-    // No explicit cleanup needed here
+    if (this.server) {
+      this.server.close();
+      this.server = null;
+    }
   }
 
   protected async sendToPlatform(
