@@ -452,9 +452,8 @@ TEST_F(AgentCommandsIntegrationTest, StreamingErrorsReachStderr) {
   mock_llm_->stream_error_message = "Mock streaming exploded";
 
   int ret = -1;
-  auto err = capture_stderr([&]() {
-    ret = agent_cmds_->RequestCommand({"-m", "please fail"});
-  });
+  auto err = capture_stderr(
+      [&]() { ret = agent_cmds_->RequestCommand({"-m", "please fail"}); });
 
   EXPECT_EQ(ret, 1);
   EXPECT_NE(err.find("Mock streaming exploded"), std::string::npos);

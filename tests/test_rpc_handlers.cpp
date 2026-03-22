@@ -269,7 +269,8 @@ TEST_F(RpcHandlersTest, AgentRequestPropagatesStreamingErrors) {
     client->Call("agent.request", {{"message", "Hello"}}, 10000);
     FAIL() << "agent.request should propagate the streaming error";
   } catch (const std::runtime_error& e) {
-    EXPECT_NE(std::string(e.what()).find("mock stream blew up"), std::string::npos);
+    EXPECT_NE(std::string(e.what()).find("mock stream blew up"),
+              std::string::npos);
   }
 
   client->Disconnect();

@@ -586,19 +586,24 @@ void register_rpc_handlers(
         std::string idempotency_key = params.value("idempotencyKey", "");
         auto result = execute_agent_request(
             params, client,
-            [&server, &client, logger, &session_key, &idempotency_key](const quantclaw::AgentEvent& event) {
+            [&server, &client, logger, &session_key,
+             &idempotency_key](const quantclaw::AgentEvent& event) {
               RpcEvent rpc_event;
 
               if (event.type == events::kTextDelta) {
-                // agent.text_delta → event "chat" {state:"delta", message:{content}, runId, sessionKey}
+                // agent.text_delta → event "chat" {state:"delta",
+                // message:{content}, runId, sessionKey}
                 rpc_event.event = events::kOcChat;
                 rpc_event.payload = {
                     {"state", "delta"},
-                    {"message", {{"role", "assistant"}, {"content", event.data.value("text", "")}}},
+                    {"message",
+                     {{"role", "assistant"},
+                      {"content", event.data.value("text", "")}}},
                     {"runId", idempotency_key},
                     {"sessionKey", session_key}};
               } else if (event.type == events::kToolUse) {
-                // agent.tool_use → event "agent" {stream:"tool", data:{id,name,input}}
+                // agent.tool_use → event "agent" {stream:"tool",
+                // data:{id,name,input}}
                 rpc_event.event = events::kOcAgent;
                 rpc_event.payload = {
                     {"stream", "tool"},
@@ -608,7 +613,8 @@ void register_rpc_handlers(
                       {"input",
                        event.data.value("input", nlohmann::json::object())}}}};
               } else if (event.type == events::kToolResult) {
-                // agent.tool_result → event "agent" {stream:"tool_result", data:{tool_use_id,content}}
+                // agent.tool_result → event "agent" {stream:"tool_result",
+                // data:{tool_use_id,content}}
                 rpc_event.event = events::kOcAgent;
                 rpc_event.payload = {
                     {"stream", "tool_result"},
@@ -616,11 +622,14 @@ void register_rpc_handlers(
                      {{"tool_use_id", event.data.value("tool_use_id", "")},
                       {"content", event.data.value("content", "")}}}};
               } else if (event.type == events::kMessageEnd) {
-                // agent.message_end → event "chat" {state:"final", message, runId, sessionKey}
+                // agent.message_end → event "chat" {state:"final", message,
+                // runId, sessionKey}
                 rpc_event.event = events::kOcChat;
                 rpc_event.payload = {
                     {"state", "final"},
-                    {"message", {{"role", "assistant"}, {"content", event.data.value("content", "")}}},
+                    {"message",
+                     {{"role", "assistant"},
+                      {"content", event.data.value("content", "")}}},
                     {"runId", idempotency_key},
                     {"sessionKey", session_key}};
               } else {

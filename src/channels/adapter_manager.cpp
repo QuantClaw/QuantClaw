@@ -40,7 +40,8 @@ std::string ChannelAdapterManager::find_adapter_script(
     search_paths.push_back(
         (exe_dir / "src/adapters" / (channel_name + ".ts")).string());
     search_paths.push_back(
-        (exe_dir.parent_path() / "src/adapters" / (channel_name + ".ts")).string());
+        (exe_dir.parent_path() / "src/adapters" / (channel_name + ".ts"))
+            .string());
   } catch (const std::exception&) {}
 
   for (const auto& path : search_paths) {

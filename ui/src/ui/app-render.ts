@@ -288,7 +288,7 @@ export function renderApp(state: AppViewState) {
           <div class="nav-group__items">
             <a
               class="nav-item nav-item--external"
-              href="https://docs.quantclaw.ai"
+              href="https://quantclaw.github.io/"
               target="_blank"
               rel="noreferrer"
               title="${t("common.docs")} (opens in new tab)"
