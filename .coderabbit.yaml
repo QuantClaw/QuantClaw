@@ -10,8 +10,4 @@ reviews:
     - "!docs/**"
     - "!test/**/*.cpp"
 
-language_specific:
-  c_cpp:
-    style_guide: "google"
-
 early_access: false

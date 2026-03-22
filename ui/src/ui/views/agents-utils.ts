@@ -2,12 +2,12 @@ import { html } from "lit";
 import {
   listCoreToolSections,
   PROFILE_OPTIONS as TOOL_PROFILE_OPTIONS,
-} from "../../../../src/agents/tool-catalog.js";
+} from "../../agents/tool-catalog.js";
 import {
   expandToolGroups,
   normalizeToolName,
   resolveToolProfilePolicy,
-} from "../../../../src/agents/tool-policy-shared.js";
+} from "../../agents/tool-policy-shared.js";
 import type { AgentIdentityResult, AgentsFilesListResult, AgentsListResult } from "../types.ts";
 
 export const TOOL_SECTIONS = listCoreToolSections();

@@ -1,4 +1,4 @@
-import { ConnectErrorDetailCodes } from "../../../../src/gateway/protocol/connect-error-details.js";
+import { ConnectErrorDetailCodes } from "../../gateway/protocol/connect-error-details.js";
 
 /** Whether the overview should show device-pairing guidance for this error. */
 export function shouldShowPairingHint(

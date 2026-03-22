@@ -3,7 +3,7 @@ import {
   type DeviceAuthStore,
   normalizeDeviceAuthRole,
   normalizeDeviceAuthScopes,
-} from "../../../src/shared/device-auth.js";
+} from "../shared/device-auth.js";
 
 const STORAGE_KEY = "quantclaw.device.auth.v1";
 

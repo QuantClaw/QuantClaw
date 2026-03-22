@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { describe, expect, it, vi } from "vitest";
-import { CONTROL_UI_BOOTSTRAP_CONFIG_PATH } from "../../../../src/gateway/control-ui-contract.js";
+import { CONTROL_UI_BOOTSTRAP_CONFIG_PATH } from "../../gateway/control-ui-contract.js";
 import { loadControlUiBootstrapConfig } from "./control-ui-bootstrap.ts";
 
 describe("loadControlUiBootstrapConfig", () => {
