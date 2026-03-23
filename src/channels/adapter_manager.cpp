@@ -31,6 +31,7 @@ std::string ChannelAdapterManager::find_adapter_script(
 
   std::vector<std::string> search_paths = {
       home + "/.quantclaw/src/adapters/" + channel_name + ".ts",
+      home + "/.quantclaw/adapters/" + channel_name + ".ts",
   };
 
   // Relative to the executable's directory
@@ -40,7 +41,12 @@ std::string ChannelAdapterManager::find_adapter_script(
     search_paths.push_back(
         (exe_dir / "src/adapters" / (channel_name + ".ts")).string());
     search_paths.push_back(
+        (exe_dir / "adapters" / (channel_name + ".ts")).string());
+    search_paths.push_back(
         (exe_dir.parent_path() / "src/adapters" / (channel_name + ".ts"))
+            .string());
+    search_paths.push_back(
+        (exe_dir.parent_path() / "adapters" / (channel_name + ".ts"))
             .string());
   } catch (const std::exception&) {}
 
