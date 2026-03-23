@@ -2,20 +2,10 @@
  * QuantClaw Feishu (Lark) Adapter
  *
  * Bridges Feishu/Lark messages to the QuantClaw agent via the gateway WebSocket RPC.
- * Runs as a subprocess managed by ChannelAdapterManager.
- *
- * Environment variables (set by adapter manager):
- *   QUANTCLAW_GATEWAY_URL    — ws://127.0.0.1:18800
- *   QUANTCLAW_AUTH_TOKEN     — gateway auth token
- *   QUANTCLAW_CHANNEL_NAME   — "feishu"
- *   QUANTCLAW_CHANNEL_CONFIG — JSON: {"appId":"cli_xxx","appSecret":"xxx","dmPolicy":"open",...}
- *
- * Usage:
- *   npm install
- *   npx tsx feishu.ts
+ * Uses Feishu SDK's long connection (WebSocket) mode for event subscription.
  */
 
-import { Client, EventPayload } from "@larksuiteoapi/node-sdk";
+import { Client, WSClient, EventDispatcher, LoggerLevel } from "@larksuiteoapi/node-sdk";
 import { ChannelAdapter, runAdapter } from "./base.js";
 
 interface FeishuConfig {
@@ -29,13 +19,47 @@ interface FeishuConfig {
   [key: string]: unknown;
 }
 
+// Event structure from Feishu long connection
+type FeishuMessageEvent = {
+  sender: {
+    sender_id: {
+      open_id?: string;
+      user_id?: string;
+      union_id?: string;
+    };
+    display_name?: string;
+    simple_name?: string;
+    tenant_key?: string;
+  };
+  message: {
+    message_id: string;
+    root_id?: string;
+    parent_id?: string;
+    chat_id: string;
+    chat_type: "p2p" | "group";
+    message_type: string;
+    content: string;
+    mentions?: Array<{
+      key: string;
+      id: {
+        open_id?: string;
+        user_id?: string;
+        union_id?: string;
+      };
+      name: string;
+      tenant_key?: string;
+    }>;
+  };
+};
+
 class FeishuAdapter extends ChannelAdapter {
   private client: Client;
+  private wsClient: WSClient | null = null;
   private dmPolicy: string;
   private groupPolicy: string;
   private requireMention: boolean;
   private botName: string = "";
-  private server: ReturnType<typeof import("http").createServer> | null = null;
+  private appId: string = "";
 
   constructor() {
     super();
@@ -45,29 +69,48 @@ class FeishuAdapter extends ChannelAdapter {
     this.groupPolicy = cfg.groupPolicy ?? "open";
     this.requireMention = cfg.requireMention ?? true;
     this.botName = cfg.botName ?? "AI Assistant";
+    this.appId = cfg.appId || process.env.FEISHU_APP_ID || "";
 
     console.log(
       `[feishu] Config: dmPolicy=${this.dmPolicy}, groupPolicy=${this.groupPolicy}, requireMention=${this.requireMention}`
     );
 
     this.client = new Client({
-      appId: cfg.appId || process.env.FEISHU_APP_ID || "",
+      appId: this.appId,
       appSecret: cfg.appSecret || process.env.FEISHU_APP_SECRET || "",
       domain: cfg.domain || "https://open.feishu.cn",
     });
   }
 
-  private async onMessageReceive(event: EventPayload<"im.message.receive_v1">): Promise<void> {
-    const message = event.data.message;
-    const sender = event.data.sender;
-    const chat = event.data.chat;
+  private async onMessageReceive(data: FeishuMessageEvent): Promise<void> {
+    console.log("[feishu] Received message event via long connection");
+
+    const message = data.message;
+    const sender = data.sender;
+
+    if (!message) {
+      console.error("[feishu] Invalid event structure, missing message");
+      return;
+    }
+
+    // Debug: log sender structure
+    console.log("[feishu] Sender structure:", JSON.stringify(sender, null, 2));
+
+    // Extract chat info from message object
+    const chatId = message.chat_id;
+    const chatType = message.chat_type;
+    const isDM = chatType === "p2p";
+
+    // Extract sender info - we need open_id for sending replies
+    const senderOpenId = sender?.sender_id?.open_id || "";
+    const senderUserId = sender?.sender_id?.user_id || "";
+    const senderName = sender?.display_name || sender?.simple_name || senderUserId;
 
     // Ignore own messages
-    if (message.sender_id?.user_id === this.client.config.appId) return;
+    if (senderUserId === this.appId) return;
 
+    // Parse message content
     let content = message.content ?? "";
-
-    // Parse message content (Feishu uses JSON format)
     try {
       const parsed = JSON.parse(content);
       if (parsed.text) {
@@ -79,16 +122,12 @@ class FeishuAdapter extends ChannelAdapter {
       // Plain text content
     }
 
-    const isDM = chat.chat_mode === "p2p";
-    const chatId = chat.chat_id;
-    const senderId = sender.sender_id?.user_id || sender.sender_id?.open_id || "unknown";
-
     console.log(
-      `[feishu] Message from ${senderId} in ${isDM ? "DM" : `group#${chatId}`}: "${content.slice(0, 80)}"`
+      `[feishu] Message from ${senderName} (open_id=${senderOpenId}, user_id=${senderUserId}) in ${isDM ? "DM" : `group#${chatId}`}: "${content.slice(0, 80)}"`
     );
 
     if (isDM) {
-      // DM policy: "open" = respond to all, "closed" = ignore, "pairing" = require approval
+      // DM policy: "open" = respond to all, "closed" = ignore
       if (this.dmPolicy === "closed") {
         console.log("[feishu] DM ignored (dmPolicy=closed)");
         return;
@@ -101,19 +140,23 @@ class FeishuAdapter extends ChannelAdapter {
       }
 
       // Check if bot is mentioned
+      console.log("[feishu] Group message mentions:", JSON.stringify(message.mentions, null, 2));
+      console.log("[feishu] Bot name:", this.botName, "App ID:", this.appId);
+
       const botMentioned = message.mentions?.some(
-        (m) => m.name === this.botName || m.id?.user_id === this.client.config.appId
+        (m) => {
+          const mentioned = m.name === this.botName || m.id?.user_id === this.appId || m.id?.open_id === this.appId;
+          console.log("[feishu] Check mention:", m.name, m.id, "->", mentioned);
+          return mentioned;
+        }
       );
 
       if (botMentioned) {
-        // Bot mentioned, process the message
         console.log("[feishu] Bot mentioned, processing");
       } else if (this.requireMention) {
-        // requireMention=true and not mentioned → ignore
         console.log("[feishu] Group message ignored (requireMention=true, not mentioned)");
         return;
       }
-      // groupPolicy="open" + requireMention=false → respond to all messages
     }
 
     if (!content || content.trim() === "") return;
@@ -122,32 +165,32 @@ class FeishuAdapter extends ChannelAdapter {
       `[feishu] Processing: "${content.slice(0, 80)}" (session: channel:feishu:${chatId})`
     );
 
-    // Send typing indicator (if supported)
+    // Send typing indicator
     try {
       await this.client.im.typing.create({
-        params: {
-          chat_id: chatId,
-        },
-        data: {
-          action: 1, // Start typing
-        },
+        params: { chat_id: chatId },
+        data: { action: 1 },
       });
     } catch (e) {
       console.warn("[feishu] Failed to send typing indicator");
     }
 
-    // Use open_id for session key to ensure proper user identification
-    const peerId = sender.sender_id?.open_id || senderId;
+    // For DM, use sender's open_id as the reply target
+    // For group, use chat_id
+    const replyTargetId = isDM ? senderOpenId : chatId;
+
+    // Store open_id in session for later use
+    const peerId = senderOpenId || senderUserId;
     await this.handlePlatformMessage(
       peerId,
-      chatId,
+      replyTargetId,
       content.trim(),
       message.message_id
     );
   }
 
   protected async startPlatform(): Promise<void> {
-    console.log("[feishu] Starting Feishu bot...");
+    console.log("[feishu] Starting Feishu bot with long connection mode...");
 
     const cfg = this.channelConfig as FeishuConfig;
     if (!cfg.appId || !cfg.appSecret) {
@@ -156,77 +199,41 @@ class FeishuAdapter extends ChannelAdapter {
       );
     }
 
-    // Verify credentials by getting tenant_access_token via POST
+    // Create event dispatcher and register message handler
+    const eventDispatcher = new EventDispatcher({}).register({
+      "im.message.receive_v1": async (data) => {
+        await this.onMessageReceive(data as unknown as FeishuMessageEvent);
+      },
+    });
+
+    // Create and start WebSocket client for long connection
+    const wsClient = new WSClient({
+      appId: cfg.appId,
+      appSecret: cfg.appSecret,
+      domain: cfg.domain || "https://open.feishu.cn",
+      loggerLevel: LoggerLevel.info,
+    });
+
     try {
-      const res = await this.client.request({
-        method: "POST",
-        url: "/open-apis/auth/v3/tenant_access_token/internal",
-        data: {
-          app_id: cfg.appId,
-          app_secret: cfg.appSecret,
-        },
-      });
-      if (res.code !== 0) {
-        throw new Error(`Feishu auth failed: ${res.msg}`);
-      }
-      console.log("[feishu] Successfully authenticated with Feishu");
+      await wsClient.start({ eventDispatcher });
+      console.log("[feishu] Long connection established successfully");
+      this.wsClient = wsClient;
     } catch (e: unknown) {
-      const err = e as { msg?: string; message?: string };
-      throw new Error(`Feishu connection failed: ${err.msg || err.message}`);
+      const err = e as { message?: string };
+      console.error("[feishu] Failed to start long connection:", err.message || e);
+      throw e;
     }
-
-    // Start HTTP server for webhook events
-    const port = parseInt(process.env.FEISHU_WEBHOOK_PORT || "9200", 10);
-    const webhookPath = process.env.FEISHU_WEBHOOK_PATH || "/webhook/feishu";
-
-    const http = await import("http");
-    const server = http.createServer((req, res) => {
-      if (req.method === "POST" && req.url === webhookPath) {
-        let body = "";
-        req.on("data", (chunk) => (body += chunk));
-        req.on("end", () => {
-          try {
-            const data = JSON.parse(body);
-            // Handle challenge verification
-            if (data.type === "url_verification" && data.challenge) {
-              console.log("[feishu] URL verification challenge received");
-              res.writeHead(200, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ challenge: data.challenge }));
-              return;
-            }
-            // Handle message events
-            if (data.header?.event_type === "im.message.receive_v1") {
-              this.onMessageReceive(data as EventPayload<"im.message.receive_v1">).catch((e) => {
-                console.error("[feishu] Error handling message:", e);
-              });
-            }
-            res.writeHead(200);
-            res.end("{}");
-          } catch (e) {
-            console.error("[feishu] Error parsing webhook body:", e);
-            res.writeHead(400);
-            res.end("Bad Request");
-          }
-        });
-      } else {
-        res.writeHead(404);
-        res.end("Not Found");
-      }
-    });
-
-    server.listen(port, () => {
-      console.log(`[feishu] Webhook server listening on port ${port}, path: ${webhookPath}`);
-    });
-
-    this.server = server;
-    console.log(`[feishu] Bot ready. Configure webhook URL: http://your-server:${port}${webhookPath}`);
   }
 
   protected async stopPlatform(): Promise<void> {
     console.log("[feishu] Stopping Feishu bot...");
-    if (this.server) {
-      this.server.close();
-      this.server = null;
+    if (this.wsClient) {
+      try {
+        (this.wsClient as any).stop?.();
+      } catch (e) {
+        console.warn("[feishu] Error stopping WSClient:", e);
+      }
+      this.wsClient = null;
     }
   }
 
@@ -235,11 +242,19 @@ class FeishuAdapter extends ChannelAdapter {
     text: string,
     replyTo?: string
   ): Promise<void> {
-    // Feishu limit: 2000 chars per message for text
     const chunks = text.match(/[\s\S]{1,2000}/g) ?? [text];
 
     for (let i = 0; i < chunks.length; i++) {
       try {
+        // Determine receive_id_type based on channel ID prefix
+        // oc_ = group chat (chat_id), ou_ = user (open_id)
+        const isGroupChat = channelId.startsWith("oc_");
+        const receiveIdType = isGroupChat ? "chat_id" : "open_id";
+
+        console.log(
+          `[feishu] Sending reply to ${channelId} (type=${receiveIdType}): "${chunks[i].slice(0, 50)}"`
+        );
+
         const payload: Record<string, unknown> = {
           receive_id: channelId,
           msg_type: "text",
@@ -250,60 +265,34 @@ class FeishuAdapter extends ChannelAdapter {
           payload.reply_id = replyTo;
         }
 
-        await this.client.im.message.create({
-          params: {
-            receive_id: channelId,
-          },
-          query: {
-            receive_id_type: "chat_id",
-          },
+        const result = await this.client.im.v1.message.create({
+          params: { receive_id_type: receiveIdType },
           data: payload,
         });
+
+        console.log(
+          `[feishu] Message sent successfully:`,
+          result?.data?.message_id || result
+        );
       } catch (e: unknown) {
-        const err = e as { msg?: string; message?: string };
+        const err = e as {
+          msg?: string;
+          message?: string;
+          response?: { data?: { field_violations?: Array<{field: string; description: string}> } };
+        };
         console.error(
           `[feishu] Failed to send message chunk ${i + 1}/${chunks.length}: ${err.msg || err.message}`
         );
+        if (err.response?.data?.field_violations) {
+          console.error(
+            `[feishu] Field violations:`,
+            JSON.stringify(err.response.data.field_violations, null, 2)
+          );
+        }
       }
     }
   }
-
-  // Handle long-connection events from gateway
-  async handleLongConnEvent(eventType: string, eventData: Record<string, unknown>): Promise<void> {
-    console.log(`[feishu] Long-conn event: ${eventType}`);
-
-    if (eventType === "im.message.receive_v1") {
-      const payload = eventData as EventPayload<"im.message.receive_v1">;
-      await this.onMessageReceive(payload);
-    }
-  }
 }
 
-// For Feishu, the gateway manages the WebSocket long-connection
-// and forwards events to this adapter
-const adapter = new FeishuAdapter();
-
-// Handle the special Feishu mode where gateway pushes events
-if (process.env.FEISHU_LONG_CONN === "1") {
-  console.log("[feishu] Running in long-connection mode, waiting for gateway events...");
-
-  process.on("message", (msg) => {
-    try {
-      const { eventType, eventData } = JSON.parse(msg as string);
-      adapter.handleLongConnEvent(eventType, eventData).catch(console.error);
-    } catch (e) {
-      console.error("[feishu] Failed to process gateway message:", e);
-    }
-  });
-
-  process.on("SIGINT", () => adapter.stop());
-  process.on("SIGTERM", () => adapter.stop());
-
-  adapter.run().catch((err) => {
-    console.error("[feishu] Fatal:", err);
-    process.exit(1);
-  });
-} else {
-  // Standard mode: run as standalone adapter
-  runAdapter(FeishuAdapter);
-}
+// Standard mode: run as standalone adapter
+runAdapter(FeishuAdapter);
