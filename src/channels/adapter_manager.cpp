@@ -80,7 +80,8 @@ bool ChannelAdapterManager::launch_adapter(AdapterProcess& adapter,
 
 #ifdef _WIN32
   // On Windows, npx is a batch script and must be run through cmd /c
-  std::vector<std::string> args = {"cmd", "/c", "npx", "tsx", adapter.script_path};
+  std::vector<std::string> args = {"cmd", "/c", "npx", "tsx",
+                                   adapter.script_path};
 #else
   // Try npx tsx first
   std::vector<std::string> args = {"npx", "tsx", adapter.script_path};
