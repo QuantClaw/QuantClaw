@@ -100,6 +100,7 @@ docs: update CLI reference with correct gateway commands
 ```
 QuantClaw/
 ├── src/                    # C++ 源码
+│   ├── adapters/           # 频道适配器 (Node.js)
 │   ├── cli/                # CLI 命令
 │   ├── core/               # Agent 核心
 │   ├── gateway/            # RPC 网关
@@ -112,7 +113,6 @@ QuantClaw/
 │   ├── src/                # TypeScript 源码（11 个文件）
 │   └── test/               # Sidecar 测试
 ├── skills/                 # 内置技能
-├── adapters/               # 频道适配器
 ├── scripts/                # 构建/发布脚本
 ├── website/                # 官网源码（VitePress）
 └── docs/                   # 其他文档

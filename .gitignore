@@ -49,3 +49,5 @@ venv/
 # Reference code (local only, not committed)
 refs/
 .claude/
+.codex/
+.codex*/

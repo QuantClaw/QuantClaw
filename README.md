@@ -113,6 +113,42 @@ quantclaw dashboard
 
 This opens the web UI at `http://127.0.0.1:18801`
 
+## Dashboard Authentication
+
+The dashboard requires a token to access. The token is defined in your configuration file:
+
+```json
+{
+  "gateway": {
+    "auth": {
+      "mode": "token",
+      "token": "YOUR_SECRET_TOKEN"
+    }
+  }
+}
+```
+
+**First-time access:**
+1. Open `http://127.0.0.1:18801` in your browser
+2. Enter the token you configured in `~/.quantclaw/quantclaw.json`
+3. The token is stored in your browser's localStorage for future visits
+
+**To disable authentication** (not recommended for production):
+```json
+{
+  "gateway": {
+    "auth": {
+      "mode": "none"
+    }
+  }
+}
+```
+
+**To change your token:**
+1. Edit `~/.quantclaw/quantclaw.json` and update `gateway.auth.token`
+2. Run `quantclaw config reload` (or restart the gateway)
+3. Clear your browser's localStorage for `127.0.0.1:18801` and enter the new token
+
 ## Port Configuration
 
 QuantClaw uses dedicated ports to avoid conflicts with OpenClaw and other services:
@@ -421,7 +457,7 @@ Skills are compatible with the OpenClaw SKILL.md format.
 
 QuantClaw supports external channel adapters that connect to the gateway as standard WebSocket RPC clients. Adapters are Node.js processes managed by `ChannelAdapterManager`.
 
-**Built-in adapters** (in `adapters/`):
+**Built-in adapters** (in `src/adapters/`):
 
 | Adapter   | Library     | Status |
 |-----------|-------------|--------|

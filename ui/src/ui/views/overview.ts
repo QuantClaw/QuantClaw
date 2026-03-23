@@ -58,7 +58,7 @@ export function renderOverview(props: OverviewProps) {
         <div style="margin-top: 6px">
           <a
             class="session-link"
-            href="https://docs.quantclaw.ai/web/control-ui#device-pairing-first-connection"
+            href="https://quantclaw.github.io/"
             target="_blank"
             rel="noreferrer"
             title="Device pairing docs (opens in new tab)"
@@ -115,7 +115,7 @@ export function renderOverview(props: OverviewProps) {
           <div style="margin-top: 6px">
             <a
               class="session-link"
-              href="https://docs.quantclaw.ai/web/dashboard"
+              href="https://quantclaw.github.io/"
               target="_blank"
               rel="noreferrer"
               title="Control UI auth docs (opens in new tab)"
@@ -131,7 +131,7 @@ export function renderOverview(props: OverviewProps) {
         <div style="margin-top: 6px">
           <a
             class="session-link"
-            href="https://docs.quantclaw.ai/web/dashboard"
+            href="https://quantclaw.github.io/"
             target="_blank"
             rel="noreferrer"
             title="Control UI auth docs (opens in new tab)"
@@ -163,14 +163,14 @@ export function renderOverview(props: OverviewProps) {
     }
     return html`
       <div class="muted" style="margin-top: 8px">
-        ${t("overview.insecure.hint", { url: "http://127.0.0.1:18789" })}
+        ${t("overview.insecure.hint", { url: "http://127.0.0.1:18800" })}
         <div style="margin-top: 6px">
           ${t("overview.insecure.stayHttp", { config: "gateway.controlUi.allowInsecureAuth: true" })}
         </div>
         <div style="margin-top: 6px">
           <a
             class="session-link"
-            href="https://docs.quantclaw.ai/gateway/tailscale"
+            href="https://quantclaw.github.io/"
             target="_blank"
             rel="noreferrer"
             title="Tailscale Serve docs (opens in new tab)"
@@ -179,7 +179,7 @@ export function renderOverview(props: OverviewProps) {
           <span class="muted"> · </span>
           <a
             class="session-link"
-            href="https://docs.quantclaw.ai/web/control-ui#insecure-http"
+            href="https://quantclaw.github.io/"
             target="_blank"
             rel="noreferrer"
             title="Insecure HTTP docs (opens in new tab)"
@@ -206,7 +206,7 @@ export function renderOverview(props: OverviewProps) {
                 const v = (e.target as HTMLInputElement).value;
                 props.onSettingsChange({ ...props.settings, gatewayUrl: v });
               }}
-              placeholder="ws://100.x.y.z:18789"
+              placeholder="ws://127.0.0.1:18800"
             />
           </label>
           ${

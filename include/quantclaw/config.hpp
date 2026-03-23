@@ -282,6 +282,8 @@ struct QuantClawConfig {
   // Internal: parse after ${VAR} expansion has already been applied
   static QuantClawConfig FromJsonExpanded(const nlohmann::json& json);
 
+  static std::string config_path_override_;
+
  public:
   // Write a dot-path value (e.g. "agent.model") into the config file.
   // Creates a backup (.bak) before writing.
@@ -294,6 +296,9 @@ struct QuantClawConfig {
 
   static std::string ExpandHome(const std::string& path);
   static std::string DefaultConfigPath();
+
+  // Set config path override (used by --config/-c command line option)
+  static void set_config_path(const std::string& path);
 };
 
 }  // namespace quantclaw

@@ -15,6 +15,7 @@ QuantClaw's architecture is designed for performance, reliability, and extensibi
 │  • HTTP/WebSocket API                                   │
 │  • Command routing                                      │
 │  • Session management                                   │
+│  • Channel adapters (src/adapters/)                     │
 └────────────┬────────────────────────────────────────────┘
              │
 ┌────────────▼────────────────────────────────────────────┐
@@ -33,7 +34,6 @@ QuantClaw's architecture is designed for performance, reliability, and extensibi
 │            Plugin System (Node.js Sidecar)               │
 │  • Custom skills                                        │
 │  • Hooks and callbacks                                  │
-│  • Channel adapters                                     │
 └────────────┬────────────────────────────────────────────┘
              │
 ┌────────────▼────────────────────────────────────────────┐
@@ -166,8 +166,13 @@ Any OpenAI-compatible endpoint can be used via the `providers.openai.baseUrl` se
 Node.js subprocess for:
 - Custom skills
 - Hook execution
-- Channel adapters
 - Event handlers
+
+### Channel Adapters
+Located in `src/adapters/`:
+- Discord adapter (discord.js)
+- Telegram adapter (telegraf)
+- Custom adapters (user-provided)
 
 ### IPC Communication
 - **TCP Protocol**: `127.0.0.1:QUANTCLAW_PORT`

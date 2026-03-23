@@ -141,6 +141,56 @@ Each key under `providers` defines a named provider:
 
 **Note:** QuantClaw uses ports `18800-18801` (different from OpenClaw's `18789-18790`), so both can run simultaneously.
 
+### Authentication Modes
+
+#### Token Mode (Recommended)
+
+When `auth.mode` is set to `"token"`, all clients (including the web dashboard) must provide the correct token to access the gateway:
+
+```json
+{
+  "gateway": {
+    "auth": {
+      "mode": "token",
+      "token": "my-secure-password-here"
+    }
+  }
+}
+```
+
+**Dashboard access:**
+1. Open `http://127.0.0.1:18801` in your browser
+2. Enter the token when prompted
+3. The token is stored in your browser's localStorage for future visits
+
+**API access:**
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:18801/api/status
+```
+
+**WebSocket access:**
+Clients must send a `connect.hello` RPC message with `authToken` after connecting.
+
+#### No Authentication
+
+To disable authentication (not recommended for production):
+
+```json
+{
+  "gateway": {
+    "auth": {
+      "mode": "none"
+    }
+  }
+}
+```
+
+### Changing Your Token
+
+1. Edit `~/.quantclaw/quantclaw.json` and update `gateway.auth.token`
+2. Apply the change: `quantclaw config reload` (or restart the gateway)
+3. For dashboard users: clear localStorage for `127.0.0.1:18801` and enter the new token
+
 ## Channel Configuration (`channels`)
 
 ```json

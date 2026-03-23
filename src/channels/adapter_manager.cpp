@@ -30,7 +30,7 @@ std::string ChannelAdapterManager::find_adapter_script(
   std::string home = platform::home_directory();
 
   std::vector<std::string> search_paths = {
-      home + "/.quantclaw/adapters/" + channel_name + ".ts",
+      home + "/.quantclaw/src/adapters/" + channel_name + ".ts",
   };
 
   // Relative to the executable's directory
@@ -38,9 +38,10 @@ std::string ChannelAdapterManager::find_adapter_script(
     auto exe = platform::executable_path();
     auto exe_dir = std::filesystem::path(exe).parent_path();
     search_paths.push_back(
-        (exe_dir / "adapters" / (channel_name + ".ts")).string());
+        (exe_dir / "src/adapters" / (channel_name + ".ts")).string());
     search_paths.push_back(
-        (exe_dir.parent_path() / "adapters" / (channel_name + ".ts")).string());
+        (exe_dir.parent_path() / "src/adapters" / (channel_name + ".ts"))
+            .string());
   } catch (const std::exception&) {}
 
   for (const auto& path : search_paths) {
@@ -77,8 +78,14 @@ bool ChannelAdapterManager::launch_adapter(AdapterProcess& adapter,
   auto script_dir =
       std::filesystem::path(adapter.script_path).parent_path().string();
 
+#ifdef _WIN32
+  // On Windows, npx is a batch script and must be run through cmd /c
+  std::vector<std::string> args = {"cmd", "/c", "npx", "tsx",
+                                   adapter.script_path};
+#else
   // Try npx tsx first
   std::vector<std::string> args = {"npx", "tsx", adapter.script_path};
+#endif
   auto pid = platform::spawn_process(args, env, script_dir);
 
   if (pid == platform::kInvalidPid) {

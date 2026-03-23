@@ -12,6 +12,9 @@
 
 namespace quantclaw {
 
+// Static member definition
+std::string QuantClawConfig::config_path_override_;
+
 // ---------------------------------------------------------------------------
 // ${VAR} environment variable substitution
 // ---------------------------------------------------------------------------
@@ -661,7 +664,14 @@ std::string QuantClawConfig::ExpandHome(const std::string& path) {
 }
 
 std::string QuantClawConfig::DefaultConfigPath() {
+  if (!config_path_override_.empty()) {
+    return config_path_override_;
+  }
   return ExpandHome("~/.quantclaw/quantclaw.json");
+}
+
+void QuantClawConfig::set_config_path(const std::string& path) {
+  config_path_override_ = path;
 }
 
 QuantClawConfig QuantClawConfig::LoadFromFile(const std::string& filepath) {

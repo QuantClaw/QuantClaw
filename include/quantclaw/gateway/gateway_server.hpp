@@ -172,6 +172,10 @@ class GatewayServer : public quantclaw::Noncopyable {
   // Security
   std::shared_ptr<RBACChecker> rbac_checker_;
   std::shared_ptr<RateLimiter> rate_limiter_;
+
+  // Active async handler threads (for graceful shutdown)
+  std::vector<std::thread> async_threads_;
+  std::mutex async_threads_mutex_;
 };
 
 }  // namespace quantclaw::gateway

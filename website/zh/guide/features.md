@@ -183,8 +183,8 @@ quantclaw health             # 网关健康状态
 
 ### 支持的频道
 
-- **Discord** — 外部 subprocess 适配器（位于 `adapters/` 目录）
-- **Telegram** — 外部 subprocess 适配器（位于 `adapters/` 目录）
+- **Discord** — 外部 subprocess 适配器（位于 `src/adapters/` 目录）
+- **Telegram** — 外部 subprocess 适配器（位于 `src/adapters/` 目录）
 - **Web 仪表板** — 内置，端口 18801
 
 ### 频道配置

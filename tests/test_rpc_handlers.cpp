@@ -58,6 +58,9 @@ void register_rpc_handlers(
 // Minimal mock LLM
 class RpcMockLLMProvider : public quantclaw::LLMProvider {
  public:
+  bool stream_should_fail = false;
+  std::string stream_error_message = "mock stream failure";
+
   quantclaw::ChatCompletionResponse
   ChatCompletion(const quantclaw::ChatCompletionRequest&) override {
     quantclaw::ChatCompletionResponse resp;
@@ -70,6 +73,10 @@ class RpcMockLLMProvider : public quantclaw::LLMProvider {
       const quantclaw::ChatCompletionRequest&,
       std::function<void(const quantclaw::ChatCompletionResponse&)> callback)
       override {
+    if (stream_should_fail) {
+      throw std::runtime_error(stream_error_message);
+    }
+
     quantclaw::ChatCompletionResponse delta;
     delta.content = "mock reply";
     callback(delta);
@@ -247,6 +254,50 @@ TEST_F(RpcHandlersTest, AgentRequestCustomSessionKey) {
       {{"message", "Hello"}, {"sessionKey", "custom:session:key"}}, 10000);
 
   EXPECT_EQ(result["sessionKey"], "custom:session:key");
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersTest, AgentRequestPropagatesStreamingErrors) {
+  mock_llm_->stream_should_fail = true;
+  mock_llm_->stream_error_message = "mock stream blew up";
+
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  try {
+    client->Call("agent.request", {{"message", "Hello"}}, 10000);
+    FAIL() << "agent.request should propagate the streaming error";
+  } catch (const std::runtime_error& e) {
+    EXPECT_NE(std::string(e.what()).find("mock stream blew up"),
+              std::string::npos);
+  }
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersTest, ChatSendPropagatesStreamingErrors) {
+  mock_llm_->stream_should_fail = true;
+  mock_llm_->stream_error_message = "mock chat stream blew up";
+
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  try {
+    client->Call("chat.send",
+                 {{"message", "Hello"},
+                  {"sessionKey", "main"},
+                  {"idempotencyKey", "run-test-1"}},
+                 10000);
+    FAIL() << "chat.send should propagate the streaming error";
+  } catch (const std::runtime_error& e) {
+    EXPECT_NE(std::string(e.what()).find("mock chat stream blew up"),
+              std::string::npos);
+  }
+
+  // Reset mock state to avoid test pollution
+  mock_llm_->stream_should_fail = false;
+  mock_llm_->stream_error_message.clear();
 
   client->Disconnect();
 }

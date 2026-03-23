@@ -65,7 +65,7 @@ export abstract class ChannelAdapter {
 
   constructor() {
     this.gatewayUrl =
-      process.env.QUANTCLAW_GATEWAY_URL ?? "ws://127.0.0.1:18789";
+      process.env.QUANTCLAW_GATEWAY_URL ?? "ws://127.0.0.1:18800";
     this.authToken = process.env.QUANTCLAW_AUTH_TOKEN ?? "";
     this.channelName = process.env.QUANTCLAW_CHANNEL_NAME ?? "unknown";
 

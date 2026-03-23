@@ -8,6 +8,7 @@
     "telegram": "tsx telegram.ts"
   },
   "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.30.0",
     "discord.js": "^14.16.0",
     "telegraf": "^4.16.0",
     "ws": "^8.18.0"

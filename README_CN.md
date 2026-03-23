@@ -113,6 +113,42 @@ quantclaw dashboard
 
 这会在 `http://127.0.0.1:18801` 打开 Web UI
 
+## 仪表板认证
+
+仪表板需要输入 token 才能访问。Token 在配置文件中设置：
+
+```json
+{
+  "gateway": {
+    "auth": {
+      "mode": "token",
+      "token": "YOUR_SECRET_TOKEN"
+    }
+  }
+}
+```
+
+**首次访问：**
+1. 在浏览器中打开 `http://127.0.0.1:18801`
+2. 输入你在 `~/.quantclaw/quantclaw.json` 中配置的 token
+3. Token 会保存在浏览器 localStorage 中，后续访问无需重复输入
+
+**关闭认证**（生产环境不推荐）：
+```json
+{
+  "gateway": {
+    "auth": {
+      "mode": "none"
+    }
+  }
+}
+```
+
+**修改 Token：**
+1. 编辑 `~/.quantclaw/quantclaw.json`，修改 `gateway.auth.token` 的值
+2. 运行 `quantclaw config reload`（或重启网关）
+3. 清除浏览器中 `127.0.0.1:18801` 的 localStorage，然后输入新 token
+
 ## 端口配置
 
 QuantClaw 使用专属端口范围以避免与 OpenClaw 和其他服务冲突：
@@ -420,7 +456,7 @@ metadata:
 
 QuantClaw 通过频道适配器接入外部消息平台。适配器是独立的 Node.js 进程，以标准 WebSocket RPC 客户端的方式连接网关。
 
-**内置适配器**（`adapters/` 目录）：
+**内置适配器**（`src/adapters/` 目录）：
 
 | 适配器    | 依赖库      | 状态 |
 |----------|-------------|------|

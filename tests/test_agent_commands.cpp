@@ -96,6 +96,8 @@ static std::string capture_stderr(std::function<void()> fn) {
 class AgentCmdMockLLM : public quantclaw::LLMProvider {
  public:
   std::string response_text = "Mock agent response.";
+  bool stream_should_fail = false;
+  std::string stream_error_message = "Mock streaming failure.";
 
   quantclaw::ChatCompletionResponse
   ChatCompletion(const quantclaw::ChatCompletionRequest& /*req*/) override {
@@ -109,6 +111,10 @@ class AgentCmdMockLLM : public quantclaw::LLMProvider {
       const quantclaw::ChatCompletionRequest& /*req*/,
       std::function<void(const quantclaw::ChatCompletionResponse&)> cb)
       override {
+    if (stream_should_fail) {
+      throw std::runtime_error(stream_error_message);
+    }
+
     quantclaw::ChatCompletionResponse delta;
     delta.content = response_text;
     delta.is_stream_end = false;
@@ -439,4 +445,16 @@ TEST_F(AgentCommandsIntegrationTest, CustomMockResponse) {
   });
   EXPECT_EQ(ret, 0);
   EXPECT_NE(out.find("Custom reply: 42"), std::string::npos);
+}
+
+TEST_F(AgentCommandsIntegrationTest, StreamingErrorsReachStderr) {
+  mock_llm_->stream_should_fail = true;
+  mock_llm_->stream_error_message = "Mock streaming exploded";
+
+  int ret = -1;
+  auto err = capture_stderr(
+      [&]() { ret = agent_cmds_->RequestCommand({"-m", "please fail"}); });
+
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(err.find("Mock streaming exploded"), std::string::npos);
 }

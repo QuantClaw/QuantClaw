@@ -127,6 +127,20 @@ create_logger(const std::string& log_level = "info",
 }
 
 int main(int argc, char* argv[]) {
+  // Parse global --config / -c flag before anything else
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    if ((arg == "--config" || arg == "-c") && i + 1 < argc) {
+      quantclaw::QuantClawConfig::set_config_path(argv[i + 1]);
+      // Remove --config <path> from argv so commands don't see it
+      for (int j = i; j + 2 < argc; ++j) {
+        argv[j] = argv[j + 2];
+      }
+      argc -= 2;
+      break;
+    }
+  }
+
   // Bootstrap with defaults; recreated below once config is loaded.
   auto logger = create_logger();
 

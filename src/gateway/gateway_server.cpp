@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <random>
 #include <sstream>
+#include <thread>
+#include <unordered_set>
 
 namespace quantclaw::gateway {
 
@@ -58,6 +60,17 @@ void GatewayServer::Stop() {
   if (server_) {
     server_->stop();
     server_.reset();
+  }
+
+  // Join all async handler threads for graceful shutdown
+  {
+    std::lock_guard<std::mutex> lock(async_threads_mutex_);
+    for (auto& t : async_threads_) {
+      if (t.joinable()) {
+        t.join();
+      }
+    }
+    async_threads_.clear();
   }
 
   std::lock_guard<std::mutex> lock(connections_mutex_);
@@ -405,6 +418,45 @@ void GatewayServer::handle_rpc_request(const std::string& conn_id,
       ws.send(resp.ToJson().dump());
       return;
     }
+  }
+
+  // Long-running handlers (agent.request, chat.send) must not block the
+  // ixwebsocket message-callback thread, or new messages (including streaming
+  // events sent back via SendEventTo) cannot be processed. Dispatch these
+  // handlers to a detached thread and reply via SendResponseTo.
+  static const std::unordered_set<std::string> kAsyncMethods = {
+      methods::kAgentRequest,
+      methods::kOcChatSend,
+  };
+
+  if (kAsyncMethods.count(request.method)) {
+    // Capture everything by value; ws reference would dangle.
+    std::string req_id = request.id;
+    std::string req_method = request.method;
+    nlohmann::json req_params = request.params;
+    ClientConnection client_copy = *client;
+    std::thread t([this, req_id, req_method, req_params,
+                   client_copy = std::move(client_copy), handler]() mutable {
+      try {
+        auto result = handler(req_params, client_copy);
+        SendResponseTo(client_copy.connection_id, req_id, true, result);
+      } catch (const std::exception& e) {
+        logger_->error("RPC handler error for {}: {}", req_method, e.what());
+        SendResponseTo(client_copy.connection_id, req_id, false,
+                       {{"error", e.what()}, {"code", "HANDLER_ERROR"}});
+      }
+    });
+    // Track thread for graceful shutdown
+    {
+      std::lock_guard<std::mutex> lock(async_threads_mutex_);
+      async_threads_.push_back(std::move(t));
+      // Clean up finished threads periodically
+      async_threads_.erase(
+          std::remove_if(async_threads_.begin(), async_threads_.end(),
+                         [](std::thread& th) { return !th.joinable(); }),
+          async_threads_.end());
+    }
+    return;
   }
 
   try {
