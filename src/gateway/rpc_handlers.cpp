@@ -587,8 +587,7 @@ void register_rpc_handlers(
         std::string streamed_text;
         auto result = execute_agent_request(
             params, client,
-            [&server, &client, logger, session_key,
-             idempotency_key,
+            [&server, &client, logger, session_key, idempotency_key,
              &streamed_text](const quantclaw::AgentEvent& event) {
               RpcEvent rpc_event;
 

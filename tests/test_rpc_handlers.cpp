@@ -324,14 +324,14 @@ TEST_F(RpcHandlersTest, ChatSendEmitsCumulativeDeltaAndStructuredFinalEvent) {
   std::condition_variable events_cv;
   std::vector<nlohmann::json> chat_events;
 
-  client->Subscribe("chat", [&](const std::string&,
-                                const nlohmann::json& payload) {
-    {
-      std::lock_guard<std::mutex> lock(events_mutex);
-      chat_events.push_back(payload);
-    }
-    events_cv.notify_all();
-  });
+  client->Subscribe("chat",
+                    [&](const std::string&, const nlohmann::json& payload) {
+                      {
+                        std::lock_guard<std::mutex> lock(events_mutex);
+                        chat_events.push_back(payload);
+                      }
+                      events_cv.notify_all();
+                    });
 
   auto result = client->Call("chat.send",
                              {{"message", "Hello"},
@@ -342,9 +342,8 @@ TEST_F(RpcHandlersTest, ChatSendEmitsCumulativeDeltaAndStructuredFinalEvent) {
 
   {
     std::unique_lock<std::mutex> lock(events_mutex);
-    ASSERT_TRUE(events_cv.wait_for(lock, std::chrono::seconds(3), [&] {
-      return chat_events.size() >= 3;
-    }));
+    ASSERT_TRUE(events_cv.wait_for(lock, std::chrono::seconds(3),
+                                   [&] { return chat_events.size() >= 3; }));
   }
 
   ASSERT_GE(chat_events.size(), 3u);
@@ -371,14 +370,14 @@ TEST_F(RpcHandlersTest, ChatSendEmitsErrorEventInsteadOfBlankFinalOnFailure) {
   std::condition_variable events_cv;
   std::vector<nlohmann::json> chat_events;
 
-  client->Subscribe("chat", [&](const std::string&,
-                                const nlohmann::json& payload) {
-    {
-      std::lock_guard<std::mutex> lock(events_mutex);
-      chat_events.push_back(payload);
-    }
-    events_cv.notify_all();
-  });
+  client->Subscribe("chat",
+                    [&](const std::string&, const nlohmann::json& payload) {
+                      {
+                        std::lock_guard<std::mutex> lock(events_mutex);
+                        chat_events.push_back(payload);
+                      }
+                      events_cv.notify_all();
+                    });
 
   EXPECT_THROW(client->Call("chat.send",
                             {{"message", "Hello"},
@@ -389,15 +388,15 @@ TEST_F(RpcHandlersTest, ChatSendEmitsErrorEventInsteadOfBlankFinalOnFailure) {
 
   {
     std::unique_lock<std::mutex> lock(events_mutex);
-    ASSERT_TRUE(events_cv.wait_for(lock, std::chrono::seconds(3), [&] {
-      return !chat_events.empty();
-    }));
+    ASSERT_TRUE(events_cv.wait_for(lock, std::chrono::seconds(3),
+                                   [&] { return !chat_events.empty(); }));
   }
 
   ASSERT_FALSE(chat_events.empty());
   EXPECT_EQ(chat_events.back().value("state", ""), "error");
-  EXPECT_NE(chat_events.back().value("errorMessage", "").find(
-                "mock chat stream blew up"),
+  EXPECT_NE(chat_events.back()
+                .value("errorMessage", "")
+                .find("mock chat stream blew up"),
             std::string::npos);
 
   mock_llm_->stream_should_fail = false;
