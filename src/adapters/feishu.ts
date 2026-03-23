@@ -7,10 +7,11 @@
 
 import {
   Client,
-  WSClient,
   EventDispatcher,
   LoggerLevel,
+  WSClient,
 } from "@larksuiteoapi/node-sdk";
+
 import { ChannelAdapter, runAdapter } from "./base.js";
 
 interface FeishuConfig {
@@ -27,11 +28,7 @@ interface FeishuConfig {
 // Event structure from Feishu long connection
 type FeishuMessageEvent = {
   sender: {
-    sender_id: {
-      open_id?: string;
-      user_id?: string;
-      union_id?: string;
-    };
+    sender_id: { open_id?: string; user_id?: string; union_id?: string };
     display_name?: string;
     simple_name?: string;
     tenant_key?: string;
@@ -46,11 +43,7 @@ type FeishuMessageEvent = {
     content: string;
     mentions?: Array<{
       key: string;
-      id: {
-        open_id?: string;
-        user_id?: string;
-        union_id?: string;
-      };
+      id: { open_id?: string; user_id?: string; union_id?: string };
       name: string;
       tenant_key?: string;
     }>;
@@ -77,7 +70,9 @@ class FeishuAdapter extends ChannelAdapter {
     this.appId = cfg.appId || process.env.FEISHU_APP_ID || "";
 
     console.log(
-      `[feishu] Config: dmPolicy=${this.dmPolicy}, groupPolicy=${this.groupPolicy}, requireMention=${this.requireMention}`,
+      `[feishu] Config: dmPolicy=${this.dmPolicy}, groupPolicy=${
+        this.groupPolicy
+      }, requireMention=${this.requireMention}`,
     );
 
     this.client = new Client({
@@ -129,7 +124,9 @@ class FeishuAdapter extends ChannelAdapter {
     }
 
     console.log(
-      `[feishu] Message from ${senderName} (open_id=${senderOpenId}, user_id=${senderUserId}) in ${isDM ? "DM" : `group#${chatId}`}: "${content.slice(0, 80)}"`,
+      `[feishu] Message from ${senderName} (open_id=${senderOpenId}, user_id=${
+        senderUserId
+      }) in ${isDM ? "DM" : `group#${chatId}`}: "${content.slice(0, 80)}"`,
     );
 
     if (isDM) {
@@ -267,7 +264,9 @@ class FeishuAdapter extends ChannelAdapter {
         const receiveIdType = isGroupChat ? "chat_id" : "open_id";
 
         console.log(
-          `[feishu] Sending reply to ${channelId} (type=${receiveIdType}): "${chunks[i].slice(0, 50)}"`,
+          `[feishu] Sending reply to ${channelId} (type=${receiveIdType}): "${chunks[
+            i
+          ].slice(0, 50)}"`,
         );
 
         const payload: Record<string, unknown> = {
@@ -300,7 +299,9 @@ class FeishuAdapter extends ChannelAdapter {
           };
         };
         console.error(
-          `[feishu] Failed to send message chunk ${i + 1}/${chunks.length}: ${err.msg || err.message}`,
+          `[feishu] Failed to send message chunk ${i + 1}/${chunks.length}: ${
+            err.msg || err.message
+          }`,
         );
         if (err.response?.data?.field_violations) {
           console.error(
