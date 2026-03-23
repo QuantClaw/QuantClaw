@@ -5,7 +5,12 @@
  * Uses Feishu SDK's long connection (WebSocket) mode for event subscription.
  */
 
-import { Client, WSClient, EventDispatcher, LoggerLevel } from "@larksuiteoapi/node-sdk";
+import {
+  Client,
+  WSClient,
+  EventDispatcher,
+  LoggerLevel,
+} from "@larksuiteoapi/node-sdk";
 import { ChannelAdapter, runAdapter } from "./base.js";
 
 interface FeishuConfig {
@@ -72,7 +77,7 @@ class FeishuAdapter extends ChannelAdapter {
     this.appId = cfg.appId || process.env.FEISHU_APP_ID || "";
 
     console.log(
-      `[feishu] Config: dmPolicy=${this.dmPolicy}, groupPolicy=${this.groupPolicy}, requireMention=${this.requireMention}`
+      `[feishu] Config: dmPolicy=${this.dmPolicy}, groupPolicy=${this.groupPolicy}, requireMention=${this.requireMention}`,
     );
 
     this.client = new Client({
@@ -104,7 +109,8 @@ class FeishuAdapter extends ChannelAdapter {
     // Extract sender info - we need open_id for sending replies
     const senderOpenId = sender?.sender_id?.open_id || "";
     const senderUserId = sender?.sender_id?.user_id || "";
-    const senderName = sender?.display_name || sender?.simple_name || senderUserId;
+    const senderName =
+      sender?.display_name || sender?.simple_name || senderUserId;
 
     // Ignore own messages
     if (senderUserId === this.appId) return;
@@ -123,7 +129,7 @@ class FeishuAdapter extends ChannelAdapter {
     }
 
     console.log(
-      `[feishu] Message from ${senderName} (open_id=${senderOpenId}, user_id=${senderUserId}) in ${isDM ? "DM" : `group#${chatId}`}: "${content.slice(0, 80)}"`
+      `[feishu] Message from ${senderName} (open_id=${senderOpenId}, user_id=${senderUserId}) in ${isDM ? "DM" : `group#${chatId}`}: "${content.slice(0, 80)}"`,
     );
 
     if (isDM) {
@@ -140,21 +146,27 @@ class FeishuAdapter extends ChannelAdapter {
       }
 
       // Check if bot is mentioned
-      console.log("[feishu] Group message mentions:", JSON.stringify(message.mentions, null, 2));
+      console.log(
+        "[feishu] Group message mentions:",
+        JSON.stringify(message.mentions, null, 2),
+      );
       console.log("[feishu] Bot name:", this.botName, "App ID:", this.appId);
 
-      const botMentioned = message.mentions?.some(
-        (m) => {
-          const mentioned = m.name === this.botName || m.id?.user_id === this.appId || m.id?.open_id === this.appId;
-          console.log("[feishu] Check mention:", m.name, m.id, "->", mentioned);
-          return mentioned;
-        }
-      );
+      const botMentioned = message.mentions?.some((m) => {
+        const mentioned =
+          m.name === this.botName ||
+          m.id?.user_id === this.appId ||
+          m.id?.open_id === this.appId;
+        console.log("[feishu] Check mention:", m.name, m.id, "->", mentioned);
+        return mentioned;
+      });
 
       if (botMentioned) {
         console.log("[feishu] Bot mentioned, processing");
       } else if (this.requireMention) {
-        console.log("[feishu] Group message ignored (requireMention=true, not mentioned)");
+        console.log(
+          "[feishu] Group message ignored (requireMention=true, not mentioned)",
+        );
         return;
       }
     }
@@ -162,7 +174,7 @@ class FeishuAdapter extends ChannelAdapter {
     if (!content || content.trim() === "") return;
 
     console.log(
-      `[feishu] Processing: "${content.slice(0, 80)}" (session: channel:feishu:${chatId})`
+      `[feishu] Processing: "${content.slice(0, 80)}" (session: channel:feishu:${chatId})`,
     );
 
     // Send typing indicator
@@ -185,7 +197,7 @@ class FeishuAdapter extends ChannelAdapter {
       peerId,
       replyTargetId,
       content.trim(),
-      message.message_id
+      message.message_id,
     );
   }
 
@@ -195,7 +207,7 @@ class FeishuAdapter extends ChannelAdapter {
     const cfg = this.channelConfig as FeishuConfig;
     if (!cfg.appId || !cfg.appSecret) {
       throw new Error(
-        "Feishu App ID and App Secret required. Set in channel config or FEISHU_APP_ID/FEISHU_APP_SECRET env."
+        "Feishu App ID and App Secret required. Set in channel config or FEISHU_APP_ID/FEISHU_APP_SECRET env.",
       );
     }
 
@@ -220,7 +232,10 @@ class FeishuAdapter extends ChannelAdapter {
       this.wsClient = wsClient;
     } catch (e: unknown) {
       const err = e as { message?: string };
-      console.error("[feishu] Failed to start long connection:", err.message || e);
+      console.error(
+        "[feishu] Failed to start long connection:",
+        err.message || e,
+      );
       throw e;
     }
   }
@@ -240,7 +255,7 @@ class FeishuAdapter extends ChannelAdapter {
   protected async sendToPlatform(
     channelId: string,
     text: string,
-    replyTo?: string
+    replyTo?: string,
   ): Promise<void> {
     const chunks = text.match(/[\s\S]{1,2000}/g) ?? [text];
 
@@ -252,7 +267,7 @@ class FeishuAdapter extends ChannelAdapter {
         const receiveIdType = isGroupChat ? "chat_id" : "open_id";
 
         console.log(
-          `[feishu] Sending reply to ${channelId} (type=${receiveIdType}): "${chunks[i].slice(0, 50)}"`
+          `[feishu] Sending reply to ${channelId} (type=${receiveIdType}): "${chunks[i].slice(0, 50)}"`,
         );
 
         const payload: Record<string, unknown> = {
@@ -272,21 +287,25 @@ class FeishuAdapter extends ChannelAdapter {
 
         console.log(
           `[feishu] Message sent successfully:`,
-          result?.data?.message_id || result
+          result?.data?.message_id || result,
         );
       } catch (e: unknown) {
         const err = e as {
           msg?: string;
           message?: string;
-          response?: { data?: { field_violations?: Array<{field: string; description: string}> } };
+          response?: {
+            data?: {
+              field_violations?: Array<{ field: string; description: string }>;
+            };
+          };
         };
         console.error(
-          `[feishu] Failed to send message chunk ${i + 1}/${chunks.length}: ${err.msg || err.message}`
+          `[feishu] Failed to send message chunk ${i + 1}/${chunks.length}: ${err.msg || err.message}`,
         );
         if (err.response?.data?.field_violations) {
           console.error(
             `[feishu] Field violations:`,
-            JSON.stringify(err.response.data.field_violations, null, 2)
+            JSON.stringify(err.response.data.field_violations, null, 2),
           );
         }
       }
