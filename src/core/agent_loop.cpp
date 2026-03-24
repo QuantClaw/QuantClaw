@@ -29,14 +29,14 @@ namespace events = quantclaw::gateway::events;
 namespace quantclaw {
 
 static bool has_non_whitespace(const std::string& value) {
-  return std::any_of(value.begin(), value.end(), [](unsigned char ch) {
-    return !std::isspace(ch);
-  });
+  return std::any_of(value.begin(), value.end(),
+                     [](unsigned char ch) { return !std::isspace(ch); });
 }
 
-static std::vector<ToolCall> filter_valid_tool_calls(
-    const std::vector<ToolCall>& tool_calls,
-    const std::shared_ptr<spdlog::logger>& logger, bool* saw_invalid = nullptr) {
+static std::vector<ToolCall>
+filter_valid_tool_calls(const std::vector<ToolCall>& tool_calls,
+                        const std::shared_ptr<spdlog::logger>& logger,
+                        bool* saw_invalid = nullptr) {
   std::vector<ToolCall> valid;
   bool invalid = false;
 
@@ -257,8 +257,7 @@ std::vector<Message> AgentLoop::ProcessMessage(
           response.tool_calls, logger_, &saw_invalid_tool_call);
 
       if (!valid_tool_calls.empty()) {
-        logger_->info("LLM requested {} tool calls",
-                      valid_tool_calls.size());
+        logger_->info("LLM requested {} tool calls", valid_tool_calls.size());
 
         std::vector<nlohmann::json> tool_calls_json;
         for (const auto& tc : valid_tool_calls) {
@@ -597,13 +596,15 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
       }
 
       if (saw_stream_end) {
-        logger_->error("Streaming response ended without text or valid tool calls");
+        logger_->error(
+            "Streaming response ended without text or valid tool calls");
         if (callback) {
           callback({events::kMessageEnd, {{"content", kEmptyStreamStopText}}});
         }
         Message final_msg;
         final_msg.role = "assistant";
-        final_msg.content.push_back(ContentBlock::MakeText(kEmptyStreamStopText));
+        final_msg.content.push_back(
+            ContentBlock::MakeText(kEmptyStreamStopText));
         new_messages.push_back(final_msg);
         return new_messages;
       }

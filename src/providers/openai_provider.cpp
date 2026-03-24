@@ -274,9 +274,8 @@ struct StreamContext {
 };
 
 static bool HasNonWhitespace(const std::string& value) {
-  return std::any_of(value.begin(), value.end(), [](unsigned char ch) {
-    return !std::isspace(ch);
-  });
+  return std::any_of(value.begin(), value.end(),
+                     [](unsigned char ch) { return !std::isspace(ch); });
 }
 
 static std::vector<ToolCall> TakeCompleteToolCalls(StreamContext* ctx,
