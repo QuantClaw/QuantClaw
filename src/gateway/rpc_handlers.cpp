@@ -584,26 +584,29 @@ void register_rpc_handlers(
                ClientConnection& client) -> nlohmann::json {
         std::string session_key = params.value("sessionKey", "agent:main:main");
         std::string idempotency_key = params.value("idempotencyKey", "");
+        std::string streamed_text;
         auto result = execute_agent_request(
             params, client,
-            [&server, &client, logger, session_key,
-             idempotency_key](const quantclaw::AgentEvent& event) {
+            [&server, &client, logger, session_key, idempotency_key,
+             &streamed_text](const quantclaw::AgentEvent& event) {
               RpcEvent rpc_event;
 
               if (event.type == events::kTextDelta) {
                 // agent.text_delta → event "chat" {state:"delta",
                 // message:{content}, runId, sessionKey}
+                streamed_text += event.data.value("text", "");
                 rpc_event.event = events::kOcChat;
                 rpc_event.payload = {
                     {"state", "delta"},
                     {"message",
-                     {{"role", "assistant"},
-                      {"content", event.data.value("text", "")}}},
+                     {{"role", "assistant"}, {"content", streamed_text}}},
+                    {"content", streamed_text},
                     {"runId", idempotency_key},
                     {"sessionKey", session_key}};
               } else if (event.type == events::kToolUse) {
                 // agent.tool_use → event "agent" {stream:"tool",
                 // data:{id,name,input}}
+                streamed_text.clear();
                 rpc_event.event = events::kOcAgent;
                 rpc_event.payload = {
                     {"stream", "tool"},
@@ -625,13 +628,24 @@ void register_rpc_handlers(
                 // agent.message_end → event "chat" {state:"final", message,
                 // runId, sessionKey}
                 rpc_event.event = events::kOcChat;
-                rpc_event.payload = {
-                    {"state", "final"},
-                    {"message",
-                     {{"role", "assistant"},
-                      {"content", event.data.value("content", "")}}},
-                    {"runId", idempotency_key},
-                    {"sessionKey", session_key}};
+                if (event.data.contains("error") &&
+                    event.data["error"].is_string()) {
+                  rpc_event.payload = {
+                      {"state", "error"},
+                      {"errorMessage", event.data["error"].get<std::string>()},
+                      {"runId", idempotency_key},
+                      {"sessionKey", session_key}};
+                } else {
+                  std::string final_text =
+                      event.data.value("content", streamed_text);
+                  rpc_event.payload = {
+                      {"state", "final"},
+                      {"message",
+                       {{"role", "assistant"}, {"content", final_text}}},
+                      {"content", final_text},
+                      {"runId", idempotency_key},
+                      {"sessionKey", session_key}};
+                }
               } else {
                 // Pass through any other events as-is
                 rpc_event.event = event.type;

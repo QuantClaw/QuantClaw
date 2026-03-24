@@ -50,6 +50,13 @@ type FeishuMessageEvent = {
   };
 };
 
+type FeishuMessagePayload = {
+  receive_id: string;
+  msg_type: "text";
+  content: string;
+  reply_id?: string;
+};
+
 class FeishuAdapter extends ChannelAdapter {
   private client: Client;
   private wsClient: WSClient | null = null;
@@ -58,16 +65,18 @@ class FeishuAdapter extends ChannelAdapter {
   private requireMention: boolean;
   private botName: string = "";
   private appId: string = "";
+  private appSecret: string = "";
 
   constructor() {
     super();
 
-    const cfg = this.channelConfig as FeishuConfig;
+    const cfg = this.channelConfig as unknown as FeishuConfig;
     this.dmPolicy = cfg.dmPolicy ?? "pairing";
     this.groupPolicy = cfg.groupPolicy ?? "open";
     this.requireMention = cfg.requireMention ?? true;
     this.botName = cfg.botName ?? "AI Assistant";
     this.appId = cfg.appId || process.env.FEISHU_APP_ID || "";
+    this.appSecret = cfg.appSecret || process.env.FEISHU_APP_SECRET || "";
 
     console.log(
       `[feishu] Config: dmPolicy=${this.dmPolicy}, groupPolicy=${
@@ -77,7 +86,7 @@ class FeishuAdapter extends ChannelAdapter {
 
     this.client = new Client({
       appId: this.appId,
-      appSecret: cfg.appSecret || process.env.FEISHU_APP_SECRET || "",
+      appSecret: this.appSecret,
       domain: cfg.domain || "https://open.feishu.cn",
     });
   }
@@ -175,7 +184,7 @@ class FeishuAdapter extends ChannelAdapter {
 
     // Send typing indicator
     try {
-      await this.client.im.typing.create({
+      await (this.client.im as any).typing.create({
         params: { chat_id: chatId },
         data: { action: 1 },
       });
@@ -200,8 +209,8 @@ class FeishuAdapter extends ChannelAdapter {
   protected async startPlatform(): Promise<void> {
     console.log("[feishu] Starting Feishu bot with long connection mode...");
 
-    const cfg = this.channelConfig as FeishuConfig;
-    if (!cfg.appId || !cfg.appSecret) {
+    const cfg = this.channelConfig as unknown as FeishuConfig;
+    if (!this.appId || !this.appSecret) {
       throw new Error(
         "Feishu App ID and App Secret required. Set in channel config or FEISHU_APP_ID/FEISHU_APP_SECRET env.",
       );
@@ -216,8 +225,8 @@ class FeishuAdapter extends ChannelAdapter {
 
     // Create and start WebSocket client for long connection
     const wsClient = new WSClient({
-      appId: cfg.appId,
-      appSecret: cfg.appSecret,
+      appId: this.appId,
+      appSecret: this.appSecret,
       domain: cfg.domain || "https://open.feishu.cn",
       loggerLevel: LoggerLevel.info,
     });
@@ -268,7 +277,7 @@ class FeishuAdapter extends ChannelAdapter {
           ].slice(0, 50)}"`,
         );
 
-        const payload: Record<string, unknown> = {
+        const payload: FeishuMessagePayload = {
           receive_id: channelId,
           msg_type: "text",
           content: JSON.stringify({ text: chunks[i] }),
