@@ -23,6 +23,7 @@
 class MockLLMProvider : public quantclaw::LLMProvider {
  public:
   std::string response_text = "I am QuantClaw.";
+  std::vector<quantclaw::ChatCompletionResponse> stream_chunks;
   mutable quantclaw::ChatCompletionRequest last_request;
 
   quantclaw::ChatCompletionResponse
@@ -40,6 +41,12 @@ class MockLLMProvider : public quantclaw::LLMProvider {
       std::function<void(const quantclaw::ChatCompletionResponse&)> callback)
       override {
     last_request = request;
+    if (!stream_chunks.empty()) {
+      for (const auto& chunk : stream_chunks) {
+        callback(chunk);
+      }
+      return;
+    }
     quantclaw::ChatCompletionResponse resp;
     resp.content = response_text;
     resp.is_stream_end = true;
@@ -242,6 +249,34 @@ TEST_F(AgentLoopTest, StreamReturnsNewMessages) {
   EXPECT_FALSE(new_msgs.back().content.empty());
   EXPECT_EQ(new_msgs.back().content[0].type, "text");
   EXPECT_EQ(new_msgs.back().content[0].text, "Final answer.");
+}
+
+TEST_F(AgentLoopTest, StreamInvalidToolCallReturnsReadableFallback) {
+  quantclaw::ChatCompletionResponse tool_chunk;
+  tool_chunk.tool_calls.push_back({"call_invalid", "", {{"command", "ver"}}});
+
+  quantclaw::ChatCompletionResponse end_chunk;
+  end_chunk.is_stream_end = true;
+
+  mock_provider_->stream_chunks = {tool_chunk, end_chunk};
+
+  std::vector<quantclaw::AgentEvent> events;
+  auto new_msgs = agent_loop_->ProcessMessageStream(
+      "Hello", {}, "System.", [&events](const quantclaw::AgentEvent& event) {
+        events.push_back(event);
+      });
+
+  ASSERT_FALSE(new_msgs.empty());
+  EXPECT_EQ(new_msgs.back().role, "assistant");
+  ASSERT_FALSE(new_msgs.back().content.empty());
+  EXPECT_EQ(new_msgs.back().content[0].text,
+            "I couldn't continue because the model emitted an invalid tool "
+            "call. Please try again.");
+  ASSERT_FALSE(events.empty());
+  EXPECT_EQ(events.back().type, quantclaw::gateway::events::kMessageEnd);
+  EXPECT_EQ(events.back().data.value("content", ""),
+            "I couldn't continue because the model emitted an invalid tool "
+            "call. Please try again.");
 }
 
 TEST_F(AgentLoopTest, NonStreamReturnsNewMessages) {

@@ -13,6 +13,9 @@
  *   - Sending chat.send RPC and collecting the response
  */
 
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import WebSocket from "ws";
 
 // ---- Types ----
@@ -62,6 +65,9 @@ export abstract class ChannelAdapter {
     { resolve: (v: unknown) => void; reject: (e: Error) => void }
   >();
   private running = false;
+  private lockFd: number | null = null;
+  private lockPath = "";
+  private ownsLock = false;
 
   constructor() {
     this.gatewayUrl =
@@ -177,6 +183,102 @@ export abstract class ChannelAdapter {
     });
   }
 
+  private acquireSingleInstanceLock(): boolean {
+    const lockDir = path.join(os.tmpdir(), "quantclaw-adapter-locks");
+    fs.mkdirSync(lockDir, { recursive: true });
+    this.lockPath = path.join(lockDir, `${this.channelName}.lock`);
+
+    while (true) {
+      try {
+        this.lockFd = fs.openSync(this.lockPath, "wx");
+        fs.writeFileSync(this.lockFd, String(process.pid));
+        this.ownsLock = true;
+        return true;
+      } catch (err) {
+        const ioErr = err as NodeJS.ErrnoException;
+        if (ioErr.code !== "EEXIST") {
+          throw err;
+        }
+
+        const ownerPid = this.readLockOwnerPid();
+        if (ownerPid !== null && this.isProcessAlive(ownerPid)) {
+          console.warn(
+            `[adapter] Another '${this.channelName}' adapter instance is already active (PID ${ownerPid}); entering standby.`
+          );
+          return false;
+        }
+
+        try {
+          fs.unlinkSync(this.lockPath);
+        } catch (unlinkErr) {
+          const ioUnlinkErr = unlinkErr as NodeJS.ErrnoException;
+          if (ioUnlinkErr.code !== "ENOENT") {
+            throw unlinkErr;
+          }
+        }
+      }
+    }
+  }
+
+  private readLockOwnerPid(): number | null {
+    try {
+      const raw = fs.readFileSync(this.lockPath, "utf8").trim();
+      if (!raw) {
+        return null;
+      }
+      const pid = Number.parseInt(raw, 10);
+      return Number.isFinite(pid) ? pid : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private isProcessAlive(pid: number): boolean {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private releaseSingleInstanceLock(): void {
+    if (this.lockFd !== null) {
+      try {
+        fs.closeSync(this.lockFd);
+      } catch {
+        // Ignore cleanup failures on shutdown.
+      }
+      this.lockFd = null;
+    }
+
+    if (!this.ownsLock || !this.lockPath) {
+      return;
+    }
+
+    try {
+      const ownerPid = this.readLockOwnerPid();
+      if (ownerPid === process.pid && fs.existsSync(this.lockPath)) {
+        fs.unlinkSync(this.lockPath);
+      }
+    } catch {
+      // Ignore cleanup failures on shutdown.
+    } finally {
+      this.ownsLock = false;
+    }
+  }
+
+  private waitUntilStopped(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        if (!this.running) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 1000);
+    });
+  }
+
   protected rpcCall(
     method: string,
     params: Record<string, unknown> = {},
@@ -262,25 +364,26 @@ export abstract class ChannelAdapter {
 
   async run(): Promise<void> {
     this.running = true;
+    const isPrimaryInstance = this.acquireSingleInstanceLock();
 
-    await this.connectGateway();
-    await this.startPlatform();
+    try {
+      if (!isPrimaryInstance) {
+        await this.waitUntilStopped();
+        return;
+      }
 
-    console.log(`[adapter] '${this.channelName}' running`);
+      await this.connectGateway();
+      await this.startPlatform();
 
-    // Keep alive until stopped
-    await new Promise<void>((resolve) => {
-      const check = setInterval(() => {
-        if (!this.running) {
-          clearInterval(check);
-          resolve();
-        }
-      }, 1000);
-    });
+      console.log(`[adapter] '${this.channelName}' running`);
+      await this.waitUntilStopped();
 
-    await this.stopPlatform();
-    this.ws?.close();
-    console.log(`[adapter] '${this.channelName}' stopped`);
+      await this.stopPlatform();
+      this.ws?.close();
+      console.log(`[adapter] '${this.channelName}' stopped`);
+    } finally {
+      this.releaseSingleInstanceLock();
+    }
   }
 
   stop(): void {
