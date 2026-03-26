@@ -3,6 +3,19 @@ build/
 build-win/
 build_test/
 cmake-build-*/
+build-*/
+build.ninja
+build.ninja.d
+Makefile
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+_deps/
+quantclaw_tests*_include.cmake
+quantclaw_tests*_tests.cmake
 Testing/
 *.o
 *.a
@@ -26,6 +39,11 @@ compile_commands.json
 # OS
 .DS_Store
 Thumbs.db
+tmp/
+.vcpkg
+.podman-qc-home/
+config.assistant.local.json
+providers.local/
 
 # Logs and runtime
 *.log
