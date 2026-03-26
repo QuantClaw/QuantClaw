@@ -10,7 +10,7 @@
 
 #include "quantclaw/session/session_manager.hpp"
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 class SessionManagerTest : public ::testing::Test {

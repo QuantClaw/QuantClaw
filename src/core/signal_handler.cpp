@@ -1,12 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/signal_handler.hpp"
+module quantclaw.core.signal_handler;
 
-#include <chrono>
-#include <csignal>
-#include <cstdlib>
-#include <thread>
+import std;
 
 namespace quantclaw {
 

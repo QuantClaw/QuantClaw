@@ -9,7 +9,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/providers/provider_error.hpp"
+import quantclaw.providers.provider_error;
 
 namespace quantclaw {
 

@@ -13,28 +13,30 @@
 #include "quantclaw/channels/adapter_manager.hpp"
 #include "quantclaw/config.hpp"
 #include "quantclaw/constants.hpp"
-#include "quantclaw/core/agent_loop.hpp"
-#include "quantclaw/core/cron_scheduler.hpp"
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/prompt_builder.hpp"
-#include "quantclaw/core/signal_handler.hpp"
-#include "quantclaw/core/skill_loader.hpp"
-#include "quantclaw/core/subagent.hpp"
+import quantclaw.core.agent_loop;
+import quantclaw.core.prompt_builder;
+import quantclaw.core.subagent;
+import quantclaw.core.dag_runtime;
 #include "quantclaw/gateway/command_queue.hpp"
 #include "quantclaw/gateway/daemon_manager.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
 #include "quantclaw/gateway/gateway_server.hpp"
 #include "quantclaw/gateway/protocol.hpp"
-#include "quantclaw/mcp/mcp_tool_manager.hpp"
+import quantclaw.mcp.mcp_tool_manager;
 #include "quantclaw/platform/process.hpp"
 #include "quantclaw/plugins/plugin_system.hpp"
-#include "quantclaw/providers/provider_registry.hpp"
+import quantclaw.providers.provider_registry;
 #include "quantclaw/security/exec_approval.hpp"
 #include "quantclaw/security/rate_limiter.hpp"
 #include "quantclaw/security/rbac.hpp"
 #include "quantclaw/security/tool_permissions.hpp"
 #include "quantclaw/session/session_manager.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.core.memory_manager;
+import quantclaw.core.dag_runtime;
+import quantclaw.core.cron_scheduler;
+import quantclaw.core.signal_handler;
+import quantclaw.core.skill_loader;
+import quantclaw.tools.tool_registry;
 #include "quantclaw/web/api_routes.hpp"
 #include "quantclaw/web/web_server.hpp"
 
@@ -200,6 +202,10 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       logger_);
   agent_loop->SetProviderRegistry(provider_registry.get());
 
+    auto dag_runtime = std::make_shared<quantclaw::DagRuntime>(
+      (sessions_dir / "dag.sqlite3").string(), logger_);
+    agent_loop->SetDagRuntime(dag_runtime);
+
   auto session_manager =
       std::make_shared<quantclaw::SessionManager>(sessions_dir, logger_);
 
@@ -293,7 +299,8 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   // Initialize subagent manager
   auto subagent_manager = std::make_shared<quantclaw::SubagentManager>(logger_);
   if (!config.subagent_config.is_null()) {
-    auto sub_cfg = quantclaw::SubagentConfig::FromJson(config.subagent_config);
+    auto sub_cfg =
+      quantclaw::SubagentConfig::FromJsonString(config.subagent_config.dump());
     subagent_manager->Configure(sub_cfg);
   }
 
@@ -374,7 +381,8 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
                   event.data.contains("content")) {
                 final_response = event.data["content"].get<std::string>();
               }
-            });
+            },
+            session_key);
 
         for (const auto& msg : new_messages) {
           quantclaw::SessionMessage smsg;
@@ -383,7 +391,20 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
           session_manager->AppendMessage(session_key, smsg);
         }
 
-        return {{"sessionKey", session_key}, {"response", final_response}};
+        auto dag_run_id = agent_loop->GetLatestDagRunIdForSession(session_key);
+        if (!dag_run_id.empty()) {
+          nlohmann::json dag_payload = nlohmann::json::object();
+          dag_payload["runId"] = dag_run_id;
+          dag_payload["status"] = "recorded";
+          session_manager->AppendCustomMessage(
+              session_key, "dag_run", dag_payload,
+              nlohmann::json::object(), nlohmann::json::object());
+        }
+
+        nlohmann::json result = nlohmann::json::object();
+        result["sessionKey"] = session_key;
+        result["response"] = final_response;
+        return result;
       },
       // ResponseSender: sends RPC response back to the client
       [&server](const std::string& conn_id, const std::string& req_id, bool ok,

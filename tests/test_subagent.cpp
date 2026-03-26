@@ -4,7 +4,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/core/subagent.hpp"
+import quantclaw.core.subagent;
 
 #include <gtest/gtest.h>
 
@@ -28,19 +28,15 @@ TEST(SpawnModeTest, ToFromString) {
 // --- SubagentConfig ---
 
 TEST(SubagentConfigTest, FromJson) {
-  nlohmann::json j = {
-      {"maxDepth", 3},
-      {"maxChildren", 2},
-      {"allowedAgents", nlohmann::json::array({"agent1", "agent2"})},
-  };
-  auto c = SubagentConfig::FromJson(j);
+  auto c = SubagentConfig::FromJsonString(
+      R"({"maxDepth":3,"maxChildren":2,"allowedAgents":["agent1","agent2"]})");
   EXPECT_EQ(c.max_depth, 3);
   EXPECT_EQ(c.max_children, 2);
   EXPECT_EQ(c.allowed_agents.size(), 2);
 }
 
 TEST(SubagentConfigTest, Defaults) {
-  auto c = SubagentConfig::FromJson(nlohmann::json::object());
+  auto c = SubagentConfig::FromJsonString("{}");
   EXPECT_EQ(c.max_depth, 5);
   EXPECT_EQ(c.max_children, 5);
   EXPECT_TRUE(c.allowed_agents.empty());
@@ -67,7 +63,7 @@ TEST_F(SubagentManagerTest, SpawnBasic) {
   params.label = "test-task";
 
   auto result = mgr_->Spawn(params, "parent-session", 0);
-  EXPECT_EQ(result.status, SpawnResult::kAccepted);
+  EXPECT_EQ(result.status, SpawnResult::Status::kAccepted);
   EXPECT_FALSE(result.child_session_key.empty());
   EXPECT_FALSE(result.run_id.empty());
   EXPECT_EQ(result.mode, SpawnMode::kRun);
@@ -78,7 +74,7 @@ TEST_F(SubagentManagerTest, SpawnDepthLimit) {
   params.task = "Too deep";
 
   auto result = mgr_->Spawn(params, "parent", 3);  // At max depth
-  EXPECT_EQ(result.status, SpawnResult::kForbidden);
+  EXPECT_EQ(result.status, SpawnResult::Status::kForbidden);
   EXPECT_TRUE(result.error.find("depth") != std::string::npos);
 }
 
@@ -88,13 +84,13 @@ TEST_F(SubagentManagerTest, SpawnChildrenLimit) {
 
   // Spawn max_children (2) subagents
   auto r1 = mgr_->Spawn(params, "parent", 0);
-  EXPECT_EQ(r1.status, SpawnResult::kAccepted);
+  EXPECT_EQ(r1.status, SpawnResult::Status::kAccepted);
   auto r2 = mgr_->Spawn(params, "parent", 0);
-  EXPECT_EQ(r2.status, SpawnResult::kAccepted);
+  EXPECT_EQ(r2.status, SpawnResult::Status::kAccepted);
 
   // Third should be rejected
   auto r3 = mgr_->Spawn(params, "parent", 0);
-  EXPECT_EQ(r3.status, SpawnResult::kForbidden);
+  EXPECT_EQ(r3.status, SpawnResult::Status::kForbidden);
   EXPECT_TRUE(r3.error.find("children") != std::string::npos);
 }
 
@@ -108,10 +104,12 @@ TEST_F(SubagentManagerTest, SpawnAllowedAgentsFilter) {
   SpawnParams params;
   params.task = "Test";
   params.agent_id = "agent-a";
-  EXPECT_EQ(mgr_->Spawn(params, "parent", 0).status, SpawnResult::kAccepted);
+  EXPECT_EQ(mgr_->Spawn(params, "parent", 0).status,
+            SpawnResult::Status::kAccepted);
 
   params.agent_id = "agent-c";
-  EXPECT_EQ(mgr_->Spawn(params, "parent", 0).status, SpawnResult::kForbidden);
+  EXPECT_EQ(mgr_->Spawn(params, "parent", 0).status,
+            SpawnResult::Status::kForbidden);
 }
 
 TEST_F(SubagentManagerTest, CompleteRun) {
@@ -121,12 +119,12 @@ TEST_F(SubagentManagerTest, CompleteRun) {
 
   auto* run = mgr_->GetRun(result.run_id);
   ASSERT_NE(run, nullptr);
-  EXPECT_EQ(run->state, SubagentRun::kRunning);
+  EXPECT_EQ(run->state, SubagentRun::State::kRunning);
 
   mgr_->CompleteRun(result.run_id, "Done!");
   run = mgr_->GetRun(result.run_id);
   ASSERT_NE(run, nullptr);
-  EXPECT_EQ(run->state, SubagentRun::kCompleted);
+  EXPECT_EQ(run->state, SubagentRun::State::kCompleted);
   EXPECT_EQ(run->result_summary, "Done!");
 }
 
@@ -138,7 +136,7 @@ TEST_F(SubagentManagerTest, FailRun) {
   mgr_->FailRun(result.run_id, "Something broke");
   auto* run = mgr_->GetRun(result.run_id);
   ASSERT_NE(run, nullptr);
-  EXPECT_EQ(run->state, SubagentRun::kFailed);
+  EXPECT_EQ(run->state, SubagentRun::State::kFailed);
 }
 
 TEST_F(SubagentManagerTest, CancelRun) {
@@ -148,7 +146,7 @@ TEST_F(SubagentManagerTest, CancelRun) {
 
   EXPECT_TRUE(mgr_->CancelRun(result.run_id));
   auto* run = mgr_->GetRun(result.run_id);
-  EXPECT_EQ(run->state, SubagentRun::kCancelled);
+  EXPECT_EQ(run->state, SubagentRun::State::kCancelled);
 
   // Can't cancel again
   EXPECT_FALSE(mgr_->CancelRun(result.run_id));
@@ -202,12 +200,12 @@ TEST_F(SubagentManagerTest, AgentRunner) {
   SpawnParams params;
   params.task = "Do the thing";
   auto result = mgr_->Spawn(params, "parent", 0);
-  EXPECT_EQ(result.status, SpawnResult::kAccepted);
+  EXPECT_EQ(result.status, SpawnResult::Status::kAccepted);
   EXPECT_EQ(received_task, "Do the thing");
 
   // Run should be completed since runner returned synchronously
   auto* run = mgr_->GetRun(result.run_id);
-  EXPECT_EQ(run->state, SubagentRun::kCompleted);
+  EXPECT_EQ(run->state, SubagentRun::State::kCompleted);
   EXPECT_EQ(run->result_summary, "result from agent");
 }
 
@@ -227,7 +225,7 @@ TEST_F(SubagentManagerTest, SpawnSessionMode) {
   params.mode = SpawnMode::kSession;
 
   auto result = mgr_->Spawn(params, "parent", 0);
-  EXPECT_EQ(result.status, SpawnResult::kAccepted);
+  EXPECT_EQ(result.status, SpawnResult::Status::kAccepted);
   EXPECT_EQ(result.mode, SpawnMode::kSession);
 }
 

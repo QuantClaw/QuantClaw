@@ -1,11 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/subagent.hpp"
+module;
 
 #include <algorithm>
+#include <nlohmann/json.hpp>
 #include <random>
 #include <sstream>
+#include <spdlog/spdlog.h>
+
+module quantclaw.core.subagent;
 
 namespace quantclaw {
 
@@ -29,7 +33,8 @@ SpawnMode spawn_mode_from_string(const std::string& s) {
 
 // --- SubagentConfig ---
 
-SubagentConfig SubagentConfig::FromJson(const nlohmann::json& j) {
+SubagentConfig SubagentConfig::FromJsonString(const std::string& json_text) {
+  auto j = nlohmann::json::parse(json_text);
   SubagentConfig c;
   c.max_depth = j.value("maxDepth", 5);
   c.max_children = j.value("maxChildren", 5);
@@ -62,7 +67,7 @@ SpawnResult SubagentManager::Spawn(const SpawnParams& params,
 
   // Check depth limit
   if (current_depth >= config_.max_depth) {
-    result.status = SpawnResult::kForbidden;
+    result.status = SpawnResult::Status::kForbidden;
     result.error =
         "Max spawn depth (" + std::to_string(config_.max_depth) + ") exceeded";
     logger_->warn("Spawn rejected: {}", result.error);
@@ -77,12 +82,13 @@ SpawnResult SubagentManager::Spawn(const SpawnParams& params,
       int active = 0;
       for (const auto& rid : it->second) {
         auto rit = runs_.find(rid);
-        if (rit != runs_.end() && rit->second.state == SubagentRun::kRunning) {
+        if (rit != runs_.end() &&
+            rit->second.state == SubagentRun::State::kRunning) {
           ++active;
         }
       }
       if (active >= config_.max_children) {
-        result.status = SpawnResult::kForbidden;
+        result.status = SpawnResult::Status::kForbidden;
         result.error = "Max active children (" +
                        std::to_string(config_.max_children) + ") exceeded";
         logger_->warn("Spawn rejected: {}", result.error);
@@ -98,7 +104,7 @@ SpawnResult SubagentManager::Spawn(const SpawnParams& params,
     auto found = std::find(config_.allowed_agents.begin(),
                            config_.allowed_agents.end(), target_agent);
     if (found == config_.allowed_agents.end()) {
-      result.status = SpawnResult::kForbidden;
+      result.status = SpawnResult::Status::kForbidden;
       result.error = "Agent '" + target_agent + "' not in allowed list";
       logger_->warn("Spawn rejected: {}", result.error);
       return result;
@@ -117,7 +123,7 @@ SpawnResult SubagentManager::Spawn(const SpawnParams& params,
   run.model = params.model;
   run.mode = params.mode;
   run.cleanup = params.cleanup;
-  run.state = SubagentRun::kRunning;
+  run.state = SubagentRun::State::kRunning;
 
   {
     std::lock_guard<std::mutex> lock(mu_);
@@ -145,13 +151,13 @@ SpawnResult SubagentManager::Spawn(const SpawnParams& params,
       }
     } catch (const std::exception& e) {
       FailRun(run_id, e.what());
-      result.status = SpawnResult::kError;
+      result.status = SpawnResult::Status::kError;
       result.error = e.what();
       return result;
     }
   }
 
-  result.status = SpawnResult::kAccepted;
+  result.status = SpawnResult::Status::kAccepted;
   result.child_session_key = child_key;
   result.run_id = run_id;
   result.mode = params.mode;
@@ -164,7 +170,7 @@ void SubagentManager::CompleteRun(const std::string& run_id,
   std::lock_guard<std::mutex> lock(mu_);
   auto it = runs_.find(run_id);
   if (it != runs_.end()) {
-    it->second.state = SubagentRun::kCompleted;
+    it->second.state = SubagentRun::State::kCompleted;
     it->second.result_summary = result_summary;
     logger_->info("Subagent {} completed", run_id);
   }
@@ -175,7 +181,7 @@ void SubagentManager::FailRun(const std::string& run_id,
   std::lock_guard<std::mutex> lock(mu_);
   auto it = runs_.find(run_id);
   if (it != runs_.end()) {
-    it->second.state = SubagentRun::kFailed;
+    it->second.state = SubagentRun::State::kFailed;
     it->second.result_summary = "Error: " + error;
     logger_->error("Subagent {} failed: {}", run_id, error);
   }
@@ -184,10 +190,10 @@ void SubagentManager::FailRun(const std::string& run_id,
 bool SubagentManager::CancelRun(const std::string& run_id) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = runs_.find(run_id);
-  if (it == runs_.end() || it->second.state != SubagentRun::kRunning) {
+  if (it == runs_.end() || it->second.state != SubagentRun::State::kRunning) {
     return false;
   }
-  it->second.state = SubagentRun::kCancelled;
+  it->second.state = SubagentRun::State::kCancelled;
   logger_->info("Subagent {} cancelled", run_id);
   return true;
 }
@@ -202,7 +208,8 @@ SubagentManager::ActiveChildren(const std::string& parent_session_key) const {
 
   for (const auto& rid : it->second) {
     auto rit = runs_.find(rid);
-    if (rit != runs_.end() && rit->second.state == SubagentRun::kRunning) {
+    if (rit != runs_.end() &&
+        rit->second.state == SubagentRun::State::kRunning) {
       result.push_back(rit->second);
     }
   }
@@ -229,9 +236,9 @@ int SubagentManager::CleanupCompleted() {
   std::vector<std::string> to_remove;
 
   for (const auto& [id, run] : runs_) {
-    if (run.cleanup && (run.state == SubagentRun::kCompleted ||
-                        run.state == SubagentRun::kFailed ||
-                        run.state == SubagentRun::kCancelled)) {
+    if (run.cleanup && (run.state == SubagentRun::State::kCompleted ||
+                        run.state == SubagentRun::State::kFailed ||
+                        run.state == SubagentRun::State::kCancelled)) {
       to_remove.push_back(id);
     }
   }

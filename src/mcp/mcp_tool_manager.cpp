@@ -1,9 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/mcp/mcp_tool_manager.hpp"
+module;
 
-#include "quantclaw/tools/tool_registry.hpp"
+import std;
+
+module quantclaw.mcp.mcp_tool_manager;
+
+import quantclaw.mcp.mcp_client;
+import quantclaw.tools.tool_registry;
 
 namespace quantclaw::mcp {
 
@@ -37,7 +42,7 @@ void MCPToolManager::DiscoverTools(const MCPConfig& config) {
         std::string qualified = MakeQualifiedName(server_cfg.name, tool.name);
         tool_to_server_[qualified] = server_cfg.name;
         tool_to_original_name_[qualified] = tool.name;
-        tool_meta_[qualified] = {tool.description, tool.parameters};
+        tool_meta_[qualified] = {tool.description, tool.parameters.dump()};
 
         logger_->info("Discovered MCP tool: {} -> {}", qualified,
                       tool.description);
@@ -56,14 +61,18 @@ void MCPToolManager::DiscoverTools(const MCPConfig& config) {
 
 void MCPToolManager::RegisterInto(ToolRegistry& registry) {
   for (const auto& [qualified_name, meta] : tool_meta_) {
+    auto schema = nlohmann::json::parse(meta.parameters_json, nullptr, false);
+    if (schema.is_discarded()) {
+      schema = nlohmann::json::object();
+    }
     auto self =
         this;  // capture raw pointer; MCPToolManager outlives the lambda
     const auto& name = qualified_name;  // C++17: structured bindings cannot be
                                         // captured in lambdas
     registry.RegisterExternalTool(
-        qualified_name, meta.description, meta.parameters,
+        qualified_name, meta.description, schema,
         [self, name](const nlohmann::json& args) -> std::string {
-          return self->ExecuteTool(name, args);
+          return self->ExecuteTool(name, args.dump());
         });
   }
 
@@ -71,7 +80,7 @@ void MCPToolManager::RegisterInto(ToolRegistry& registry) {
 }
 
 std::string MCPToolManager::ExecuteTool(const std::string& qualified_name,
-                                        const nlohmann::json& arguments) {
+                                        const std::string& arguments_json) {
   auto server_it = tool_to_server_.find(qualified_name);
   if (server_it == tool_to_server_.end()) {
     throw std::runtime_error("Unknown MCP tool: " + qualified_name);
@@ -92,7 +101,13 @@ std::string MCPToolManager::ExecuteTool(const std::string& qualified_name,
   logger_->debug("Executing MCP tool '{}' (server: '{}', original: '{}')",
                  qualified_name, server_it->second, original_it->second);
 
-  auto response = client_it->second->CallTool(original_it->second, arguments);
+  auto parsed_args = nlohmann::json::parse(arguments_json, nullptr, false);
+  if (parsed_args.is_discarded()) {
+    throw std::runtime_error("Invalid JSON arguments for MCP tool: " +
+                             qualified_name);
+  }
+
+  auto response = client_it->second->CallTool(original_it->second, parsed_args);
 
   if (!response.error.empty()) {
     throw std::runtime_error("MCP tool error: " + response.error);

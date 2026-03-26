@@ -1,7 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/providers/provider_error.hpp"
+module;
+
+#include <stdexcept>
+#include <string>
+
+module quantclaw.providers.provider_error;
 
 namespace quantclaw {
 

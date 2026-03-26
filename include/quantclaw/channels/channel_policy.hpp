@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 namespace quantclaw {

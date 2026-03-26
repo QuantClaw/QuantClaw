@@ -4,8 +4,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/core/default_context_engine.hpp"
-#include "quantclaw/core/multi_stage_compaction.hpp"
+import quantclaw.core.default_context_engine;
+import quantclaw.core.multi_stage_compaction;
 
 #include <gtest/gtest.h>
 

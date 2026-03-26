@@ -8,10 +8,10 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/core/memory_search.hpp"
-#include "quantclaw/core/mmr_reranker.hpp"
-#include "quantclaw/core/temporal_decay.hpp"
-#include "quantclaw/core/vector_index.hpp"
+import quantclaw.core.mmr_reranker;
+import quantclaw.core.temporal_decay;
+import quantclaw.core.vector_index;
+import quantclaw.core.memory_search;
 #include "quantclaw/providers/embedding_provider.hpp"
 
 #include <gtest/gtest.h>

@@ -19,14 +19,14 @@
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/config.hpp"
-#include "quantclaw/core/agent_loop.hpp"
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+import quantclaw.core.agent_loop;
+import quantclaw.core.memory_manager;
+import quantclaw.core.skill_loader;
 #include "quantclaw/providers/llm_provider.hpp"
 #include "quantclaw/providers/provider_registry.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.tools.tool_registry;
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 class ConfigTest : public ::testing::Test {
@@ -125,6 +125,24 @@ TEST_F(ConfigTest, ParseOpenClawFormat) {
 
   ASSERT_EQ(config.tools_permission.allow.size(), 2u);
   EXPECT_EQ(config.tools_permission.allow[0], "group:fs");
+}
+
+TEST_F(ConfigTest, ParseOpenClawFormatWithLocalProvider) {
+  nlohmann::json json_config = {
+      {"agent", {{"model", "local/Qwen3.5-4B.Q6_K.gguf"}}},
+      {"providers",
+       {{"local",
+         {{"apiKey", "local"},
+          {"baseUrl", "http://127.0.0.1:8081"},
+          {"timeout", 120}}}}}};
+
+  auto config = quantclaw::QuantClawConfig::FromJson(json_config);
+
+  EXPECT_EQ(config.agent.model, "local/Qwen3.5-4B.Q6_K.gguf");
+  ASSERT_TRUE(config.providers.count("local"));
+  EXPECT_EQ(config.providers.at("local").api_key, "local");
+  EXPECT_EQ(config.providers.at("local").base_url, "http://127.0.0.1:8081");
+  EXPECT_EQ(config.providers.at("local").timeout, 120);
 }
 
 // --- Defaults ---

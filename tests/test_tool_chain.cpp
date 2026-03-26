@@ -4,7 +4,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/tools/tool_chain.hpp"
+import quantclaw.tools.tool_chain;
 
 #include <gtest/gtest.h>
 

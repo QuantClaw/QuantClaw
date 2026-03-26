@@ -14,8 +14,8 @@
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/config.hpp"
-#include "quantclaw/core/context_pruner.hpp"
-#include "quantclaw/core/memory_search.hpp"
+import quantclaw.core.context_pruner;
+import quantclaw.core.memory_search;
 #include "quantclaw/gateway/command_queue.hpp"
 
 #include <gtest/gtest.h>

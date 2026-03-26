@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <cstdio>
+#include <cstdlib>
+#include <filesystem>
 #include <memory>
 #include <sstream>
 
@@ -11,6 +13,7 @@
 #include "quantclaw/cli/agent_commands.hpp"
 #include "quantclaw/cli/cli_manager.hpp"
 #include "quantclaw/cli/gateway_commands.hpp"
+#include "quantclaw/cli/onboard_commands.hpp"
 #include "quantclaw/cli/session_commands.hpp"
 
 #include <gtest/gtest.h>
@@ -354,6 +357,137 @@ class GatewayCommandsTest : public ::testing::Test {
 
 TEST_F(GatewayCommandsTest, Construction) {
   EXPECT_NO_THROW({ GatewayCommands gw(logger_); });
+}
+
+TEST_F(GatewayCommandsTest, CallCommandWithoutMethodReturnsUsageError) {
+  GatewayCommands gw(logger_);
+  auto err = capture_stderr([&]() {
+    int ret = gw.CallCommand({});
+    EXPECT_EQ(ret, 1);
+  });
+  EXPECT_NE(err.find("Usage:"), std::string::npos);
+}
+
+TEST_F(GatewayCommandsTest, CallCommandInvalidJsonReturnsError) {
+  GatewayCommands gw(logger_);
+  auto err = capture_stderr([&]() {
+    int ret = gw.CallCommand({"gateway.status", "{invalid-json"});
+    EXPECT_EQ(ret, 1);
+  });
+  EXPECT_NE(err.find("Invalid JSON params"), std::string::npos);
+}
+
+TEST_F(GatewayCommandsTest, StatusWhenGatewayUnavailableReturnsError) {
+  GatewayCommands gw(logger_);
+  gw.SetGatewayUrl("ws://127.0.0.1:1");
+  int ret = gw.StatusCommand({"--json"});
+  EXPECT_EQ(ret, 1);
+}
+
+class EnvVarGuard {
+ public:
+  EnvVarGuard(const std::string& key, const std::string& value) : key_(key) {
+#ifdef _WIN32
+    char* old = nullptr;
+    size_t len = 0;
+    _dupenv_s(&old, &len, key.c_str());
+    if (old) {
+      had_old_ = true;
+      old_value_ = old;
+      free(old);
+    }
+    _putenv_s(key.c_str(), value.c_str());
+#else
+    const char* old = std::getenv(key.c_str());
+    if (old) {
+      had_old_ = true;
+      old_value_ = old;
+    }
+    setenv(key.c_str(), value.c_str(), 1);
+#endif
+  }
+
+  ~EnvVarGuard() {
+#ifdef _WIN32
+    if (had_old_) {
+      _putenv_s(key_.c_str(), old_value_.c_str());
+    } else {
+      _putenv_s(key_.c_str(), "");
+    }
+#else
+    if (had_old_) {
+      setenv(key_.c_str(), old_value_.c_str(), 1);
+    } else {
+      unsetenv(key_.c_str());
+    }
+#endif
+  }
+
+ private:
+  std::string key_;
+  bool had_old_ = false;
+  std::string old_value_;
+};
+
+class OnboardCommandsTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
+    logger_ = std::make_shared<spdlog::logger>("test_onboard_cmd", null_sink);
+
+    auto unique = std::to_string(std::chrono::steady_clock::now()
+                                     .time_since_epoch()
+                                     .count());
+    temp_home_ = std::filesystem::temp_directory_path() /
+                 ("quantclaw_onboard_test_" + unique);
+    std::filesystem::create_directories(temp_home_);
+    home_guard_ = std::make_unique<EnvVarGuard>("HOME", temp_home_.string());
+
+    onboard_ = std::make_unique<OnboardCommands>(logger_);
+  }
+
+  void TearDown() override {
+    onboard_.reset();
+    home_guard_.reset();
+    std::error_code ec;
+    std::filesystem::remove_all(temp_home_, ec);
+  }
+
+  std::shared_ptr<spdlog::logger> logger_;
+  std::unique_ptr<OnboardCommands> onboard_;
+  std::filesystem::path temp_home_;
+  std::unique_ptr<EnvVarGuard> home_guard_;
+};
+
+TEST_F(OnboardCommandsTest, QuickSetupCreatesConfigAndWorkspaceFiles) {
+  int ret = onboard_->QuickSetupCommand({});
+  EXPECT_EQ(ret, 0);
+
+  auto config = temp_home_ / ".quantclaw" / "quantclaw.json";
+  auto ws = temp_home_ / ".quantclaw" / "agents" / "main" / "workspace";
+
+  EXPECT_TRUE(std::filesystem::exists(config));
+  EXPECT_TRUE(std::filesystem::exists(ws / "SOUL.md"));
+  EXPECT_TRUE(std::filesystem::exists(ws / "MEMORY.md"));
+  EXPECT_TRUE(std::filesystem::exists(ws / "SKILL.md"));
+  EXPECT_TRUE(std::filesystem::exists(ws / "IDENTITY.md"));
+  EXPECT_TRUE(std::filesystem::exists(ws / "HEARTBEAT.md"));
+  EXPECT_TRUE(std::filesystem::exists(ws / "USER.md"));
+  EXPECT_TRUE(std::filesystem::exists(ws / "AGENTS.md"));
+  EXPECT_TRUE(std::filesystem::exists(ws / "TOOLS.md"));
+}
+
+TEST_F(OnboardCommandsTest, OnboardSkipDaemonWithDefaultAnswers) {
+  std::istringstream scripted_input("\n\n\n");
+  auto* old_buf = std::cin.rdbuf(scripted_input.rdbuf());
+
+  int ret = onboard_->OnboardCommand({"--skip-daemon"});
+
+  std::cin.rdbuf(old_buf);
+  EXPECT_EQ(ret, 0);
+
+  auto config = temp_home_ / ".quantclaw" / "quantclaw.json";
+  EXPECT_TRUE(std::filesystem::exists(config));
 }
 
 // Note: status_command, start_command etc. involve gateway connections

@@ -8,7 +8,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "quantclaw/providers/provider_error.hpp"
+import quantclaw.providers.provider_error;
 
 namespace quantclaw {
 

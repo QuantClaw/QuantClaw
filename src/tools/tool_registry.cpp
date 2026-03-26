@@ -1,9 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/tools/tool_registry.hpp"
+module;
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -14,20 +15,24 @@
 #include <thread>
 
 #include <httplib.h>
+#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/core/cron_scheduler.hpp"
-#include "quantclaw/core/memory_search.hpp"
-
-namespace fs = std::filesystem;
-#include "quantclaw/core/subagent.hpp"
-#include "quantclaw/mcp/mcp_tool_manager.hpp"
 #include "quantclaw/platform/process.hpp"
 #include "quantclaw/security/exec_approval.hpp"
 #include "quantclaw/security/sandbox.hpp"
 #include "quantclaw/security/tool_permissions.hpp"
 #include "quantclaw/session/session_manager.hpp"
-#include "quantclaw/tools/tool_chain.hpp"
+
+module quantclaw.tools.tool_registry;
+
+import quantclaw.core.subagent;
+import quantclaw.core.cron_scheduler;
+import quantclaw.core.memory_search;
+import quantclaw.mcp.mcp_tool_manager;
+import quantclaw.tools.tool_chain;
+
+namespace fs = std::filesystem;
 
 namespace quantclaw {
 
@@ -109,7 +114,7 @@ void ToolRegistry::register_tool(
       std::remove_if(tool_schemas_.begin(), tool_schemas_.end(),
                      [&name](const ToolSchema& s) { return s.name == name; }),
       tool_schemas_.end());
-  tool_schemas_.push_back({name, description, std::move(params_schema)});
+  tool_schemas_.push_back({name, description, params_schema.dump()});
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +269,7 @@ void ToolRegistry::RegisterChainTool() {
                            "Execute a pipeline of tools in sequence. Each step "
                            "can reference previous results via "
                            "{{prev.result}} or {{steps[N].result}} templates.",
-                           chain_params});
+                           chain_params.dump()});
 
   logger_->info("Registered chain tool");
 }
@@ -319,9 +324,10 @@ void ToolRegistry::SetSubagentManager(SubagentManager* manager,
     auto result = subagent_manager_->Spawn(sp, current_session_key_);
 
     nlohmann::json r;
-    r["status"] = (result.status == SpawnResult::kAccepted)    ? "accepted"
-                  : (result.status == SpawnResult::kForbidden) ? "forbidden"
-                                                               : "error";
+    r["status"] =
+      (result.status == SpawnResult::Status::kAccepted)     ? "accepted"
+      : (result.status == SpawnResult::Status::kForbidden) ? "forbidden"
+                                   : "error";
     if (!result.child_session_key.empty())
       r["child_session_key"] = result.child_session_key;
     if (!result.run_id.empty())
@@ -357,7 +363,7 @@ void ToolRegistry::SetSubagentManager(SubagentManager* manager,
                       tool_schemas_.end());
   tool_schemas_.push_back({"spawn_subagent",
                            "Spawn a subagent to handle a subtask autonomously.",
-                           sp});
+                           sp.dump()});
   logger_->info("Subagent manager set, spawn_subagent tool registered");
 }
 
@@ -447,7 +453,7 @@ void ToolRegistry::SetCronScheduler(std::shared_ptr<CronScheduler> sched) {
       tool_schemas_.end());
   tool_schemas_.push_back({"cron",
                            "Manage gateway cron jobs: list, add, remove, run.",
-                           cron_params});
+                           cron_params.dump()});
 
   logger_->info("Cron scheduler set, cron tool registered");
 }
@@ -493,7 +499,8 @@ void ToolRegistry::SetSessionManager(std::shared_ptr<SessionManager> mgr) {
   tool_schemas_.push_back(
       {"sessions_list", "List agent sessions.",
        nlohmann::json::parse(
-           R"JSON({"type":"object","properties":{"limit":{"type":"integer","description":"Max results (default 20)"},"offset":{"type":"integer","description":"Offset for pagination"}}})JSON")});
+         R"JSON({"type":"object","properties":{"limit":{"type":"integer","description":"Max results (default 20)"},"offset":{"type":"integer","description":"Offset for pagination"}}})JSON")
+         .dump()});
 
   // sessions_history
   tools_["sessions_history"] =
@@ -526,7 +533,8 @@ void ToolRegistry::SetSessionManager(std::shared_ptr<SessionManager> mgr) {
   tool_schemas_.push_back(
       {"sessions_history", "Read the transcript of a session.",
        nlohmann::json::parse(
-           R"JSON({"type":"object","properties":{"sessionKey":{"type":"string","description":"Session key"},"limit":{"type":"integer","description":"Max messages (default 50)"}},"required":["sessionKey"]})JSON")});
+         R"JSON({"type":"object","properties":{"sessionKey":{"type":"string","description":"Session key"},"limit":{"type":"integer","description":"Max messages (default 50)"}},"required":["sessionKey"]})JSON")
+         .dump()});
 
   // sessions_send
   tools_["sessions_send"] =
@@ -548,7 +556,8 @@ void ToolRegistry::SetSessionManager(std::shared_ptr<SessionManager> mgr) {
   tool_schemas_.push_back(
       {"sessions_send", "Send a message into another session (agent-to-agent).",
        nlohmann::json::parse(
-           R"({"type":"object","properties":{"sessionKey":{"type":"string","description":"Target session key"},"message":{"type":"string","description":"Message text"}},"required":["sessionKey","message"]})")});
+         R"({"type":"object","properties":{"sessionKey":{"type":"string","description":"Target session key"},"message":{"type":"string","description":"Message text"}},"required":["sessionKey","message"]})")
+         .dump()});
 
   logger_->info(
       "Session manager set: sessions_list/history/send tools registered");
@@ -571,7 +580,7 @@ void ToolRegistry::RegisterExternalTool(
       std::remove_if(tool_schemas_.begin(), tool_schemas_.end(),
                      [&name](const ToolSchema& s) { return s.name == name; }),
       tool_schemas_.end());
-  tool_schemas_.push_back({name, description, parameters});
+  tool_schemas_.push_back({name, description, parameters.dump()});
   external_tools_.insert(name);
   logger_->info("Registered external tool: {}", name);
 }
@@ -598,6 +607,16 @@ std::string ToolRegistry::ExecuteTool(const std::string& tool_name,
   if (!check_permission(tool_name))
     throw std::runtime_error("Permission denied: tool '" + tool_name +
                              "' is not allowed");
+  if (should_request_mutation_approval(tool_name, parameters)) {
+    auto decision =
+        approval_manager_->RequestApproval(approval_summary(tool_name, parameters));
+    if (decision == ApprovalDecision::kDenied) {
+      throw std::runtime_error("Tool execution denied: " + tool_name);
+    }
+    if (decision == ApprovalDecision::kTimeout) {
+      throw std::runtime_error("Tool approval timed out: " + tool_name);
+    }
+  }
   logger_->debug("Executing tool: {} params: {}", tool_name, parameters.dump());
   try {
     auto result = tools_[tool_name](parameters);
@@ -629,6 +648,95 @@ std::vector<ToolRegistry::ToolSchema> ToolRegistry::GetToolSchemas() const {
 
 bool ToolRegistry::HasTool(const std::string& tool_name) const {
   return tools_.find(tool_name) != tools_.end();
+}
+
+bool ToolRegistry::looks_like_network_write(const nlohmann::json& params) {
+  if (!params.is_object())
+    return false;
+
+  auto method_it = params.find("method");
+  if (method_it == params.end() || !method_it->is_string())
+    return false;
+
+  std::string method = method_it->get<std::string>();
+  std::transform(method.begin(), method.end(), method.begin(),
+                 [](unsigned char c) { return std::toupper(c); });
+  return method == "POST" || method == "PUT" || method == "PATCH" ||
+         method == "DELETE";
+}
+
+bool ToolRegistry::looks_like_mutating_action(const nlohmann::json& params) {
+  if (!params.is_object())
+    return false;
+
+  auto action_it = params.find("action");
+  if (action_it == params.end() || !action_it->is_string())
+    return false;
+
+  std::string action = action_it->get<std::string>();
+  std::transform(action.begin(), action.end(), action.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+
+  return action == "add" || action == "create" || action == "delete" ||
+         action == "remove" || action == "update" || action == "set" ||
+         action == "install" || action == "enable" || action == "disable" ||
+         action == "write" || action == "send-keys" || action == "start" ||
+         action == "stop" || action == "run" || action == "kill";
+}
+
+std::string ToolRegistry::approval_summary(const std::string& tool_name,
+                                           const nlohmann::json& params) {
+  std::string payload = params.dump();
+  if (payload.size() > 240) {
+    payload = payload.substr(0, 240) + "...";
+  }
+  return "tool:" + tool_name + " args=" + payload;
+}
+
+bool ToolRegistry::IsMutatingToolCall(const std::string& tool_name,
+                                      const nlohmann::json& parameters) const {
+  if (tool_name == "write" || tool_name == "edit" ||
+      tool_name == "apply_patch" || tool_name == "exec" ||
+      tool_name == "bash") {
+    return true;
+  }
+
+  if (tool_name == "process") {
+    return looks_like_mutating_action(parameters);
+  }
+
+  if (external_tools_.count(tool_name)) {
+    if (looks_like_network_write(parameters) ||
+        looks_like_mutating_action(parameters)) {
+      return true;
+    }
+
+    std::string lowered = tool_name;
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return lowered.find("write") != std::string::npos ||
+           lowered.find("create") != std::string::npos ||
+           lowered.find("update") != std::string::npos ||
+           lowered.find("delete") != std::string::npos ||
+           lowered.find("install") != std::string::npos ||
+           lowered.find("enable") != std::string::npos ||
+           lowered.find("disable") != std::string::npos ||
+           lowered.find("patch") != std::string::npos ||
+           lowered.find("remove") != std::string::npos;
+  }
+
+  return false;
+}
+
+bool ToolRegistry::should_request_mutation_approval(
+    const std::string& tool_name, const nlohmann::json& params) const {
+  if (!approval_manager_) {
+    return false;
+  }
+  if (tool_name == "exec" || tool_name == "bash") {
+    return false;
+  }
+  return IsMutatingToolCall(tool_name, params);
 }
 
 // ---------------------------------------------------------------------------

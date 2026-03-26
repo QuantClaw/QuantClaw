@@ -6,7 +6,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/mcp/mcp_server.hpp"
+import quantclaw.mcp.mcp_server;
 
 #include <gtest/gtest.h>
 
@@ -73,11 +73,9 @@ TEST_F(MCPServerTest, CallTool) {
   EXPECT_EQ(content[0]["text"], "Processed: hello");
 }
 
-// --- Backward compatibility: old method names still work ---
-
-TEST_F(MCPServerTest, ListToolsLegacyName) {
+TEST_F(MCPServerTest, ListTools) {
   nlohmann::json request = {
-      {"jsonrpc", "2.0"}, {"id", 10}, {"method", "list_tools"}, {"params", {}}};
+  {"jsonrpc", "2.0"}, {"id", 10}, {"method", "tools/list"}, {"params", {}}};
 
   auto response = server_->HandleRequest(request);
 
@@ -86,11 +84,11 @@ TEST_F(MCPServerTest, ListToolsLegacyName) {
   EXPECT_EQ(response["result"]["tools"].size(), 1u);
 }
 
-TEST_F(MCPServerTest, CallToolLegacyName) {
+TEST_F(MCPServerTest, CallTool) {
   nlohmann::json request = {
       {"jsonrpc", "2.0"},
       {"id", 11},
-      {"method", "call_tool"},
+  {"method", "tools/call"},
       {"params",
        {{"name", "test_tool"}, {"arguments", {{"input", "legacy"}}}}}};
 

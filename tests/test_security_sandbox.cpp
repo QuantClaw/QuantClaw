@@ -7,7 +7,7 @@
 #include "quantclaw/platform/process.hpp"
 #include "quantclaw/security/sandbox.hpp"
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 #ifdef __linux__

@@ -11,7 +11,7 @@
 #include <string>
 #include <thread>
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/platform/ipc.hpp"

@@ -23,7 +23,7 @@
 
 #include "quantclaw/gateway/daemon_manager.hpp"
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 using namespace quantclaw::gateway;

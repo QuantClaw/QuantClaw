@@ -1,13 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/providers/provider_registry.hpp"
+module quantclaw.providers.provider_registry;
 
-#include <algorithm>
-#include <cstdlib>
+import std;
+
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 #include "quantclaw/providers/anthropic_provider.hpp"
-#include "quantclaw/providers/openai_provider.hpp"
 
 namespace quantclaw {
 
@@ -38,72 +39,13 @@ void ProviderRegistry::RegisterFactory(const std::string& provider_id,
 }
 
 void ProviderRegistry::RegisterBuiltinFactories() {
-  // OpenAI-compatible factory (also works for Ollama, Together, etc.)
-  RegisterFactory("openai", [](const ProviderEntry& entry,
-                               std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty() ? "https://api.openai.com/v1" : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
-  });
-
-  // Anthropic
-  RegisterFactory("anthropic", [](const ProviderEntry& entry,
-                                  std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty() ? "https://api.anthropic.com" : entry.base_url;
-    return std::make_shared<AnthropicProvider>(entry.api_key, url,
-                                               entry.timeout, logger);
-  });
-
-  // Ollama (uses OpenAI-compatible API)
-  RegisterFactory("ollama", [](const ProviderEntry& entry,
-                               std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty() ? "http://localhost:11434/v1" : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
-  });
-
-  // Gemini / Google (uses OpenAI-compatible API via base_url override)
-  RegisterFactory("gemini", [](const ProviderEntry& entry,
-                               std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty()
-            ? "https://generativelanguage.googleapis.com/v1beta/openai"
-            : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
-  });
-
-  // Google alias
-  RegisterFactory("google", factories_["gemini"]);
-
-  // Bedrock (uses OpenAI-compatible gateway)
-  RegisterFactory("bedrock", [](const ProviderEntry& entry,
-                                std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty() ? "http://localhost:8080/v1" : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
-  });
-
-  // OpenRouter
-  RegisterFactory("openrouter", [](const ProviderEntry& entry,
-                                   std::shared_ptr<spdlog::logger> logger) {
-    std::string url = entry.base_url.empty() ? "https://openrouter.ai/api/v1"
-                                             : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
-  });
-
-  // Together
-  RegisterFactory("together", [](const ProviderEntry& entry,
-                                 std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty() ? "https://api.together.xyz/v1" : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
+  RegisterFactory("local", [](const ProviderEntry& entry,
+                 std::shared_ptr<spdlog::logger> logger) {
+  std::string url =
+    entry.base_url.empty() ? "http://127.0.0.1:8081" : entry.base_url;
+  std::string api_key = entry.api_key.empty() ? "local" : entry.api_key;
+  return std::make_shared<AnthropicProvider>(api_key, url, entry.timeout,
+                         logger);
   });
 }
 
@@ -351,7 +293,13 @@ ProviderRegistry::resolve_api_key(const ProviderEntry& entry) const {
 
   // Convention-based env vars
   std::string upper_id = entry.id;
-  std::transform(upper_id.begin(), upper_id.end(), upper_id.begin(), ::toupper);
+  std::transform(upper_id.begin(), upper_id.end(), upper_id.begin(),
+                 [](unsigned char c) {
+                   if (std::isalnum(c)) {
+                     return static_cast<char>(std::toupper(c));
+                   }
+                   return '_';
+                 });
 
   // Try PROVIDER_API_KEY (e.g. OPENAI_API_KEY)
   std::string env_name = upper_id + "_API_KEY";
@@ -361,6 +309,12 @@ ProviderRegistry::resolve_api_key(const ProviderEntry& entry) const {
 
   // Try PROVIDER_KEY
   env_name = upper_id + "_KEY";
+  val = std::getenv(env_name.c_str());
+  if (val)
+    return val;
+
+  // Try PROVIDER_TOKEN (e.g. GITHUB_TOKEN, GITHUB_COPILOT_TOKEN)
+  env_name = upper_id + "_TOKEN";
   val = std::getenv(env_name.c_str());
   if (val)
     return val;

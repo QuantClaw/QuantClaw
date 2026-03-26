@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 
 namespace quantclaw::gateway {
 

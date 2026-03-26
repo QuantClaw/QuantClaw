@@ -1,9 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/temporal_decay.hpp"
+module quantclaw.core.temporal_decay;
 
-#include <cmath>
+import std;
 
 namespace quantclaw {
 

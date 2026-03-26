@@ -13,7 +13,7 @@
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/providers/cooldown_tracker.hpp"
-#include "quantclaw/providers/provider_error.hpp"
+import quantclaw.providers.provider_error;
 
 namespace quantclaw {
 

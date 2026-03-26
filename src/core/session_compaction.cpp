@@ -1,7 +1,13 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/session_compaction.hpp"
+module;
+
+#include "quantclaw/providers/llm_provider.hpp"
+
+module quantclaw.core.session_compaction;
+
+import std;
 
 namespace quantclaw {
 

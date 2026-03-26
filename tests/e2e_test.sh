@@ -6,7 +6,7 @@ set -euo pipefail
 PASS=0
 FAIL=0
 PORT=18800
-BINARY="./build/quantclaw"
+BINARY="${BINARY:-./build/quantclaw}"
 GATEWAY_PID=""
 
 # ---------- helpers ----------
@@ -149,8 +149,8 @@ fi
 
 echo "--- Test: sessions list ---"
 SESSIONS=$(run_cli sessions list --json)
-if echo "$SESSIONS" | jq -e 'type == "array"' >/dev/null 2>&1; then
-    pass "sessions list returns array"
+if echo "$SESSIONS" | jq -e 'type == "array" or .sessions' >/dev/null 2>&1; then
+    pass "sessions list returns array/object"
 else
     fail "sessions list" "not an array"
 fi
@@ -159,8 +159,10 @@ fi
 
 echo "--- Test: graceful shutdown ---"
 kill -TERM "$GATEWAY_PID" 2>/dev/null || true
+set +e
 wait "$GATEWAY_PID" 2>/dev/null
 EXIT_CODE=$?
+set -e
 GATEWAY_PID=""
 
 if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 143 ]; then

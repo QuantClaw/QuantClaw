@@ -1,17 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/skill_loader.hpp"
+module;
 
-#include <cctype>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <regex>
-#include <sstream>
-#include <stack>
-#include <unordered_set>
+#include "quantclaw/config.hpp"
 
+module quantclaw.core.skill_loader;
+
+import std;
+
+#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 namespace quantclaw {

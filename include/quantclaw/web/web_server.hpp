@@ -13,7 +13,7 @@
 #include <vector>
 
 #include <httplib.h>
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 namespace quantclaw::web {

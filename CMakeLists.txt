@@ -1,9 +1,37 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.31)
 project(quantclaw VERSION 0.3.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+# Machine-targeted build policy: this branch is GCC-only.
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    message(FATAL_ERROR
+        "QuantClaw local C++23/modules build is configured for GCC only. "
+        "Reconfigure with GCC (e.g. CC=gcc CXX=g++ cmake ...).")
+endif()
+
+if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
+    message(FATAL_ERROR
+        "GCC 15+ is required for this C++23/modules configuration. "
+        "Detected GCC ${CMAKE_CXX_COMPILER_VERSION}.")
+endif()
+
+if(NOT (CMAKE_GENERATOR STREQUAL "Ninja" OR
+        CMAKE_GENERATOR STREQUAL "Ninja Multi-Config"))
+    message(FATAL_ERROR
+        "C++ modules require Ninja generator in this configuration. "
+        "Configure with the CMake preset or: cmake -G Ninja ...")
+endif()
+
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+
+# Match direct `c++ -fmodules-ts` builds for GCC modules.
+add_compile_options(-fmodules-ts)
+
+option(QC_PRECOMPILE_GCC_STDLIB_MODULES
+    "Precompile GCC libstdc++ std/std.compat module units for import std;"
+    ON)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -23,6 +51,16 @@ if(UNIX AND NOT APPLE)
 endif()
 
 option(BUILD_TESTS "Build tests" ON)
+
+# Prefer the workspace's existing vcpkg install trees when present.
+foreach(_qc_vcpkg_root
+        "${CMAKE_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux"
+        "${CMAKE_SOURCE_DIR}/build-ninja/vcpkg_installed/x64-linux"
+        "${CMAKE_SOURCE_DIR}/build-coverage/vcpkg_installed/x64-linux")
+    if(EXISTS "${_qc_vcpkg_root}")
+        list(PREPEND CMAKE_PREFIX_PATH "${_qc_vcpkg_root}")
+    endif()
+endforeach()
 
 # Sanitizer options (mutually exclusive: ASAN and TSAN cannot be combined)
 option(ENABLE_ASAN  "Build with AddressSanitizer + LeakSanitizer"   OFF)
@@ -57,19 +95,56 @@ elseif(ENABLE_ASAN OR ENABLE_TSAN OR ENABLE_UBSAN)
 endif()
 
 # Required dependencies
-find_package(spdlog REQUIRED)
-find_package(CURL REQUIRED)
+include(FetchContent)
+find_package(spdlog CONFIG QUIET)
+find_package(CURL CONFIG QUIET)
+if(NOT CURL_FOUND)
+    set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(CURL_USE_OPENSSL ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        curl
+        GIT_REPOSITORY https://github.com/curl/curl.git
+        GIT_TAG        curl-8_11_1
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(curl)
+endif()
 find_package(OpenSSL REQUIRED)
+find_package(SQLite3 QUIET)
+if(TARGET SQLite3::SQLite3)
+    set(QC_SQLITE_TARGET SQLite3::SQLite3)
+else()
+    find_package(unofficial-sqlite3 CONFIG REQUIRED)
+    set(QC_SQLITE_TARGET unofficial::sqlite3::sqlite3)
+endif()
+find_package(nlohmann_json CONFIG QUIET)
 
 # nlohmann_json: use FetchContent to ensure consistent version across all environments
-include(FetchContent)
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG        v3.11.3
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(nlohmann_json)
+if(NOT nlohmann_json_FOUND)
+    if(NOT DEFINED fetchcontent_included)
+        include(FetchContent)
+        set(fetchcontent_included TRUE)
+    endif()
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG        v3.11.3
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+if(NOT spdlog_FOUND)
+    FetchContent_Declare(
+        spdlog
+        GIT_REPOSITORY https://github.com/gabime/spdlog.git
+        GIT_TAG        v1.14.1
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(spdlog)
+endif()
 
 # IXWebSocket: try vcpkg first, fallback to FetchContent
 set(USE_TLS ON CACHE BOOL "" FORCE)
@@ -119,33 +194,12 @@ endif()
 
 # Source files - explicitly listed
 set(QUANTCLAW_CORE_SOURCES
-    # Core
-    src/core/agent_loop.cpp
-    src/core/config.cpp
-    src/core/memory_manager.cpp
-    src/core/skill_loader.cpp
-    src/core/prompt_builder.cpp
-    src/core/signal_handler.cpp
-    src/core/session_compaction.cpp
-    src/core/cron_scheduler.cpp
-    src/core/memory_search.cpp
-    src/core/context_pruner.cpp
-    src/core/usage_accumulator.cpp
-    src/core/message_commands.cpp
-    src/core/subagent.cpp
-    src/core/default_context_engine.cpp
-    src/core/multi_stage_compaction.cpp
-    src/core/vector_index.cpp
-    src/core/mmr_reranker.cpp
-    src/core/temporal_decay.cpp
-    # Providers
-    src/providers/curl_raii.cpp
-    src/providers/openai_provider.cpp
-    src/providers/anthropic_provider.cpp
     src/providers/provider_registry.cpp
     src/providers/provider_error.cpp
     src/providers/cooldown_tracker.cpp
     src/providers/failover_resolver.cpp
+    # Third-party module wrapper
+    src/thirdparty/json.ixx
     # CLI
     src/cli/cli_manager.cpp
     src/cli/commands.cpp
@@ -164,9 +218,12 @@ set(QUANTCLAW_CORE_SOURCES
     src/session/session_maintenance.cpp
     # Tools
     src/tools/tool_registry.cpp
+    src/tools/tool_chain.cppm
     src/tools/tool_chain.cpp
     src/tools/browser_tool.cpp
     # MCP
+    src/mcp/mcp_server.cppm
+    src/mcp/mcp_client.cppm
     src/mcp/mcp_server.cpp
     src/mcp/mcp_client.cpp
     src/mcp/mcp_tool_manager.cpp
@@ -219,12 +276,90 @@ if(NOT QC_GIT_COMMIT)
 endif()
 string(TIMESTAMP QC_BUILD_DATE "%Y-%m-%d")
 
+set(QC_NLOHMANN_JSON_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/include/nlohmann/json.hpp")
+set(QC_NLOHMANN_JSON_CMI_STAMP "${CMAKE_BINARY_DIR}/nlohmann_json_header_unit.stamp")
+
+add_custom_command(
+    OUTPUT ${QC_NLOHMANN_JSON_CMI_STAMP}
+    COMMAND ${CMAKE_CXX_COMPILER}
+            -std=c++23
+            -fmodules-ts
+            -x c++-user-header
+            -c ${QC_NLOHMANN_JSON_HEADER}
+    COMMAND ${CMAKE_COMMAND} -E touch ${QC_NLOHMANN_JSON_CMI_STAMP}
+    DEPENDS ${QC_NLOHMANN_JSON_HEADER}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Precompiling nlohmann/json.hpp header unit"
+    VERBATIM
+)
+
+add_custom_target(nlohmann_json_header_unit DEPENDS ${QC_NLOHMANN_JSON_CMI_STAMP})
+
 add_library(quantclaw_core STATIC ${QUANTCLAW_CORE_SOURCES})
+set_property(TARGET quantclaw_core PROPERTY CXX_SCAN_FOR_MODULES ON)
+add_dependencies(quantclaw_core nlohmann_json_header_unit)
+
+target_sources(quantclaw_core
+    PUBLIC
+        FILE_SET CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+        FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/agent_loop.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/content_block.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/context_engine.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/context_pruner.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/cron_scheduler.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/dag_runtime.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/default_context_engine.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/memory_manager.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/memory_search.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/message_commands.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/mmr_reranker.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/multi_stage_compaction.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/prompt_builder.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/session_compaction.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/signal_handler.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/skill_loader.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/temporal_decay.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/usage_accumulator.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/vector_index.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/subagent.cppm
+)
+
+target_sources(quantclaw_core
+    PUBLIC
+        FILE_SET CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/providers
+        FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/providers/provider_error.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/providers/provider_registry.cppm
+)
+
+target_sources(quantclaw_core
+    PUBLIC
+        FILE_SET CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/tools
+        FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/tool_chain.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/tool_registry.cppm
+)
+
+target_sources(quantclaw_core
+    PUBLIC
+        FILE_SET CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp
+        FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/mcp_client.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/mcp_server.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/mcp_tool_manager.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/quantclaw_mcp_tools.cppm
+)
 
 target_include_directories(quantclaw_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -247,6 +382,7 @@ target_link_libraries(quantclaw_core
         CURL::libcurl
         OpenSSL::SSL
         OpenSSL::Crypto
+        ${QC_SQLITE_TARGET}
 )
 
 # WinSock2 and BCrypt (needed by mbedtls) required on Windows
@@ -260,20 +396,87 @@ target_include_directories(quantclaw PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+set_property(TARGET quantclaw PROPERTY CXX_SCAN_FOR_MODULES ON)
 
-# Compiler flags
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(quantclaw_core PRIVATE -Wall -Wextra -O2)
-    target_compile_options(quantclaw PRIVATE -Wall -Wextra -O2)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_options(quantclaw_core PRIVATE /W4 /Od /RTC1 /EHsc)
-        target_compile_options(quantclaw PRIVATE /W4 /Od /RTC1 /EHsc)
+if(QC_PRECOMPILE_GCC_STDLIB_MODULES)
+    # GCC/libstdc++ ships C++23 named module sources at bits/std.cc and
+    # bits/std.compat.cc. Build them once into this build tree so sources can
+    # use `import std;` and `import std.compat;` reliably.
+    execute_process(
+        COMMAND ${CMAKE_CXX_COMPILER} -dumpfullversion
+        OUTPUT_VARIABLE QC_GCC_FULL_VERSION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(NOT QC_GCC_FULL_VERSION)
+        execute_process(
+            COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
+            OUTPUT_VARIABLE QC_GCC_FULL_VERSION
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+    endif()
+
+    string(REGEX MATCH "^[0-9]+" QC_GCC_MAJOR "${QC_GCC_FULL_VERSION}")
+
+    set(QC_GCC_STD_MODULE_SOURCE "")
+    foreach(_std_src
+            "/usr/include/c++/${QC_GCC_MAJOR}/bits/std.cc"
+            "/usr/include/c++/${QC_GCC_FULL_VERSION}/bits/std.cc")
+        if(EXISTS "${_std_src}")
+            set(QC_GCC_STD_MODULE_SOURCE "${_std_src}")
+            break()
+        endif()
+    endforeach()
+
+    set(QC_GCC_STD_COMPAT_MODULE_SOURCE "")
+    foreach(_std_compat_src
+            "/usr/include/c++/${QC_GCC_MAJOR}/bits/std.compat.cc"
+            "/usr/include/c++/${QC_GCC_FULL_VERSION}/bits/std.compat.cc")
+        if(EXISTS "${_std_compat_src}")
+            set(QC_GCC_STD_COMPAT_MODULE_SOURCE "${_std_compat_src}")
+            break()
+        endif()
+    endforeach()
+
+    if(QC_GCC_STD_MODULE_SOURCE)
+        set(QC_GCC_STD_MODULE_DIR
+            "${CMAKE_BINARY_DIR}/generated/stdlib_modules")
+        file(MAKE_DIRECTORY "${QC_GCC_STD_MODULE_DIR}")
+        configure_file("${QC_GCC_STD_MODULE_SOURCE}"
+            "${QC_GCC_STD_MODULE_DIR}/std.cc"
+            COPYONLY)
+        target_sources(quantclaw_core
+            PUBLIC
+                FILE_SET CXX_MODULES
+                BASE_DIRS ${QC_GCC_STD_MODULE_DIR}
+                FILES
+                    ${QC_GCC_STD_MODULE_DIR}/std.cc
+        )
+        if(QC_GCC_STD_COMPAT_MODULE_SOURCE)
+            configure_file("${QC_GCC_STD_COMPAT_MODULE_SOURCE}"
+                "${QC_GCC_STD_MODULE_DIR}/std.compat.cc"
+                COPYONLY)
+            target_sources(quantclaw_core
+                PUBLIC
+                    FILE_SET CXX_MODULES
+                    BASE_DIRS ${QC_GCC_STD_MODULE_DIR}
+                    FILES
+                        ${QC_GCC_STD_MODULE_DIR}/std.compat.cc
+            )
+        endif()
+
+        message(STATUS "Enabled libstdc++ named module precompile for import std;")
     else()
-        target_compile_options(quantclaw_core PRIVATE /W4 /O2 /EHsc)
-        target_compile_options(quantclaw PRIVATE /W4 /O2 /EHsc)
+        message(WARNING
+            "QC_PRECOMPILE_GCC_STDLIB_MODULES=ON but libstdc++ std.cc was not found. "
+            "`import std;` may fail on this host.")
     endif()
 endif()
+
+# Compiler flags (GCC-only)
+target_compile_options(quantclaw_core PRIVATE -Wall -Wextra -Wpedantic -O2)
+target_compile_options(quantclaw PRIVATE -Wall -Wextra -Wpedantic -O2)
 
 install(TARGETS quantclaw DESTINATION bin)
 
@@ -296,6 +499,7 @@ if(BUILD_TESTS)
     enable_testing()
 
     set(TEST_SOURCES
+        tests/test_helpers.cppm
         tests/test_config.cpp
         tests/test_protocol.cpp
         tests/test_session_manager.cpp
@@ -345,13 +549,23 @@ if(BUILD_TESTS)
         tests/test_context_engine.cpp
         tests/test_multi_stage_compaction.cpp
         tests/test_hybrid_memory_search.cpp
+        tests/test_dag_runtime.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})
+    target_sources(quantclaw_tests
+        PUBLIC
+            FILE_SET CXX_MODULES
+            BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/tests
+            FILES
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_helpers.cppm
+    )
     target_link_libraries(quantclaw_tests PRIVATE
         quantclaw_core
         GTest::gtest_main
     )
+    set_property(TARGET quantclaw_tests PROPERTY CXX_SCAN_FOR_MODULES ON)
+    target_compile_options(quantclaw_tests PRIVATE -Wall -Wextra -Wpedantic -O2)
     target_include_directories(quantclaw_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -373,6 +587,10 @@ if(BUILD_TESTS)
         )
     else()
         gtest_discover_tests(quantclaw_tests)
+    endif()
+
+    if(TARGET qc_stdlib_modules)
+        add_dependencies(quantclaw_tests qc_stdlib_modules)
     endif()
 endif()
 

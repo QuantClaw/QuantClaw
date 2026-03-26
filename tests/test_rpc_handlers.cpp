@@ -12,19 +12,19 @@
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/config.hpp"
-#include "quantclaw/core/agent_loop.hpp"
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/prompt_builder.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+import quantclaw.core.agent_loop;
+import quantclaw.core.memory_manager;
+import quantclaw.core.skill_loader;
+import quantclaw.core.prompt_builder;
 #include "quantclaw/gateway/gateway_client.hpp"
 #include "quantclaw/gateway/gateway_server.hpp"
 #include "quantclaw/gateway/protocol.hpp"
 #include "quantclaw/providers/llm_provider.hpp"
 #include "quantclaw/session/session_manager.hpp"
-#include "quantclaw/tools/tool_chain.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.tools.tool_chain;
+import quantclaw.tools.tool_registry;
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 // Forward declare
@@ -735,6 +735,98 @@ TEST_F(RpcHandlersTest, ToolsCatalogStub) {
     EXPECT_TRUE(group.contains("tools"));
     ASSERT_TRUE(group["tools"].is_array());
   }
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersTest, ChannelsStatusShape) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  auto result = client->Call("channels.status", nlohmann::json::object());
+  ASSERT_TRUE(result.is_object());
+  ASSERT_TRUE(result.contains("channelOrder"));
+  ASSERT_TRUE(result["channelOrder"].is_array());
+  ASSERT_TRUE(result.contains("channels"));
+  ASSERT_TRUE(result["channels"].is_object());
+  ASSERT_TRUE(result["channelOrder"].size() >= 1u);
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersTest, ChannelsLogoutStub) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  auto result = client->Call("channels.logout", {{"id", "cli"}});
+  EXPECT_TRUE(result.value("ok", false));
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersTest, AgentsListStub) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  auto result = client->Call("agents.list", nlohmann::json::object());
+  ASSERT_TRUE(result.is_object());
+  EXPECT_EQ(result.value("defaultId", ""), "main");
+  ASSERT_TRUE(result.contains("agents"));
+  ASSERT_TRUE(result["agents"].is_array());
+  ASSERT_GE(result["agents"].size(), 1u);
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersTest, UiCompatibilityHandlers) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  auto identity = client->Call("agent.identity.get", nlohmann::json::object());
+  EXPECT_EQ(identity.value("agentId", ""), "main");
+
+  auto nodes = client->Call("node.list", nlohmann::json::object());
+  ASSERT_TRUE(nodes.is_array());
+
+  auto pairs = client->Call("device.pair.list", nlohmann::json::object());
+  ASSERT_TRUE(pairs.is_array());
+
+  auto schema = client->Call("config.schema", nlohmann::json::object());
+  ASSERT_TRUE(schema.is_object());
+  ASSERT_TRUE(schema.contains("schema"));
+  ASSERT_TRUE(schema.contains("uiHints"));
+
+  auto logs = client->Call("logs.tail", nlohmann::json::object());
+  ASSERT_TRUE(logs.is_object());
+  ASSERT_TRUE(logs.contains("lines"));
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersTest, UsageHandlersReturnExpectedShapes) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  auto sessions_usage =
+      client->Call("sessions.usage",
+                   {{"startDate", "2026-01-01"}, {"endDate", "2026-12-31"}});
+  ASSERT_TRUE(sessions_usage.is_object());
+  ASSERT_TRUE(sessions_usage.contains("totals"));
+
+  auto usage_cost = client->Call("usage.cost", nlohmann::json::object());
+  ASSERT_TRUE(usage_cost.is_object());
+  ASSERT_TRUE(usage_cost.contains("totals"));
+
+  auto series =
+      client->Call("sessions.usage.timeseries", nlohmann::json::object());
+  ASSERT_TRUE(series.is_object());
+  ASSERT_TRUE(series.contains("points"));
+  ASSERT_TRUE(series["points"].is_array());
+
+  auto logs = client->Call("sessions.usage.logs", nlohmann::json::object());
+  ASSERT_TRUE(logs.is_object());
+  ASSERT_TRUE(logs.contains("logs"));
+  ASSERT_TRUE(logs["logs"].is_array());
 
   client->Disconnect();
 }

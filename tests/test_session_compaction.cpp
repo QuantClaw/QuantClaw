@@ -4,7 +4,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/core/session_compaction.hpp"
+import quantclaw.core.session_compaction;
 
 #include <gtest/gtest.h>
 

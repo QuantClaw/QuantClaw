@@ -31,7 +31,7 @@ QuantClaw is a native C++ implementation of the [OpenClaw](https://github.com/op
 - **Memory Efficient**: Small memory footprint, suitable for resource-constrained environments
 - **OpenClaw Compatible**: Works with OpenClaw workspace files, skills, and configuration
 - **Dual Protocol**: WebSocket RPC gateway + HTTP REST API
-- **Multi-Provider LLM**: OpenAI-compatible and Anthropic APIs with `provider/model` prefix routing
+- **Multi-Provider LLM**: OpenAI-compatible, Anthropic, and Anthropic-compatible local endpoints with `provider/model` prefix routing
 - **Model Failover**: Multi-key rotation with exponential backoff cooldowns and automatic model fallback chains
 - **Command Queue**: Per-session serialization with collect/followup/steer/interrupt modes and global concurrency control
 - **Context Management**: Auto-compaction, tool result pruning, and BM25 memory search
@@ -222,6 +222,11 @@ QuantClaw uses JSON configuration (`~/.quantclaw/quantclaw.json`):
       "apiKey": "YOUR_ANTHROPIC_API_KEY",
       "baseUrl": "https://api.anthropic.com",
       "timeout": 30
+    },
+    "local": {
+      "apiKey": "local",
+      "baseUrl": "http://127.0.0.1:8081",
+      "timeout": 120
     }
   },
   "gateway": {
@@ -251,7 +256,26 @@ QuantClaw uses JSON configuration (`~/.quantclaw/quantclaw.json`):
 }
 ```
 
-The model field uses `provider/model-name` prefix routing. If no prefix is given, it defaults to `openai`. See `config.example.json` for a full example with all options.
+The model field uses `provider/model-name` prefix routing. If no prefix is given, it defaults to `openai`. For local inference with Anthropic-compatible runtimes, use `local/<your-model-id>` with `providers.local.baseUrl` pointing to your local `/v1/messages` endpoint. See `config.example.json` for a full example with all options.
+
+### Local inference (Anthropic-compatible runtime)
+
+Use the built-in `local` provider for local gateways that expose an Anthropic-style `/v1/messages` API:
+
+```json
+{
+  "agent": {
+    "model": "local/Qwen3.5-4B.Q6_K.gguf"
+  },
+  "providers": {
+    "local": {
+      "apiKey": "local",
+      "baseUrl": "http://127.0.0.1:8081",
+      "timeout": 120
+    }
+  }
+}
+```
 
 ### Log Retention
 

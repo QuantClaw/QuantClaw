@@ -12,22 +12,22 @@
 
 #include "quantclaw/config.hpp"
 #include "quantclaw/constants.hpp"
-#include "quantclaw/core/agent_loop.hpp"
-#include "quantclaw/core/cron_scheduler.hpp"
-#include "quantclaw/core/memory_search.hpp"
-#include "quantclaw/core/message_commands.hpp"
-#include "quantclaw/core/prompt_builder.hpp"
-#include "quantclaw/core/session_compaction.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+import quantclaw.core.agent_loop;
+import quantclaw.core.message_commands;
 #include "quantclaw/gateway/command_queue.hpp"
 #include "quantclaw/gateway/gateway_server.hpp"
 #include "quantclaw/gateway/protocol.hpp"
 #include "quantclaw/plugins/plugin_system.hpp"
-#include "quantclaw/providers/provider_registry.hpp"
+import quantclaw.providers.provider_registry;
 #include "quantclaw/security/exec_approval.hpp"
 #include "quantclaw/session/session_manager.hpp"
-#include "quantclaw/tools/tool_chain.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.core.cron_scheduler;
+import quantclaw.core.memory_search;
+import quantclaw.core.prompt_builder;
+import quantclaw.core.session_compaction;
+import quantclaw.core.skill_loader;
+import quantclaw.tools.tool_chain;
+import quantclaw.tools.tool_registry;
 
 namespace quantclaw::gateway {
 
@@ -250,7 +250,7 @@ void register_rpc_handlers(
     };
 
     auto new_messages = agent_loop->ProcessMessageStream(
-        message, llm_history, system_prompt, wrapped_callback);
+      message, llm_history, system_prompt, wrapped_callback, session_key);
 
     // Persist all new messages (assistant + tool_result) to session transcript
     for (const auto& msg : new_messages) {
@@ -258,6 +258,14 @@ void register_rpc_handlers(
       smsg.role = msg.role;
       smsg.content = msg.content;
       session_manager->AppendMessage(session_key, smsg);
+    }
+
+    auto dag_run_id = agent_loop->GetLatestDagRunIdForSession(session_key);
+    if (!dag_run_id.empty()) {
+      session_manager->AppendCustomMessage(
+          session_key, "dag_run",
+          nlohmann::json{{"runId", dag_run_id}, {"status", "recorded"}},
+          nlohmann::json::object(), nlohmann::json::object());
     }
 
     if (!error_message.empty()) {
@@ -466,7 +474,7 @@ void register_rpc_handlers(
   // Returns ChannelsStatusSnapshot shape expected by the UI.
   server.RegisterHandler(
       methods::kChannelsStatus,
-      [&config, logger](const nlohmann::json& params,
+      [&config, logger](const nlohmann::json& /*params*/,
                         ClientConnection& /*client*/) -> nlohmann::json {
         auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                           std::chrono::system_clock::now().time_since_epoch())
@@ -1248,7 +1256,8 @@ void register_rpc_handlers(
 
               auto system_prompt = prompt_builder->BuildFull(job.session_key);
               auto new_msgs = agent_loop->ProcessMessage(job.message, history,
-                                                         system_prompt);
+                                                         system_prompt,
+                                                         job.session_key);
 
               // Store messages
               for (const auto& msg : new_msgs) {
@@ -1256,6 +1265,16 @@ void register_rpc_handlers(
                 sm.role = msg.role;
                 sm.content = msg.content;
                 session_manager->AppendMessage(job.session_key, sm);
+              }
+
+              auto dag_run_id =
+                  agent_loop->GetLatestDagRunIdForSession(job.session_key);
+              if (!dag_run_id.empty()) {
+                session_manager->AppendCustomMessage(
+                    job.session_key, "dag_run",
+                    nlohmann::json{{"runId", dag_run_id},
+                                   {"status", "recorded"}},
+                    nlohmann::json::object(), nlohmann::json::object());
               }
 
               nlohmann::json r;

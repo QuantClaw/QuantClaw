@@ -11,18 +11,18 @@
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/config.hpp"
-#include "quantclaw/core/agent_loop.hpp"
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/prompt_builder.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+import quantclaw.core.agent_loop;
+import quantclaw.core.memory_manager;
+import quantclaw.core.skill_loader;
+import quantclaw.core.prompt_builder;
 #include "quantclaw/gateway/gateway_server.hpp"
 #include "quantclaw/providers/llm_provider.hpp"
 #include "quantclaw/session/session_manager.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.tools.tool_registry;
 #include "quantclaw/web/api_routes.hpp"
 #include "quantclaw/web/web_server.hpp"
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 // Mock LLM provider

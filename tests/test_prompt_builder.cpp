@@ -8,12 +8,12 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/prompt_builder.hpp"
-#include "quantclaw/core/skill_loader.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.core.memory_manager;
+import quantclaw.core.skill_loader;
+import quantclaw.core.prompt_builder;
+import quantclaw.tools.tool_registry;
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 class PromptBuilderTest : public ::testing::Test {

@@ -1,12 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/mmr_reranker.hpp"
+module quantclaw.core.mmr_reranker;
 
-#include <algorithm>
-#include <cctype>
-#include <sstream>
-#include <unordered_set>
+import std;
 
 namespace quantclaw {
 

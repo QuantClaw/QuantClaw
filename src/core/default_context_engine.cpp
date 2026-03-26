@@ -1,10 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/default_context_engine.hpp"
+module;
 
 #include "quantclaw/constants.hpp"
-#include "quantclaw/core/context_pruner.hpp"
+
+module quantclaw.core.default_context_engine;
+
+import std;
+import quantclaw.core.context_pruner;
+import quantclaw.core.multi_stage_compaction;
 
 namespace quantclaw {
 

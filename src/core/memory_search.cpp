@@ -1,15 +1,19 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/memory_search.hpp"
+module;
 
-#include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <fstream>
-#include <sstream>
-#include <unordered_map>
-#include <unordered_set>
+#include "quantclaw/providers/embedding_provider.hpp"
+
+module quantclaw.core.memory_search;
+
+import std;
+
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
+import quantclaw.core.mmr_reranker;
+import quantclaw.core.temporal_decay;
+import quantclaw.core.vector_index;
 
 namespace quantclaw {
 

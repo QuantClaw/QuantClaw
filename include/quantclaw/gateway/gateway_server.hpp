@@ -12,7 +12,7 @@
 
 #include <ixwebsocket/IXHttp.h>
 #include <ixwebsocket/IXWebSocketServer.h>
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/common/noncopyable.hpp"

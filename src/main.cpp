@@ -22,10 +22,11 @@
 #include "quantclaw/cli/session_commands.hpp"
 #include "quantclaw/common/parse_util.hpp"
 #include "quantclaw/config.hpp"
-#include "quantclaw/core/memory_search.hpp"
-#include "quantclaw/core/skill_loader.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
 #include "quantclaw/platform/process.hpp"
+
+import quantclaw.core.skill_loader;
+import quantclaw.core.memory_search;
 
 // Bring port/URL constants into scope (avoids quantclaw:: prefix for literals)
 using quantclaw::kDefaultGatewayPort;

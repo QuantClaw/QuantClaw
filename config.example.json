@@ -18,6 +18,16 @@
       "apiKey": "YOUR_ANTHROPIC_API_KEY",
       "baseUrl": "https://api.anthropic.com",
       "timeout": 30
+    },
+    "github-copilot": {
+      "apiKey": "YOUR_GITHUB_COPILOT_TOKEN",
+      "baseUrl": "https://api.githubcopilot.com",
+      "timeout": 30
+    },
+    "local": {
+      "apiKey": "local",
+      "baseUrl": "http://127.0.0.1:8081",
+      "timeout": 120
     }
   },
   "gateway": {

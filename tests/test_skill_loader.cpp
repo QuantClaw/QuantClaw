@@ -9,9 +9,9 @@
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/config.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+import quantclaw.core.skill_loader;
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 class SkillLoaderTest : public ::testing::Test {

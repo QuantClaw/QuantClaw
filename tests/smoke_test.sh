@@ -9,7 +9,7 @@ set -uo pipefail
 # ---------- Configuration ----------
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BINARY="${REPO_ROOT}/build/quantclaw"
+BINARY="${BINARY:-${REPO_ROOT}/build/quantclaw}"
 WS_RPC="${REPO_ROOT}/scripts/smoke-tests/ws-rpc.js"
 WS_CONCURRENT="${REPO_ROOT}/scripts/smoke-tests/ws-concurrent.js"
 LOG_DIR="/tmp/quantclaw-smoke-ci"
@@ -532,8 +532,10 @@ echo ""
 echo "--- Teardown ---"
 
 kill -TERM "$GATEWAY_PID" 2>/dev/null || true
+set +e
 wait "$GATEWAY_PID" 2>/dev/null
 EXIT_CODE=$?
+set -e
 GATEWAY_PID=""
 
 if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 143 ]; then

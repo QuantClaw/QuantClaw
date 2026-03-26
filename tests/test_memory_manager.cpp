@@ -8,10 +8,10 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/memory_search.hpp"
+import quantclaw.core.memory_manager;
+import quantclaw.core.memory_search;
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 class MemoryManagerTest : public ::testing::Test {

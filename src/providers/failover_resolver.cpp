@@ -7,7 +7,7 @@
 #include <chrono>
 #include <optional>
 
-#include "quantclaw/providers/provider_registry.hpp"
+import quantclaw.providers.provider_registry;
 
 namespace quantclaw {
 

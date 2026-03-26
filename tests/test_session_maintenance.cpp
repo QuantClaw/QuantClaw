@@ -9,7 +9,7 @@
 
 #include "quantclaw/session/session_maintenance.hpp"
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 namespace quantclaw {

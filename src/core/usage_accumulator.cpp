@@ -1,7 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/usage_accumulator.hpp"
+module quantclaw.core.usage_accumulator;
+
+import std;
+
+#include <nlohmann/json.hpp>
 
 namespace quantclaw {
 

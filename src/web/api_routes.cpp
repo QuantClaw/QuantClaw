@@ -16,12 +16,12 @@
 #include <nlohmann/json.hpp>
 
 #include "quantclaw/config.hpp"
-#include "quantclaw/core/agent_loop.hpp"
-#include "quantclaw/core/prompt_builder.hpp"
+import quantclaw.core.agent_loop;
+import quantclaw.core.prompt_builder;
 #include "quantclaw/gateway/gateway_server.hpp"
 #include "quantclaw/plugins/plugin_system.hpp"
 #include "quantclaw/session/session_manager.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.tools.tool_registry;
 #include "quantclaw/web/web_server.hpp"
 
 namespace quantclaw::web {

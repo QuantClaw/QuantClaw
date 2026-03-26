@@ -10,7 +10,7 @@
 #include "quantclaw/config.hpp"
 #include "quantclaw/providers/cooldown_tracker.hpp"
 #include "quantclaw/providers/failover_resolver.hpp"
-#include "quantclaw/providers/provider_error.hpp"
+import quantclaw.providers.provider_error;
 #include "quantclaw/providers/provider_registry.hpp"
 
 #include <gtest/gtest.h>

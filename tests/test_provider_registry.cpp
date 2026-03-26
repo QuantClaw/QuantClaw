@@ -162,6 +162,37 @@ TEST(ProviderRegistryTest, NullForUnknownProvider) {
   EXPECT_EQ(provider, nullptr);
 }
 
+TEST(ProviderRegistryTest, GitHubCopilotBuiltinFactoryWorks) {
+  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  reg->RegisterBuiltinFactories();
+
+  ProviderEntry entry;
+  entry.id = "github-copilot";
+  entry.api_key = "ghu_test_token";
+  reg->AddProvider(entry);
+
+  auto provider = reg->GetProvider("github-copilot");
+  ASSERT_NE(provider, nullptr);
+}
+
+TEST(ProviderRegistryTest, ProviderIdDashUsesTokenEnvFallback) {
+#ifndef _WIN32
+  setenv("GITHUB_COPILOT_TOKEN", "ghu_env_token", 1);
+#else
+  _putenv_s("GITHUB_COPILOT_TOKEN", "ghu_env_token");
+#endif
+
+  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  reg->RegisterBuiltinFactories();
+
+  ProviderEntry entry;
+  entry.id = "github-copilot";
+  reg->AddProvider(entry);
+
+  auto provider = reg->GetProvider("github-copilot");
+  ASSERT_NE(provider, nullptr);
+}
+
 TEST(ProviderRegistryTest, ProviderEntryInspection) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
 
@@ -175,6 +206,27 @@ TEST(ProviderRegistryTest, ProviderEntryInspection) {
   ASSERT_NE(e, nullptr);
   EXPECT_EQ(e->display_name, "Local Ollama");
   EXPECT_EQ(e->base_url, "http://localhost:11434/v1");
+}
+
+TEST(ProviderRegistryTest, LocalBuiltinFactoryWorks) {
+  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  reg->RegisterBuiltinFactories();
+
+  ProviderEntry entry;
+  entry.id = "local";
+  reg->AddProvider(entry);
+
+  auto provider = reg->GetProvider("local");
+  ASSERT_NE(provider, nullptr);
+  EXPECT_EQ(provider->GetProviderName(), "anthropic");
+}
+
+TEST(ProviderRegistryTest, LocalOpenAIAliasNotRegistered) {
+  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  reg->RegisterBuiltinFactories();
+
+  auto provider = reg->GetProvider("local-openai");
+  EXPECT_EQ(provider, nullptr);
 }
 
 }  // namespace quantclaw

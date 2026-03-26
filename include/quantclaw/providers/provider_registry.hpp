@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/config.hpp"
@@ -61,7 +61,8 @@ class ProviderRegistry {
   // Register a provider factory (e.g. "openai", "anthropic", "ollama")
   void RegisterFactory(const std::string& provider_id, ProviderFactory factory);
 
-  // Register built-in provider factories (openai, anthropic, ollama, gemini)
+  // Register built-in provider factories (openai, anthropic, ollama,
+  // anthropic-style local, gemini)
   void RegisterBuiltinFactories();
 
   // Add a provider entry (from config)

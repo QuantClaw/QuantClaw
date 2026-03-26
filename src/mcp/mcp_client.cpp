@@ -1,13 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/mcp/mcp_client.hpp"
+module quantclaw.mcp.mcp_client;
 
-#include <sstream>
+import std;
 
-#include <curl/curl.h>
-#include <nlohmann/json.hpp>
-#include <spdlog/spdlog.h>
 
 namespace quantclaw::mcp {
 

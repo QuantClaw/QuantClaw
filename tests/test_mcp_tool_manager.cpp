@@ -4,8 +4,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/mcp/mcp_tool_manager.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.mcp.mcp_tool_manager;
+import quantclaw.tools.tool_registry;
 
 #include <gtest/gtest.h>
 
@@ -116,6 +116,6 @@ TEST_F(MCPToolManagerTest, RegisterIntoEmptyManager) {
 
 TEST_F(MCPToolManagerTest, ExecuteToolUnknownThrows) {
   quantclaw::mcp::MCPToolManager manager(logger_);
-  EXPECT_THROW(manager.ExecuteTool("mcp__unknown__tool", {}),
+  EXPECT_THROW(manager.ExecuteTool("mcp__unknown__tool", "{}"),
                std::runtime_error);
 }

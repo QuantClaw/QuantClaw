@@ -14,7 +14,7 @@
 #include <vector>
 
 #include <ixwebsocket/IXWebSocket.h>
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/platform/process.hpp"

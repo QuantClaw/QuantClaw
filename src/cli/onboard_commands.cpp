@@ -559,14 +559,28 @@ bool OnboardCommands::CreateConfigFile(const std::string& model, int port,
       config["models"] = {
           {"defaultModel", model},
           {"providers",
-           {{"anthropic", {{"apiKey", ""}}}, {"openai", {{"apiKey", ""}}}}}};
+           {{"anthropic", {{"apiKey", ""}}},
+            {"openai", {{"apiKey", ""}}},
+            {"github", {{"apiKey", ""}}},
+            {"github-copilot", {{"apiKey", ""}}}}}};
     } else {
       config["models"]["defaultModel"] = model;
       // Preserve existing API keys
       if (!config["models"].contains("providers") ||
           config["models"]["providers"].is_null()) {
         config["models"]["providers"] = {{"anthropic", {{"apiKey", ""}}},
-                                         {"openai", {{"apiKey", ""}}}};
+                                         {"openai", {{"apiKey", ""}}},
+                                         {"github", {{"apiKey", ""}}},
+                                         {"github-copilot", {{"apiKey", ""}}}};
+      } else {
+        // Add provider stubs if missing while preserving existing values.
+        if (!config["models"]["providers"].contains("github")) {
+          config["models"]["providers"]["github"] = {{"apiKey", ""}};
+        }
+        if (!config["models"]["providers"].contains("github-copilot")) {
+          config["models"]["providers"]["github-copilot"] =
+              {{"apiKey", ""}};
+        }
       }
     }
 

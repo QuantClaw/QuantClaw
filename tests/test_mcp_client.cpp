@@ -25,7 +25,7 @@ static constexpr socket_t kInvalidSocket = -1;
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/mcp/mcp_client.hpp"
+import quantclaw.mcp.mcp_client;
 
 #include <gtest/gtest.h>
 

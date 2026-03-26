@@ -12,11 +12,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/common/noncopyable.hpp"
-#include "quantclaw/core/content_block.hpp"
+import quantclaw.core.content_block;
 
 namespace quantclaw {
 

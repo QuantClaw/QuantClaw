@@ -1,15 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/memory_manager.hpp"
+module quantclaw.core.memory_manager;
 
-#include <algorithm>
-#include <chrono>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-#include <thread>
+import std;
 
 #include <spdlog/spdlog.h>
 

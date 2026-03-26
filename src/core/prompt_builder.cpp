@@ -1,17 +1,16 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/prompt_builder.hpp"
-
-#include <chrono>
-#include <filesystem>
-#include <iomanip>
-#include <sstream>
+module;
 
 #include "quantclaw/config.hpp"
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/skill_loader.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+
+module quantclaw.core.prompt_builder;
+
+import std;
+import quantclaw.core.memory_manager;
+import quantclaw.core.skill_loader;
+import quantclaw.tools.tool_registry;
 
 namespace quantclaw {
 

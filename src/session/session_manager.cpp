@@ -90,67 +90,6 @@ std::string BuildMainSessionKey(const std::string& agent_id) {
   return "agent:" + to_lower(agent_id) + ":main";
 }
 
-// --- ContentBlock ---
-
-nlohmann::json ContentBlock::ToJson() const {
-  nlohmann::json j;
-  j["type"] = type;
-  if (type == "text" || type == "thinking") {
-    j["text"] = text;
-  } else if (type == "tool_use") {
-    j["id"] = id;
-    j["name"] = name;
-    j["input"] = input;
-  } else if (type == "tool_result") {
-    j["tool_use_id"] = tool_use_id;
-    j["content"] = content;
-  }
-  return j;
-}
-
-ContentBlock ContentBlock::FromJson(const nlohmann::json& j) {
-  ContentBlock cb;
-  cb.type = j.value("type", "text");
-  if (cb.type == "text" || cb.type == "thinking") {
-    cb.text = j.value("text", "");
-  } else if (cb.type == "tool_use") {
-    cb.id = j.value("id", "");
-    cb.name = j.value("name", "");
-    cb.input = j.value("input", nlohmann::json::object());
-  } else if (cb.type == "tool_result") {
-    cb.tool_use_id = j.value("tool_use_id", "");
-    cb.content = j.value("content", "");
-  }
-  return cb;
-}
-
-ContentBlock ContentBlock::MakeText(const std::string& text) {
-  ContentBlock cb;
-  cb.type = "text";
-  cb.text = text;
-  return cb;
-}
-
-ContentBlock ContentBlock::MakeToolUse(const std::string& id,
-                                       const std::string& name,
-                                       const nlohmann::json& input) {
-  ContentBlock cb;
-  cb.type = "tool_use";
-  cb.id = id;
-  cb.name = name;
-  cb.input = input;
-  return cb;
-}
-
-ContentBlock ContentBlock::MakeToolResult(const std::string& tool_use_id,
-                                          const std::string& content) {
-  ContentBlock cb;
-  cb.type = "tool_result";
-  cb.tool_use_id = tool_use_id;
-  cb.content = content;
-  return cb;
-}
-
 // --- SessionMessage ---
 
 nlohmann::json SessionMessage::ToJsonl() const {

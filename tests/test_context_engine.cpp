@@ -5,8 +5,8 @@
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/config.hpp"
-#include "quantclaw/core/context_engine.hpp"
-#include "quantclaw/core/default_context_engine.hpp"
+import quantclaw.core.context_engine;
+import quantclaw.core.default_context_engine;
 
 #include <gtest/gtest.h>
 

@@ -11,7 +11,7 @@
 
 #include "quantclaw/web/web_server.hpp"
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 class WebServerTest : public ::testing::Test {

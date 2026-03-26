@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/agent_loop.hpp"
+module quantclaw.core.agent_loop;
 
 #include <chrono>
 #include <sstream>
@@ -10,21 +10,34 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/core/context_pruner.hpp"
-#include "quantclaw/core/default_context_engine.hpp"
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/session_compaction.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+#include "quantclaw/providers/llm_provider.hpp"
 #include "quantclaw/gateway/protocol.hpp"
 #include "quantclaw/providers/failover_resolver.hpp"
-#include "quantclaw/providers/provider_error.hpp"
-#include "quantclaw/providers/provider_registry.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.core.context_engine;
+import quantclaw.core.dag_runtime;
+import quantclaw.core.usage_accumulator;
+import quantclaw.providers.provider_error;
+import quantclaw.core.context_pruner;
+import quantclaw.core.default_context_engine;
+import quantclaw.core.memory_manager;
+import quantclaw.core.session_compaction;
+import quantclaw.core.skill_loader;
+import quantclaw.providers.provider_registry;
+import quantclaw.tools.tool_registry;
 
 // Bring event name constants into scope
 namespace events = quantclaw::gateway::events;
 
 namespace quantclaw {
+
+static int compute_effective_max_iterations(const AgentConfig& cfg) {
+  // Respect explicit user overrides (e.g. local orchestration tuning).
+  // Keep dynamic OpenClaw scaling only when the default value is in use.
+  if (cfg.max_iterations > 0 && cfg.max_iterations != kDefaultMaxIterations) {
+    return cfg.max_iterations;
+  }
+  return cfg.DynamicMaxIterations();
+}
 
 // Truncate a tool result if it exceeds the limit (head + tail with ellipsis)
 static std::string truncate_tool_result(const std::string& result,
@@ -53,6 +66,56 @@ static std::string truncate_tool_result(const std::string& result,
     truncated += lines[i] + "\n";
   }
   return truncated;
+}
+
+static size_t estimate_request_payload_chars(const std::vector<Message>& msgs) {
+  size_t total = 0;
+  for (const auto& msg : msgs) {
+    total += msg.role.size();
+    for (const auto& block : msg.content) {
+      total += block.type.size();
+      total += block.text.size();
+      total += block.id.size();
+      total += block.name.size();
+      total += block.tool_use_id.size();
+      total += block.content.size();
+      if (!block.input.is_null()) {
+        total += block.input.dump().size();
+      }
+    }
+  }
+  return total;
+}
+
+static void emit_memory_management_node(DagRuntime* dag_runtime,
+                                        DagTurnState* dag_turn,
+                                        const AgentConfig& cfg,
+                                        const std::shared_ptr<MemoryManager>& mm,
+                                        int iteration, int max_iterations,
+                                        int context_window,
+                                        const std::vector<Message>& msgs) {
+  if (!dag_runtime || !dag_runtime->IsEnabled() || !dag_turn) {
+    return;
+  }
+
+  nlohmann::json payload = {
+      {"iteration", iteration},
+      {"maxIterations", max_iterations},
+      {"requestMessages", msgs.size()},
+      {"estimatedPayloadChars", estimate_request_payload_chars(msgs)},
+      {"contextWindow", context_window},
+      {"autoCompact", cfg.auto_compact},
+      {"compactMaxMessages", cfg.compact_max_messages},
+      {"compactKeepRecent", cfg.compact_keep_recent},
+      {"compactMaxTokens", cfg.compact_max_tokens},
+      {"hasMemoryManager", static_cast<bool>(mm)},
+  };
+
+  if (mm) {
+    payload["workspacePath"] = mm->GetWorkspacePath().string();
+  }
+
+  dag_runtime->EmitNode(dag_turn, DagNodeType::kMemoryManagement, payload);
 }
 
 // Get context window size for a model name
@@ -90,8 +153,7 @@ AgentLoop::AgentLoop(std::shared_ptr<MemoryManager> memory_manager,
       llm_provider_(llm_provider),
       logger_(logger),
       agent_config_(agent_config) {
-  // Use dynamic max iterations based on context window
-  max_iterations_ = agent_config_.DynamicMaxIterations();
+  max_iterations_ = compute_effective_max_iterations(agent_config_);
   logger_->info("AgentLoop initialized with model: {}, max_iterations: {}",
                 agent_config_.model, max_iterations_);
 }
@@ -151,7 +213,19 @@ std::vector<Message> AgentLoop::ProcessMessage(
   logger_->info("Processing message (non-streaming)");
   stop_requested_ = false;
 
+  DagTurnState dag_turn;
+  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+    dag_turn = dag_runtime_->BeginTurn(effective_session_key, message);
+  }
+
   auto provider = resolve_provider();
+  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+    dag_runtime_->EmitNode(
+        &dag_turn, DagNodeType::kProviderResolved,
+        nlohmann::json{{"model", agent_config_.model},
+                       {"providerId", last_provider_id_},
+                       {"profileId", last_profile_id_}});
+  }
 
   std::vector<Message> new_messages;
 
@@ -165,6 +239,13 @@ std::vector<Message> AgentLoop::ProcessMessage(
                        : get_context_window(agent_config_.model);
   auto assembled = engine->Assemble(history, system_prompt, message, ctx_window,
                                     agent_config_.max_tokens);
+  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+    dag_runtime_->EmitNode(
+        &dag_turn, DagNodeType::kContextAssembled,
+        nlohmann::json{{"historyMessages", history.size()},
+                       {"assembledMessages", assembled.messages.size()},
+                       {"contextWindow", ctx_window}});
+  }
 
   // Create LLM request
   ChatCompletionRequest request;
@@ -181,7 +262,12 @@ std::vector<Message> AgentLoop::ProcessMessage(
     tool["type"] = "function";
     tool["function"]["name"] = schema.name;
     tool["function"]["description"] = schema.description;
-    tool["function"]["parameters"] = schema.parameters;
+    auto params_json =
+        nlohmann::json::parse(schema.parameters_json, nullptr, false);
+    if (params_json.is_discarded()) {
+      params_json = nlohmann::json::object();
+    }
+    tool["function"]["parameters"] = std::move(params_json);
     tools_json.push_back(tool);
   }
   request.tools = tools_json.get<std::vector<nlohmann::json>>();
@@ -193,8 +279,18 @@ std::vector<Message> AgentLoop::ProcessMessage(
   int overflow_retries = 0;
 
   while (iterations < max_iterations_ && !stop_requested_) {
+    emit_memory_management_node(dag_runtime_.get(), &dag_turn, agent_config_,
+                                memory_manager_, iterations + 1,
+                                max_iterations_, ctx_window, request.messages);
     try {
       auto response = provider->ChatCompletion(request);
+      if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+        dag_runtime_->EmitNode(
+            &dag_turn, DagNodeType::kLlmResponse,
+            nlohmann::json{{"hasToolCalls", !response.tool_calls.empty()},
+                           {"toolCallCount", response.tool_calls.size()},
+                           {"contentSize", response.content.size()}});
+      }
 
       // --- Usage tracking ---
       if (usage_accumulator_ && !effective_session_key.empty()) {
@@ -216,6 +312,16 @@ std::vector<Message> AgentLoop::ProcessMessage(
         logger_->info("LLM requested {} tool calls",
                       response.tool_calls.size());
 
+        if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+          for (const auto& tc : response.tool_calls) {
+            dag_runtime_->EmitNode(
+                &dag_turn, DagNodeType::kToolCall,
+                nlohmann::json{{"id", tc.id},
+                               {"name", tc.name},
+                               {"input", tc.arguments}});
+          }
+        }
+
         std::vector<nlohmann::json> tool_calls_json;
         for (const auto& tc : response.tool_calls) {
           nlohmann::json tc_json;
@@ -230,6 +336,11 @@ std::vector<Message> AgentLoop::ProcessMessage(
         for (auto& result : tool_results) {
           result = truncate_tool_result(result, kToolResultMaxChars,
                                         kToolResultKeepLines);
+          if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+            dag_runtime_->EmitNode(
+                &dag_turn, DagNodeType::kToolResult,
+                nlohmann::json{{"contentSize", result.size()}});
+          }
         }
 
         // Assistant message: text + tool_use blocks
@@ -259,6 +370,12 @@ std::vector<Message> AgentLoop::ProcessMessage(
 
       if (!response.content.empty()) {
         logger_->info("LLM provided final response");
+        if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+          dag_runtime_->EmitNode(
+              &dag_turn, DagNodeType::kTurnFinal,
+              nlohmann::json{{"contentSize", response.content.size()}});
+          dag_runtime_->EndTurn(&dag_turn, "completed");
+        }
         Message final_msg;
         final_msg.role = "assistant";
         final_msg.content.push_back(ContentBlock::MakeText(response.content));
@@ -267,6 +384,10 @@ std::vector<Message> AgentLoop::ProcessMessage(
       }
 
       logger_->error("Unexpected LLM response format");
+      if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+        dag_runtime_->EmitNode(&dag_turn, DagNodeType::kTurnError,
+                               nlohmann::json{{"reason", "unexpected_response_format"}});
+      }
       break;
 
     } catch (const ProviderError& pe) {
@@ -277,6 +398,12 @@ std::vector<Message> AgentLoop::ProcessMessage(
         logger_->warn(
             "Context overflow (attempt {}/{}), compacting and retrying",
             overflow_retries, kOverflowCompactionMaxRetries);
+        if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+          dag_runtime_->EmitNode(
+            &dag_turn, DagNodeType::kCompaction,
+            nlohmann::json{{"attempt", overflow_retries},
+                   {"maxRetries", kOverflowCompactionMaxRetries}});
+        }
         request.messages =
             engine->CompactOverflow(request.messages, system_prompt, 0);
         continue;
@@ -286,6 +413,14 @@ std::vector<Message> AgentLoop::ProcessMessage(
       if (pe.Kind() == ProviderErrorKind::kContextOverflow) {
         logger_->error("Context overflow: all {} compaction retries exhausted",
                        kOverflowCompactionMaxRetries);
+        if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+          dag_runtime_->EmitNode(
+              &dag_turn, DagNodeType::kTurnError,
+              nlohmann::json{{"providerErrorKind",
+                              ProviderErrorKindToString(pe.Kind())},
+                             {"error", pe.what()}});
+          dag_runtime_->EndTurn(&dag_turn, "error", pe.what());
+        }
         throw;
       }
 
@@ -319,6 +454,14 @@ std::vector<Message> AgentLoop::ProcessMessage(
         iterations++;
         continue;
       }
+      if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+        dag_runtime_->EmitNode(
+            &dag_turn, DagNodeType::kTurnError,
+            nlohmann::json{{"providerErrorKind",
+                            ProviderErrorKindToString(pe.Kind())},
+                           {"error", pe.what()}});
+        dag_runtime_->EndTurn(&dag_turn, "error", pe.what());
+      }
       throw;
 
     } catch (const std::exception& e) {
@@ -329,17 +472,35 @@ std::vector<Message> AgentLoop::ProcessMessage(
         iterations++;
         continue;
       }
+      if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+        dag_runtime_->EmitNode(&dag_turn, DagNodeType::kTurnError,
+                               nlohmann::json{{"error", e.what()}});
+        dag_runtime_->EndTurn(&dag_turn, "error", e.what());
+      }
       throw;
     }
   }
 
   if (stop_requested_) {
+    if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+      dag_runtime_->EmitNode(&dag_turn, DagNodeType::kTurnStopped,
+                             nlohmann::json::object());
+      dag_runtime_->EndTurn(&dag_turn, "stopped");
+    }
     Message stop_msg;
     stop_msg.role = "assistant";
     stop_msg.content.push_back(
         ContentBlock::MakeText("[Agent turn stopped by user]"));
     new_messages.push_back(stop_msg);
     return new_messages;
+  }
+
+  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+    dag_runtime_->EmitNode(
+        &dag_turn, DagNodeType::kTurnError,
+        nlohmann::json{{"error", "max_iterations_exhausted"},
+                       {"maxIterations", max_iterations_}});
+    dag_runtime_->EndTurn(&dag_turn, "error", "max_iterations_exhausted");
   }
 
   throw std::runtime_error("Failed to get valid response after " +
@@ -355,7 +516,19 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
   logger_->info("Processing message (streaming)");
   stop_requested_ = false;
 
+  DagTurnState dag_turn;
+  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+    dag_turn = dag_runtime_->BeginTurn(effective_session_key, message);
+  }
+
   auto provider = resolve_provider();
+  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+    dag_runtime_->EmitNode(
+        &dag_turn, DagNodeType::kProviderResolved,
+        nlohmann::json{{"model", agent_config_.model},
+                       {"providerId", last_provider_id_},
+                       {"profileId", last_profile_id_}});
+  }
 
   std::vector<Message> new_messages;
 
@@ -369,6 +542,13 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
                        : get_context_window(agent_config_.model);
   auto assembled = engine->Assemble(history, system_prompt, message, ctx_window,
                                     agent_config_.max_tokens);
+  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+    dag_runtime_->EmitNode(
+        &dag_turn, DagNodeType::kContextAssembled,
+        nlohmann::json{{"historyMessages", history.size()},
+                       {"assembledMessages", assembled.messages.size()},
+                       {"contextWindow", ctx_window}});
+  }
 
   ChatCompletionRequest request;
   request.messages = assembled.messages;
@@ -384,7 +564,12 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
     tool["type"] = "function";
     tool["function"]["name"] = schema.name;
     tool["function"]["description"] = schema.description;
-    tool["function"]["parameters"] = schema.parameters;
+    auto params_json =
+        nlohmann::json::parse(schema.parameters_json, nullptr, false);
+    if (params_json.is_discarded()) {
+      params_json = nlohmann::json::object();
+    }
+    tool["function"]["parameters"] = std::move(params_json);
     tools_json.push_back(tool);
   }
   request.tools = tools_json.get<std::vector<nlohmann::json>>();
@@ -395,6 +580,9 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
   int overflow_retries_stream = 0;
 
   while (iterations < max_iterations_ && !stop_requested_) {
+    emit_memory_management_node(dag_runtime_.get(), &dag_turn, agent_config_,
+                                memory_manager_, iterations + 1,
+                                max_iterations_, ctx_window, request.messages);
     try {
       std::string full_response;
       TokenUsage stream_usage;
@@ -414,6 +602,13 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
 
             if (!chunk.tool_calls.empty()) {
               for (const auto& tc : chunk.tool_calls) {
+                if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+                  dag_runtime_->EmitNode(
+                      &dag_turn, DagNodeType::kToolCall,
+                      nlohmann::json{{"id", tc.id},
+                                     {"name", tc.name},
+                                     {"input", tc.arguments}});
+                }
                 if (callback) {
                   callback({events::kToolUse,
                             {{"id", tc.id},
@@ -440,6 +635,13 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
                   // --- Tool result truncation ---
                   result = truncate_tool_result(result, kToolResultMaxChars,
                                                 kToolResultKeepLines);
+                  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+                    dag_runtime_->EmitNode(
+                        &dag_turn, DagNodeType::kToolResult,
+                        nlohmann::json{{"toolUseId", tc.id},
+                                       {"contentSize", result.size()},
+                                       {"isError", false}});
+                  }
                   if (callback) {
                     callback({events::kToolResult,
                               {{"tool_use_id", tc.id}, {"content", result}}});
@@ -453,6 +655,13 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
                   new_messages.push_back(results_msg);
                 } catch (const std::exception& e) {
                   std::string error_content = "Error: " + std::string(e.what());
+                  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+                    dag_runtime_->EmitNode(
+                        &dag_turn, DagNodeType::kToolResult,
+                        nlohmann::json{{"toolUseId", tc.id},
+                                       {"content", error_content},
+                                       {"isError", true}});
+                  }
                   if (callback) {
                     callback({events::kToolResult,
                               {{"tool_use_id", tc.id},
@@ -497,6 +706,12 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
 
       // If we got a final response without tool calls, we're done
       if (!full_response.empty()) {
+        if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+          dag_runtime_->EmitNode(
+              &dag_turn, DagNodeType::kTurnFinal,
+              nlohmann::json{{"contentSize", full_response.size()}});
+          dag_runtime_->EndTurn(&dag_turn, "completed");
+        }
         Message final_msg;
         final_msg.role = "assistant";
         final_msg.content.push_back(ContentBlock::MakeText(full_response));
@@ -513,6 +728,12 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
         overflow_retries_stream++;
         logger_->warn("Streaming context overflow (attempt {}/{}), compacting",
                       overflow_retries_stream, kOverflowCompactionMaxRetries);
+        if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+          dag_runtime_->EmitNode(
+            &dag_turn, DagNodeType::kCompaction,
+            nlohmann::json{{"attempt", overflow_retries_stream},
+                   {"maxRetries", kOverflowCompactionMaxRetries}});
+        }
         request.messages =
             engine->CompactOverflow(request.messages, system_prompt, 0);
         continue;
@@ -521,6 +742,14 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
       // Context overflow with retries exhausted — throw immediately
       if (pe.Kind() == ProviderErrorKind::kContextOverflow) {
         logger_->error("Streaming context overflow: retries exhausted");
+        if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+          dag_runtime_->EmitNode(
+              &dag_turn, DagNodeType::kTurnError,
+              nlohmann::json{{"providerErrorKind",
+                              ProviderErrorKindToString(pe.Kind())},
+                             {"error", pe.what()}});
+          dag_runtime_->EndTurn(&dag_turn, "error", pe.what());
+        }
         if (callback) {
           callback({events::kMessageEnd, {{"error", pe.what()}}});
         }
@@ -546,6 +775,14 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
       }
 
       logger_->error("Error in streaming: {}", pe.what());
+      if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+        dag_runtime_->EmitNode(
+            &dag_turn, DagNodeType::kTurnError,
+            nlohmann::json{{"providerErrorKind",
+                            ProviderErrorKindToString(pe.Kind())},
+                           {"error", pe.what()}});
+        dag_runtime_->EndTurn(&dag_turn, "error", pe.what());
+      }
       if (callback) {
         callback({events::kMessageEnd, {{"error", pe.what()}}});
       }
@@ -553,6 +790,11 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
 
     } catch (const std::exception& e) {
       logger_->error("Error in streaming: {}", e.what());
+      if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+        dag_runtime_->EmitNode(&dag_turn, DagNodeType::kTurnError,
+                               nlohmann::json{{"error", e.what()}});
+        dag_runtime_->EndTurn(&dag_turn, "error", e.what());
+      }
       if (callback) {
         callback({events::kMessageEnd, {{"error", e.what()}}});
       }
@@ -562,6 +804,14 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
 
   std::string stop_text =
       stop_requested_ ? "[Stopped]" : "[Max iterations reached]";
+  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+    dag_runtime_->EmitNode(
+        &dag_turn,
+        stop_requested_ ? DagNodeType::kTurnStopped : DagNodeType::kTurnError,
+        nlohmann::json{{"content", stop_text}});
+    dag_runtime_->EndTurn(&dag_turn, stop_requested_ ? "stopped" : "error",
+                          stop_requested_ ? "" : "max_iterations_reached");
+  }
   if (callback) {
     callback({events::kMessageEnd, {{"content", stop_text}}});
   }
@@ -579,7 +829,7 @@ void AgentLoop::Stop() {
 
 void AgentLoop::SetConfig(const AgentConfig& config) {
   agent_config_ = config;
-  max_iterations_ = config.DynamicMaxIterations();
+  max_iterations_ = compute_effective_max_iterations(config);
   logger_->info(
       "AgentLoop config updated: model={}, temp={}, max_tokens={}, "
       "max_iterations={}, thinking={}",

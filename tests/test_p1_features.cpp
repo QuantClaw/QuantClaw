@@ -16,16 +16,16 @@
 
 #include "quantclaw/config.hpp"
 #include "quantclaw/constants.hpp"
-#include "quantclaw/core/agent_loop.hpp"
-#include "quantclaw/core/context_pruner.hpp"
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/skill_loader.hpp"
-#include "quantclaw/core/usage_accumulator.hpp"
+import quantclaw.core.agent_loop;
+import quantclaw.core.context_pruner;
+import quantclaw.core.memory_manager;
+import quantclaw.core.skill_loader;
+import quantclaw.core.usage_accumulator;
 #include "quantclaw/providers/llm_provider.hpp"
-#include "quantclaw/providers/provider_error.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.providers.provider_error;
+import quantclaw.tools.tool_registry;
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 using namespace quantclaw;

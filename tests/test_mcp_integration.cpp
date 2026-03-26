@@ -8,10 +8,10 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/mcp/mcp_server.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.mcp.mcp_server;
+import quantclaw.tools.tool_registry;
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 // Simple MCP tool backed by ToolRegistry

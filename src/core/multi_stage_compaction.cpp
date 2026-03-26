@@ -1,12 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/core/multi_stage_compaction.hpp"
+module;
 
-#include <algorithm>
-#include <cmath>
+#include "quantclaw/providers/llm_provider.hpp"
 
-#include "quantclaw/core/context_pruner.hpp"
+module quantclaw.core.multi_stage_compaction;
+
+import std;
+import quantclaw.core.context_pruner;
 
 namespace quantclaw {
 

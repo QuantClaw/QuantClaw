@@ -7,11 +7,11 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/core/cron_scheduler.hpp"
-#include "quantclaw/core/memory_search.hpp"
-#include "quantclaw/core/session_compaction.hpp"
+import quantclaw.core.memory_search;
+import quantclaw.core.session_compaction;
+import quantclaw.core.cron_scheduler;
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 // Windows SDK defines AddJob as AddJobA (print spooler API); undefine to

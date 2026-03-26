@@ -7,9 +7,9 @@
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 
-#include "quantclaw/core/content_block.hpp"
+import quantclaw.core.content_block;
 
 namespace quantclaw {
 

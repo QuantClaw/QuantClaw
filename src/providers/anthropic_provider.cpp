@@ -9,7 +9,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/providers/provider_error.hpp"
+import quantclaw.providers.provider_error;
 
 namespace quantclaw {
 
@@ -209,6 +209,19 @@ AnthropicProvider::ChatCompletion(const ChatCompletionRequest& request) {
         if (!result.content.empty())
           result.content += "\n";
         result.content += block.value("text", "");
+      } else if (block_type == "thinking") {
+        // Anthropic-compatible local runtimes (e.g. llama-server) may emit
+        // reasoning-only blocks with type="thinking" and field "thinking".
+        // Preserve this content so responses are not dropped as empty.
+        std::string thinking = block.value("thinking", "");
+        if (thinking.empty()) {
+          thinking = block.value("text", "");
+        }
+        if (!thinking.empty()) {
+          if (!result.content.empty())
+            result.content += "\n";
+          result.content += thinking;
+        }
       } else if (block_type == "tool_use") {
         ToolCall tc;
         tc.id = block.value("id", "");

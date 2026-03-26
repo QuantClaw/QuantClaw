@@ -12,7 +12,7 @@
 #include <unordered_map>
 
 #include <ixwebsocket/IXWebSocket.h>
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/gateway/protocol.hpp"

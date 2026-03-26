@@ -14,7 +14,7 @@
 #include "quantclaw/plugins/plugin_registry.hpp"
 #include "quantclaw/plugins/plugin_system.hpp"
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 // Windows SDK defines StartService/StopService as macros; undefine them

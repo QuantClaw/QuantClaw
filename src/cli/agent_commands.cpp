@@ -3,11 +3,8 @@
 
 #include "quantclaw/cli/agent_commands.hpp"
 
-#include <chrono>
-#include <iostream>
+import std;
 
-#include "quantclaw/gateway/gateway_client.hpp"
-#include "quantclaw/gateway/protocol.hpp"
 
 namespace quantclaw::cli {
 

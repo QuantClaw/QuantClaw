@@ -8,9 +8,9 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/tools/tool_registry.hpp"
+import quantclaw.tools.tool_registry;
 
-#include "test_helpers.hpp"
+import quantclaw.test.helpers;
 #include <gtest/gtest.h>
 
 class ToolRegistryTest : public ::testing::Test {
@@ -242,4 +242,30 @@ TEST_F(ToolRegistryTest, EmptyRegistryNoTools) {
   auto empty = std::make_unique<quantclaw::ToolRegistry>(logger_);
   EXPECT_TRUE(empty->GetToolSchemas().empty());
   EXPECT_FALSE(empty->HasTool("read"));
+}
+
+TEST_F(ToolRegistryTest, MutationClassifierRecognizesBuiltins) {
+  EXPECT_TRUE(tool_registry_->IsMutatingToolCall("write", nlohmann::json::object()));
+  EXPECT_TRUE(tool_registry_->IsMutatingToolCall("edit", nlohmann::json::object()));
+  EXPECT_TRUE(
+      tool_registry_->IsMutatingToolCall("apply_patch", nlohmann::json::object()));
+  EXPECT_FALSE(tool_registry_->IsMutatingToolCall("read", nlohmann::json::object()));
+}
+
+TEST_F(ToolRegistryTest, MutationClassifierRecognizesProcessAction) {
+  EXPECT_TRUE(
+      tool_registry_->IsMutatingToolCall("process", nlohmann::json{{"action", "start"}}));
+  EXPECT_FALSE(
+      tool_registry_->IsMutatingToolCall("process", nlohmann::json{{"action", "list"}}));
+}
+
+TEST_F(ToolRegistryTest, MutationClassifierRecognizesExternalMutationHints) {
+  tool_registry_->RegisterExternalTool(
+      "mcp_remote_call", "mock", nlohmann::json::object(),
+      [](const nlohmann::json&) -> std::string { return "ok"; });
+
+  EXPECT_TRUE(tool_registry_->IsMutatingToolCall(
+      "mcp_remote_call", nlohmann::json{{"method", "POST"}}));
+  EXPECT_TRUE(tool_registry_->IsMutatingToolCall(
+      "mcp_remote_call", nlohmann::json{{"action", "delete"}}));
 }
