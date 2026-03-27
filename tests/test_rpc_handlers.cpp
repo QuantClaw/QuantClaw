@@ -16,11 +16,11 @@ import quantclaw.core.agent_loop;
 import quantclaw.core.memory_manager;
 import quantclaw.core.skill_loader;
 import quantclaw.core.prompt_builder;
-import "quantclaw/gateway/gateway_client.hpp";
-import "quantclaw/gateway/gateway_server.hpp";
+import quantclaw.gateway.gateway_client;
+import quantclaw.gateway.gateway_server;
 import quantclaw.gateway.protocol;
-import "quantclaw/providers/llm_provider.hpp";
-import "quantclaw/session/session_manager.hpp";
+import quantclaw.providers.llm_provider;
+import quantclaw.session.session_manager;
 import quantclaw.tools.tool_chain;
 import quantclaw.tools.tool_registry;
 

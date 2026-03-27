@@ -1,13 +1,13 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/cli/onboard_commands.hpp";
+import quantclaw.cli.onboard_commands;
 
 import std;
 
 import quantclaw.builtin_skills;
 import "quantclaw/config.hpp";
-import "quantclaw/gateway/gateway_client.hpp";
+import quantclaw.gateway.gateway_client;
 import quantclaw.platform.service;
 
 namespace quantclaw::cli {

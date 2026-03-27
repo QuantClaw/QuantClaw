@@ -1,13 +1,55 @@
 // Copyright 2024 QuantClaw Authors. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/providers/curl_raii.hpp";
+export module quantclaw.providers.curl_raii;
 
+import std;
 import <curl/curl.h>;
 
-namespace quantclaw {
+export namespace quantclaw {
 
-// --- CurlHandle ---
+class CurlHandle {
+ public:
+  CurlHandle();
+  ~CurlHandle();
+
+  CurlHandle(const CurlHandle&) = delete;
+  CurlHandle& operator=(const CurlHandle&) = delete;
+  CurlHandle(CurlHandle&& other) noexcept;
+  CurlHandle& operator=(CurlHandle&& other) noexcept;
+
+  CURL* get() const {
+    return handle_;
+  }
+  operator CURL*() const {
+    return handle_;
+  }
+
+ private:
+  CURL* handle_;
+};
+
+class CurlSlist {
+ public:
+  CurlSlist() = default;
+  ~CurlSlist();
+
+  CurlSlist(const CurlSlist&) = delete;
+  CurlSlist& operator=(const CurlSlist&) = delete;
+  CurlSlist(CurlSlist&& other) noexcept;
+  CurlSlist& operator=(CurlSlist&& other) noexcept;
+
+  void append(const char* str);
+  curl_slist* get() const {
+    return list_;
+  }
+  operator curl_slist*() const {
+    return list_;
+  }
+
+ private:
+  curl_slist* list_ = nullptr;
+};
 
 CurlHandle::CurlHandle() : handle_(curl_easy_init()) {
   if (!handle_) {
@@ -35,8 +77,6 @@ CurlHandle& CurlHandle::operator=(CurlHandle&& other) noexcept {
   }
   return *this;
 }
-
-// --- CurlSlist ---
 
 CurlSlist::~CurlSlist() {
   if (list_) {

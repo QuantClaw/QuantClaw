@@ -8,7 +8,8 @@ import std;
 import nlohmann.json;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/providers/anthropic_provider.hpp";
+import quantclaw.providers.anthropic_provider;
+import quantclaw.providers.llm_provider;
 
 namespace quantclaw {
 

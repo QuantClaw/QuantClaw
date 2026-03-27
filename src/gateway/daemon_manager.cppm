@@ -4,7 +4,7 @@
 export module quantclaw.gateway.daemon_manager;
 
 import std;
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 import quantclaw.platform.service;
 
 namespace spdlog {

@@ -1,14 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.cli.gateway_commands;
 
 import std;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 
-namespace quantclaw::cli {
+export namespace quantclaw::cli {
 
 class GatewayCommands {
  public:

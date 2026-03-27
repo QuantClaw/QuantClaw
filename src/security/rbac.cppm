@@ -1,11 +1,13 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.security.rbac;
 
 import std;
 
-namespace quantclaw {
+import quantclaw.gateway.protocol;
+
+export namespace quantclaw {
 
 // Roles (compatible with OpenClaw connect.hello roles)
 enum class Role {

@@ -4,7 +4,7 @@
 export module quantclaw.core.context_pruner;
 
 import std;
-import "quantclaw/providers/llm_provider.hpp";
+import quantclaw.providers.llm_provider;
 
 export namespace quantclaw {
 

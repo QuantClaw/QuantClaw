@@ -1,27 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.gateway.command_queue;
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <deque>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <string>
-#include <thread>
-#include <unordered_map>
-#include <vector>
-
+import std;
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 import quantclaw.common.noncopyable;
 
-namespace quantclaw::gateway {
+export namespace quantclaw::gateway {
 
 // ================================================================
 // QueueMode: determines how new messages interact with an
@@ -106,7 +94,6 @@ class SessionLane {
     return session_key_;
   }
 
-  // Per-session config overrides
   void SetMode(QueueMode mode) {
     mode_ = mode;
   }
@@ -132,7 +119,6 @@ class SessionLane {
     return drop_;
   }
 
-  // Queue management (caller holds CommandQueue's mutex)
   void Enqueue(QueuedCommand cmd);
   bool HasPending() const;
   bool HasActive() const {
@@ -142,31 +128,15 @@ class SessionLane {
     return *active_command_;
   }
 
-  // Pop the next pending command and mark it active.
-  // Returns nullopt if no pending commands or debounce
-  // timer hasn't expired.
   std::optional<QueuedCommand>
   TryActivate(std::chrono::steady_clock::time_point now);
 
-  // Mark the active command as complete and return it.
   std::optional<QueuedCommand> CompleteActive();
-
-  // Apply cap overflow policy. Returns dropped command IDs.
   std::vector<std::string> ApplyCapOverflow();
-
-  // For steer mode: drain all pending messages as a single
-  // concatenated string, clearing the pending queue.
   std::string DrainPendingAsSteeringText();
-
-  // Cancel a specific pending command by ID.
-  // Returns true if the command was found and removed.
   bool CancelPending(const std::string& command_id);
-
-  // For interrupt: clear pending + abort active.
-  // Returns the active command's ID if one was running.
   std::optional<std::string> InterruptActive();
 
-  // Queue introspection
   size_t PendingCount() const {
     return pending_.size();
   }
@@ -191,19 +161,15 @@ class SessionLane {
 // Callback types for CommandQueue.
 // ================================================================
 
-// Executes an agent request. Called on a worker thread.
-// Must block until the agent run completes.
 using AgentExecutor = std::function<nlohmann::json(
     const QueuedCommand& cmd,
     std::function<void(const std::string& event, const nlohmann::json& payload)>
         event_sink)>;
 
-// Sends a final RPC response to a client.
 using ResponseSender = std::function<void(
     const std::string& connection_id, const std::string& rpc_request_id,
     bool ok, const nlohmann::json& payload_or_error)>;
 
-// Sends an RPC event to a specific client.
 using EventSender = std::function<void(const std::string& connection_id,
                                        const std::string& event_name,
                                        const nlohmann::json& payload)>;
@@ -222,35 +188,21 @@ class CommandQueue : public quantclaw::Noncopyable {
                std::shared_ptr<spdlog::logger> logger);
   ~CommandQueue();
 
-  // Start the dispatcher thread.
   void Start();
-
-  // Stop all processing. Waits for active runs to finish.
   void Stop();
 
-  // Submit a new command. Returns the command ID.
-  // Thread-safe: called from any RPC handler thread.
   std::string Submit(const std::string& session_key, const std::string& message,
                      const nlohmann::json& params,
                      const std::string& connection_id,
                      const std::string& rpc_request_id, QueueMode mode);
 
-  // Cancel a specific queued command (not yet active).
   bool Cancel(const std::string& command_id);
-
-  // Abort the active run for a session.
   bool AbortSession(const std::string& session_key);
-
-  // Per-session configuration override.
   void ConfigureSession(const std::string& session_key, QueueMode mode,
                         int debounce_ms = -1, int cap = -1,
                         const std::string& drop = "");
-
-  // Query queue state.
   nlohmann::json SessionQueueStatus(const std::string& session_key) const;
   nlohmann::json GlobalStatus() const;
-
-  // Update global config.
   void SetConfig(const QueueConfig& config);
 
  private:
@@ -269,19 +221,11 @@ class CommandQueue : public quantclaw::Noncopyable {
 
   mutable std::mutex mu_;
   std::condition_variable cv_;
-
-  // session_key -> lane
   std::unordered_map<std::string, std::unique_ptr<SessionLane>> lanes_;
-
-  // Dispatcher thread
   std::thread dispatcher_;
   std::atomic<bool> running_{false};
   std::atomic<int> active_count_{0};
-
-  // Worker threads (tracked so we can join them in Stop())
   std::vector<std::thread> workers_;
-
-  // cmd_id -> session_key (for Cancel lookup)
   std::unordered_map<std::string, std::string> command_to_session_;
 };
 

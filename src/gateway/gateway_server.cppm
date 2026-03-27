@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.gateway.gateway_server;
 
 import std;
 
@@ -13,9 +13,9 @@ import <spdlog/spdlog.h>;
 import quantclaw.common.noncopyable;
 import quantclaw.gateway.protocol;
 import quantclaw.security.rate_limiter;
-import "quantclaw/security/rbac.hpp";
+import quantclaw.security.rbac;
 
-namespace quantclaw::gateway {
+export namespace quantclaw::gateway {
 
 // WebSocket server that handles plain HTTP requests gracefully
 // instead of logging "Missing Sec-WebSocket-Key" errors.
@@ -77,6 +77,18 @@ class HttpAwareWebSocketServer : public ix::WebSocketServer {
     ix::Http::sendResponse(resp, socket);
     connectionState->setTerminated();
   }
+};
+
+struct ClientConnection {
+  std::string connection_id;
+  std::string role;
+  std::vector<std::string> scopes;
+  std::string device_id;
+  std::string client_name;
+  std::string client_version;
+  int64_t connected_at = 0;
+  bool authenticated = false;
+  std::string client_type = "quantclaw";
 };
 
 using RpcHandler = std::function<nlohmann::json(const nlohmann::json& params,

@@ -9,7 +9,7 @@ import <sys/wait.h>;
 import <unistd.h>;
 import <poll.h>;
 
-import "quantclaw/common/defer.hpp";
+import quantclaw.common.defer;
 import quantclaw.platform.process;
 
 namespace quantclaw::platform {
@@ -126,7 +126,8 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
     return result;
   }
   // Auto-close read end at function exit (all paths).
-  DEFER(close(pipefd[0]));
+  [[maybe_unused]] auto close_read_end =
+      quantclaw::MakeDefer([&] { close(pipefd[0]); });
 
   pid_t pid = fork();
   if (pid < 0) {

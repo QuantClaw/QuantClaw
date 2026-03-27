@@ -5,8 +5,8 @@ import std;
 import <spdlog/sinks/null_sink.h>;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/providers/anthropic_provider.hpp";
-import "quantclaw/providers/llm_provider.hpp";
+import quantclaw.providers.anthropic_provider;
+import quantclaw.providers.llm_provider;
 
 import <gtest/gtest.h>;
 

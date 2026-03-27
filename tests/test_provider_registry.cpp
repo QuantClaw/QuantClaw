@@ -5,7 +5,7 @@ import std;
 import <spdlog/sinks/null_sink.h>;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/providers/provider_registry.hpp";
+import quantclaw.providers.provider_registry;
 
 import <gtest/gtest.h>;
 

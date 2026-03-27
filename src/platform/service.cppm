@@ -4,7 +4,7 @@
 export module quantclaw.platform.service;
 
 import std;
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 
 namespace spdlog {
 class logger;

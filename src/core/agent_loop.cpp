@@ -7,7 +7,7 @@ import std;
 
 import nlohmann.json;
 import <spdlog/spdlog.h>;
-import "quantclaw/providers/failover_resolver.hpp";
+import quantclaw.providers.failover_resolver;
 import quantclaw.core.context_engine;
 import quantclaw.core.dag_runtime;
 import quantclaw.core.usage_accumulator;
@@ -18,9 +18,9 @@ import quantclaw.core.memory_manager;
 import quantclaw.core.session_compaction;
 import quantclaw.core.skill_loader;
 import quantclaw.providers.provider_registry;
-import "quantclaw/providers/llm_provider.hpp";
+import quantclaw.providers.llm_provider;
 import quantclaw.gateway.protocol;
-import "quantclaw/providers/failover_resolver.hpp";
+import quantclaw.providers.failover_resolver;
 import quantclaw.tools.tool_registry;
 
 // Bring event name constants into scope

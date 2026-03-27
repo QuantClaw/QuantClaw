@@ -18,8 +18,8 @@ import "quantclaw/config.hpp";
 import quantclaw.core.agent_loop;
 import quantclaw.core.memory_manager;
 import quantclaw.core.skill_loader;
-import "quantclaw/providers/llm_provider.hpp";
-import "quantclaw/providers/provider_registry.hpp";
+import quantclaw.providers.llm_provider;
+import quantclaw.providers.provider_registry;
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;

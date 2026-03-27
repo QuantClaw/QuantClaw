@@ -6,7 +6,7 @@ module;
 module quantclaw.core.default_context_engine;
 
 import std;
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 import quantclaw.core.context_pruner;
 import quantclaw.core.multi_stage_compaction;
 

@@ -4,7 +4,7 @@
 export module quantclaw.core.multi_stage_compaction;
 
 import std;
-import "quantclaw/providers/llm_provider.hpp";
+import quantclaw.providers.llm_provider;
 
 namespace spdlog {
 class logger;

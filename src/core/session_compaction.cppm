@@ -5,7 +5,7 @@ export module quantclaw.core.session_compaction;
 
 import std;
 import nlohmann.json;
-import "quantclaw/providers/llm_provider.hpp";
+import quantclaw.providers.llm_provider;
 
 namespace spdlog {
 class logger;

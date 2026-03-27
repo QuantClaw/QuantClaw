@@ -194,14 +194,25 @@ endif()
 
 # Source files - explicitly listed
 set(QUANTCLAW_CORE_SOURCES
+    src/constants.cppm
+    src/common/defer.cppm
+    src/providers/llm_provider.cppm
+    src/providers/curl_raii.cppm
+    src/providers/anthropic_provider.cppm
     src/providers/provider_registry.cpp
-    src/providers/provider_error.cpp
-    src/providers/cooldown_tracker.cpp
-    src/providers/failover_resolver.cpp
+    src/providers/provider_error.cppm
+    src/providers/cooldown_tracker.cppm
+    src/providers/failover_resolver.cppm
+    src/session/session_manager.cppm
+    src/security/rbac.cppm
     src/platform/process.cppm
     src/platform/ipc.cppm
     src/platform/service.cppm
     src/cli/cli_manager.cppm
+    src/cli/agent_commands.cppm
+    src/cli/gateway_commands.cppm
+    src/cli/onboard_commands.cppm
+    src/cli/session_commands.cppm
     src/gateway/daemon_manager.cppm
     src/gateway/protocol.cppm
     src/channels/channel_policy.cppm
@@ -218,16 +229,18 @@ set(QUANTCLAW_CORE_SOURCES
     src/thirdparty/json.ixx
     # CLI
     src/cli/cli_manager.cpp
-    src/cli/commands.cpp
-    src/cli/gateway_commands.cpp
     src/cli/agent_commands.cpp
-    src/cli/session_commands.cpp
+    src/cli/gateway_commands.cpp
     src/cli/onboard_commands.cpp
+    src/cli/session_commands.cpp
     # Gateway
+    src/gateway/gateway_server.cppm
     src/gateway/gateway_server.cpp
+    src/gateway/gateway_client.cppm
     src/gateway/gateway_client.cpp
     src/gateway/rpc_handlers.cpp
     src/gateway/daemon_manager.cpp
+    src/gateway/command_queue.cppm
     src/gateway/command_queue.cpp
     # Session
     src/session/session_manager.cpp
@@ -296,83 +309,25 @@ if(NOT QC_GIT_COMMIT)
 endif()
 string(TIMESTAMP QC_BUILD_DATE "%Y-%m-%d")
 
-set(QC_NLOHMANN_JSON_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/include/nlohmann/json.hpp")
-set(QC_NLOHMANN_JSON_CMI_STAMP "${CMAKE_BINARY_DIR}/nlohmann_json_header_unit.stamp")
-
-add_custom_command(
-    OUTPUT ${QC_NLOHMANN_JSON_CMI_STAMP}
-    COMMAND ${CMAKE_CXX_COMPILER}
-            -std=c++23
-            -fmodules-ts
-            -x c++-user-header
-            -c ${QC_NLOHMANN_JSON_HEADER}
-    COMMAND ${CMAKE_COMMAND} -E touch ${QC_NLOHMANN_JSON_CMI_STAMP}
-    DEPENDS ${QC_NLOHMANN_JSON_HEADER}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Precompiling nlohmann/json.hpp header unit"
-    VERBATIM
-)
-
-add_custom_target(nlohmann_json_header_unit DEPENDS ${QC_NLOHMANN_JSON_CMI_STAMP})
-
 add_library(quantclaw_core STATIC ${QUANTCLAW_CORE_SOURCES})
 set_property(TARGET quantclaw_core PROPERTY CXX_SCAN_FOR_MODULES ON)
-add_dependencies(quantclaw_core nlohmann_json_header_unit)
 
-target_sources(quantclaw_core
-    PUBLIC
-        FILE_SET CXX_MODULES
-        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
-        FILES
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/agent_loop.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/content_block.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/context_engine.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/context_pruner.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/cron_scheduler.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/dag_runtime.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/default_context_engine.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/memory_manager.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/memory_search.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/message_commands.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/mmr_reranker.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/multi_stage_compaction.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/prompt_builder.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/session_compaction.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/signal_handler.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/skill_loader.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/temporal_decay.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/usage_accumulator.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/vector_index.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/subagent.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/providers/provider_error.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/providers/provider_registry.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/process.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/ipc.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/service.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/cli/cli_manager.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/gateway/daemon_manager.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/gateway/protocol.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/channels/channel_policy.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/plugin_manifest.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/plugin_registry.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/plugin_system.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/hook_manager.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/sidecar_manager.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/security/rate_limiter.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/security/tool_permissions.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/security/exec_approval.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/browser_tool.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/common/noncopyable.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/common/parse_util.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/common/string_util.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/builtin_skills.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/tool_chain.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/tool_registry.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/mcp_client.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/mcp_server.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/mcp_tool_manager.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/quantclaw_mcp_tools.cppm
+execute_process(
+    COMMAND ${CMAKE_COMMAND}
+            -DQC_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+            -DQC_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DQC_BINARY_DIR=${CMAKE_BINARY_DIR}
+            -DQC_PROJECT_VERSION=${PROJECT_VERSION}
+            -DQC_BUILD_DATE=${QC_BUILD_DATE}
+            -DQC_GIT_COMMIT=${QC_GIT_COMMIT}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/scripts/precompile_gcm_cache.cmake
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    RESULT_VARIABLE QC_PRECOMPILE_GCM_RESULT
 )
+if(NOT QC_PRECOMPILE_GCM_RESULT EQUAL 0)
+    message(FATAL_ERROR
+        "Failed to precompile header units/modules into gcm.cache before build")
+endif()
 
 target_include_directories(quantclaw_core
     PUBLIC
@@ -532,7 +487,6 @@ if(BUILD_TESTS)
         tests/test_p1_features.cpp
         tests/test_mcp_server.cpp
         tests/test_mcp_integration.cpp
-        tests/test_openai_provider.cpp
         tests/test_anthropic_provider.cpp
         tests/test_security_sandbox.cpp
         tests/test_tool_registry.cpp

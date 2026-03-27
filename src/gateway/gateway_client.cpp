@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/gateway/gateway_client.hpp";
+import quantclaw.gateway.gateway_client;
 
 import std;
 

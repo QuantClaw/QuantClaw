@@ -3,20 +3,20 @@
 
 import std;
 
+import <spdlog/spdlog.h>;
 import <spdlog/sinks/daily_file_sink.h>;
 import <spdlog/sinks/stdout_color_sinks.h>;
-import <spdlog/spdlog.h>;
 
 import quantclaw.core.skill_loader;
 import quantclaw.core.memory_search;
-import "quantclaw/cli/agent_commands.hpp";
+import quantclaw.cli.agent_commands;
 import quantclaw.cli.cli_manager;
-import "quantclaw/cli/gateway_commands.hpp";
-import "quantclaw/cli/onboard_commands.hpp";
-import "quantclaw/cli/session_commands.hpp";
+import quantclaw.cli.gateway_commands;
+import quantclaw.cli.onboard_commands;
+import quantclaw.cli.session_commands;
 import quantclaw.common.parse_util;
 import "quantclaw/config.hpp";
-import "quantclaw/gateway/gateway_client.hpp";
+import quantclaw.gateway.gateway_client;
 import quantclaw.platform.process;
 
 // Bring port/URL constants into scope (avoids quantclaw:: prefix for literals)

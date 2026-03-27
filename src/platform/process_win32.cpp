@@ -5,7 +5,7 @@
 
 import std;
 
-import "quantclaw/common/defer.hpp";
+import quantclaw.common.defer;
 import quantclaw.platform.process;
 
 // clang-format off
@@ -177,11 +177,12 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
   }
 
   // RAII cleanup for handles.
-  DEFER({
+  [[maybe_unused]] auto close_process_handles = quantclaw::MakeDefer([&] {
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
   });
-  DEFER(CloseHandle(read_pipe));
+  [[maybe_unused]] auto close_read_pipe =
+      quantclaw::MakeDefer([&] { CloseHandle(read_pipe); });
 
   // Read output with timeout awareness.
   DWORD wait_ms = (timeout_seconds > 0)

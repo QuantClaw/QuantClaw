@@ -16,7 +16,7 @@ import nlohmann.json;
 import "quantclaw/config.hpp";
 import quantclaw.core.context_pruner;
 import quantclaw.core.memory_search;
-import "quantclaw/gateway/command_queue.hpp";
+import quantclaw.gateway.command_queue;
 
 #include <gtest/gtest.h>
 

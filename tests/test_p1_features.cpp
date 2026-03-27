@@ -15,13 +15,13 @@
 #include <spdlog/spdlog.h>
 
 import "quantclaw/config.hpp";
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 import quantclaw.core.agent_loop;
 import quantclaw.core.context_pruner;
 import quantclaw.core.memory_manager;
 import quantclaw.core.skill_loader;
 import quantclaw.core.usage_accumulator;
-import "quantclaw/providers/llm_provider.hpp";
+import quantclaw.providers.llm_provider;
 import quantclaw.providers.provider_error;
 import quantclaw.tools.tool_registry;
 

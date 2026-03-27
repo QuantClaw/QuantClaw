@@ -27,7 +27,8 @@ std::string ProviderErrorKindToString(ProviderErrorKind kind);
 class ProviderError : public std::runtime_error {
  public:
   ProviderError(ProviderErrorKind kind, int http_status,
-                const std::string& message, const std::string& provider_id = "",
+                const std::string& message,
+                const std::string& provider_id = "",
                 const std::string& profile_id = "");
 
   ProviderErrorKind Kind() const {

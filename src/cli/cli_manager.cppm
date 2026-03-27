@@ -4,7 +4,7 @@
 export module quantclaw.cli.cli_manager;
 
 import std;
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 
 export namespace quantclaw::cli {
 

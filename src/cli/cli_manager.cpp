@@ -6,7 +6,7 @@ import quantclaw.cli.cli_manager;
 import std;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 
 namespace quantclaw::cli {
 

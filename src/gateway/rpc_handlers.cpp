@@ -4,16 +4,16 @@
 import std;
 
 import "quantclaw/config.hpp";
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 import quantclaw.core.agent_loop;
 import quantclaw.core.message_commands;
-import "quantclaw/gateway/command_queue.hpp";
-import "quantclaw/gateway/gateway_server.hpp";
+import quantclaw.gateway.command_queue;
+import quantclaw.gateway.gateway_server;
 import quantclaw.gateway.protocol;
 import quantclaw.plugins.plugin_system;
 import quantclaw.providers.provider_registry;
 import quantclaw.security.exec_approval;
-import "quantclaw/session/session_manager.hpp";
+import quantclaw.session.session_manager;
 import quantclaw.core.cron_scheduler;
 import quantclaw.core.memory_search;
 import quantclaw.core.prompt_builder;

@@ -20,7 +20,7 @@ import quantclaw.platform.process;
 import quantclaw.security.exec_approval;
 import "quantclaw/security/sandbox.hpp";
 import quantclaw.security.tool_permissions;
-import "quantclaw/session/session_manager.hpp";
+import quantclaw.session.session_manager;
 
 namespace fs = std::filesystem;
 

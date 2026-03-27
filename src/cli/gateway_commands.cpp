@@ -1,21 +1,21 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/cli/gateway_commands.hpp";
+import quantclaw.cli.gateway_commands;
 
 import std;
 
 import "quantclaw/channels/adapter_manager.hpp";
 import "quantclaw/config.hpp";
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 import quantclaw.core.agent_loop;
 import quantclaw.core.prompt_builder;
 import quantclaw.core.subagent;
 import quantclaw.core.dag_runtime;
-import "quantclaw/gateway/command_queue.hpp";
+import quantclaw.gateway.command_queue;
 import quantclaw.gateway.daemon_manager;
-import "quantclaw/gateway/gateway_client.hpp";
-import "quantclaw/gateway/gateway_server.hpp";
+import quantclaw.gateway.gateway_client;
+import quantclaw.gateway.gateway_server;
 import quantclaw.gateway.protocol;
 import quantclaw.mcp.mcp_tool_manager;
 import quantclaw.platform.process;
@@ -23,9 +23,9 @@ import quantclaw.plugins.plugin_system;
 import quantclaw.providers.provider_registry;
 import quantclaw.security.exec_approval;
 import quantclaw.security.rate_limiter;
-import "quantclaw/security/rbac.hpp";
+import quantclaw.security.rbac;
 import quantclaw.security.tool_permissions;
-import "quantclaw/session/session_manager.hpp";
+import quantclaw.session.session_manager;
 import quantclaw.core.memory_manager;
 import quantclaw.core.dag_runtime;
 import quantclaw.core.cron_scheduler;

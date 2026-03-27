@@ -11,8 +11,8 @@
 import <spdlog/sinks/null_sink.h>;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/gateway/gateway_client.hpp";
-import "quantclaw/gateway/gateway_server.hpp";
+import quantclaw.gateway.gateway_client;
+import quantclaw.gateway.gateway_server;
 import quantclaw.gateway.protocol;
 
 import quantclaw.test.helpers;

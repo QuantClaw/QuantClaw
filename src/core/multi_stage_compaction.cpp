@@ -6,7 +6,7 @@ module;
 module quantclaw.core.multi_stage_compaction;
 
 import std;
-import "quantclaw/providers/llm_provider.hpp";
+import quantclaw.providers.llm_provider;
 import quantclaw.core.context_pruner;
 
 namespace quantclaw {

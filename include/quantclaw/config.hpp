@@ -7,7 +7,7 @@ import std;
 
 import nlohmann.json;
 
-import "quantclaw/constants.hpp";
+import quantclaw.constants;
 
 namespace quantclaw {
 

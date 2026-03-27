@@ -10,11 +10,11 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-import "quantclaw/cli/agent_commands.hpp";
+import quantclaw.cli.agent_commands;
 import quantclaw.cli.cli_manager;
-import "quantclaw/cli/gateway_commands.hpp";
-import "quantclaw/cli/onboard_commands.hpp";
-import "quantclaw/cli/session_commands.hpp";
+import quantclaw.cli.gateway_commands;
+import quantclaw.cli.onboard_commands;
+import quantclaw.cli.session_commands;
 
 #include <gtest/gtest.h>
 

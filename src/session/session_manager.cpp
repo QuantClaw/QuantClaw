@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/session/session_manager.hpp";
+import quantclaw.session.session_manager;
 
 import std;
 

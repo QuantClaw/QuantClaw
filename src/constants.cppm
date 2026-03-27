@@ -1,28 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.constants;
 
-// ============================================================
-// QuantClaw project-wide named constants
-//
-// All "magic numbers" that appear across multiple files must be
-// defined here so they can be changed in one place.
-// ============================================================
-
-// Fallbacks in case the file is included without CMake's compile definitions
-// (e.g., in a standalone IDE configuration or unit test binary).
-#ifndef QUANTCLAW_VERSION
-#define QUANTCLAW_VERSION "dev"
-#endif
-#ifndef QUANTCLAW_BUILD_DATE
-#define QUANTCLAW_BUILD_DATE "unknown"
-#endif
-#ifndef QUANTCLAW_GIT_COMMIT
-#define QUANTCLAW_GIT_COMMIT "unknown"
-#endif
-
-namespace quantclaw {
+export namespace quantclaw {
 
 // ------------------------------------------------------------
 // Version information (injected by CMake at build time)

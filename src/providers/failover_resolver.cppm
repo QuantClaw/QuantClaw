@@ -1,13 +1,85 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/providers/failover_resolver.hpp";
+export module quantclaw.providers.failover_resolver;
 
 import std;
+import <spdlog/spdlog.h>;
 
+import quantclaw.providers.cooldown_tracker;
+import quantclaw.providers.llm_provider;
+import quantclaw.providers.provider_error;
 import quantclaw.providers.provider_registry;
 
-namespace quantclaw {
+export namespace quantclaw {
+
+// Auth profile: one API key for a provider.
+// A provider may have multiple profiles for key rotation.
+struct AuthProfile {
+  std::string id;           // e.g. "prod", "backup"
+  std::string api_key;      // Direct key value
+  std::string api_key_env;  // Env var name (resolved at startup)
+  int priority = 0;         // Lower = higher priority (0 is highest)
+};
+
+// Result of a failover resolution attempt.
+struct ResolvedProvider {
+  std::shared_ptr<LLMProvider> provider;
+  std::string provider_id;
+  std::string profile_id;
+  std::string model;
+  bool is_fallback = false;  // True if this is not the primary model
+};
+
+// Orchestrates multi-profile key rotation and model fallback chains.
+class FailoverResolver {
+ public:
+  FailoverResolver(ProviderRegistry* registry,
+                   std::shared_ptr<spdlog::logger> logger);
+
+  void SetFallbackChain(const std::vector<std::string>& models);
+  void SetProfiles(const std::string& provider_id,
+                   const std::vector<AuthProfile>& profiles);
+
+  std::optional<ResolvedProvider> Resolve(const std::string& model,
+                                          const std::string& session_key = "");
+
+  void RecordSuccess(const std::string& provider_id,
+                     const std::string& profile_id,
+                     const std::string& session_key = "");
+
+  void RecordFailure(const std::string& provider_id,
+                     const std::string& profile_id, ProviderErrorKind kind,
+                     int retry_after_seconds = 0);
+
+  void ClearSessionPin(const std::string& session_key);
+
+  const CooldownTracker& GetCooldownTracker() const {
+    return cooldown_;
+  }
+
+ private:
+  std::string cooldown_key(const std::string& provider_id,
+                           const std::string& profile_id) const;
+
+  std::optional<ResolvedProvider>
+  try_resolve_model(const std::string& model, const std::string& session_key);
+
+  ProviderRegistry* registry_;
+  std::shared_ptr<spdlog::logger> logger_;
+  CooldownTracker cooldown_;
+
+  mutable std::mutex mu_;
+  std::vector<std::string> fallback_chain_;
+  std::unordered_map<std::string, std::vector<AuthProfile>> profiles_;
+  std::unordered_map<std::string, int64_t> profile_last_used_;
+
+  struct SessionPin {
+    std::string provider_id;
+    std::string profile_id;
+  };
+  std::unordered_map<std::string, SessionPin> session_pins_;
+};
 
 FailoverResolver::FailoverResolver(ProviderRegistry* registry,
                                    std::shared_ptr<spdlog::logger> logger)
@@ -28,13 +100,10 @@ void FailoverResolver::SetProfiles(const std::string& provider_id,
 std::optional<ResolvedProvider>
 FailoverResolver::Resolve(const std::string& model,
                           const std::string& session_key) {
-  // Try the primary model first
   auto result = try_resolve_model(model, session_key);
   if (result)
     return result;
 
-  // Walk the fallback chain
-  // Snapshot the fallback chain under lock, then release lock before iterating
   std::vector<std::string> chain_snapshot;
   {
     std::lock_guard<std::mutex> lock(mu_);
@@ -42,12 +111,10 @@ FailoverResolver::Resolve(const std::string& model,
   }
 
   for (const auto& fallback_model : chain_snapshot) {
-    // Skip if it's the same as primary
     if (fallback_model == model)
       continue;
 
     result = try_resolve_model(fallback_model, session_key);
-
     if (result) {
       result->is_fallback = true;
       logger_->warn("Primary model '{}' unavailable, falling back to '{}'",
@@ -69,7 +136,6 @@ void FailoverResolver::RecordSuccess(const std::string& provider_id,
 
   {
     std::lock_guard<std::mutex> lock(mu_);
-    // Update last-used timestamp for round-robin ordering
     auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
                    std::chrono::steady_clock::now().time_since_epoch())
                    .count();
@@ -116,7 +182,6 @@ FailoverResolver::try_resolve_model(const std::string& model,
 
   std::lock_guard<std::mutex> lock(mu_);
 
-  // Check session pin first
   if (!session_key.empty()) {
     auto pin_it = session_pins_.find(session_key);
     if (pin_it != session_pins_.end() &&
@@ -124,12 +189,10 @@ FailoverResolver::try_resolve_model(const std::string& model,
       const auto& pin = pin_it->second;
       auto key = cooldown_key(provider_id, pin.profile_id);
       if (!cooldown_.IsInCooldown(key)) {
-        // Create provider with pinned profile's API key
         auto prof_it = profiles_.find(provider_id);
         if (prof_it != profiles_.end()) {
           for (const auto& profile : prof_it->second) {
             if (profile.id == pin.profile_id) {
-              // Temporarily override the entry's API key
               auto provider =
                   registry_->GetProviderWithKey(provider_id, profile.api_key);
               if (provider) {
@@ -139,25 +202,19 @@ FailoverResolver::try_resolve_model(const std::string& model,
             }
           }
         }
-        // Pin references a profile that no longer exists, try normal flow
       }
-      // Pinned profile is in cooldown, clear pin
       session_pins_.erase(pin_it);
     }
   }
 
-  // Check if this provider has auth profiles
   auto prof_it = profiles_.find(provider_id);
   if (prof_it != profiles_.end() && !prof_it->second.empty()) {
-    // Build sorted candidate list: available pool first, then cooldown pool.
-    // Within available pool: sort by priority (asc), then last_used (asc) for
-    // round-robin among same-priority profiles.
     struct Candidate {
       const AuthProfile* profile;
       bool in_cooldown;
       int priority;
       int64_t last_used;
-      int index;  // Original index for stable tie-breaking
+      int index;
     };
     std::vector<Candidate> available;
     std::vector<Candidate> cooled_down;
@@ -170,17 +227,15 @@ FailoverResolver::try_resolve_model(const std::string& model,
           (lu_it != profile_last_used_.end()) ? lu_it->second : 0;
 
       if (cooldown_.IsInCooldown(key)) {
-        cooled_down.push_back(
-            {&profile, true, profile.priority, last_used, idx});
+        cooled_down.push_back({&profile, true, profile.priority, last_used,
+                               idx});
       } else {
-        available.push_back(
-            {&profile, false, profile.priority, last_used, idx});
+        available.push_back({&profile, false, profile.priority, last_used,
+                               idx});
       }
       idx++;
     }
 
-    // Sort available: priority ascending, then last_used ascending (LRU
-    // first), then original index for deterministic tie-breaking.
     std::sort(available.begin(), available.end(),
               [](const Candidate& a, const Candidate& b) {
                 if (a.priority != b.priority)
@@ -190,12 +245,10 @@ FailoverResolver::try_resolve_model(const std::string& model,
                 return a.index < b.index;
               });
 
-    // Try available profiles first
     for (const auto& c : available) {
       auto provider =
           registry_->GetProviderWithKey(provider_id, c.profile->api_key);
       if (provider) {
-        // Update last_used timestamp for round-robin
         auto key = cooldown_key(provider_id, c.profile->id);
         auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
                        std::chrono::steady_clock::now().time_since_epoch())
@@ -206,7 +259,6 @@ FailoverResolver::try_resolve_model(const std::string& model,
       }
     }
 
-    // All profiles in cooldown — try probe throttling on the first profile.
     if (!cooled_down.empty()) {
       auto probe_key = cooldown_key(provider_id, cooled_down[0].profile->id);
       if (cooldown_.TryProbe(probe_key)) {
@@ -216,7 +268,8 @@ FailoverResolver::try_resolve_model(const std::string& model,
             provider_id, cooled_down[0].profile->api_key);
         if (provider) {
           return ResolvedProvider{provider, provider_id,
-                                  cooled_down[0].profile->id, ref.model, false};
+                                  cooled_down[0].profile->id, ref.model,
+                                  false};
         }
       }
     }
@@ -226,10 +279,8 @@ FailoverResolver::try_resolve_model(const std::string& model,
     return std::nullopt;
   }
 
-  // No profiles configured — use default provider entry
   auto key = cooldown_key(provider_id, "");
   if (cooldown_.IsInCooldown(key)) {
-    // Probe throttling for default entry
     if (cooldown_.TryProbe(key)) {
       logger_->info("Probing cooled-down provider '{}' (probe throttle)",
                     provider_id);

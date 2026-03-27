@@ -1,12 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.cli.onboard_commands;
 
 import std;
-import <spdlog/logger.h>;
+import <spdlog/spdlog.h>;
 
-namespace quantclaw::cli {
+export namespace quantclaw::cli {
 
 class OnboardCommands {
  public:

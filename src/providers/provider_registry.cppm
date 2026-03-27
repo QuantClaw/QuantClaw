@@ -6,14 +6,13 @@ export module quantclaw.providers.provider_registry;
 import std;
 import nlohmann.json;
 import "quantclaw/config.hpp";
+import quantclaw.providers.llm_provider;
 
 namespace spdlog {
 class logger;
 }
 
 export namespace quantclaw {
-
-class LLMProvider;
 
 struct ModelRef {
   std::string provider;

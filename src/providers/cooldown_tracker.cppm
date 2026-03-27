@@ -1,11 +1,46 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/providers/cooldown_tracker.hpp";
+export module quantclaw.providers.cooldown_tracker;
 
 import std;
 
-namespace quantclaw {
+import quantclaw.providers.provider_error;
+
+export namespace quantclaw {
+
+// Tracks per-key cooldown state with exponential backoff.
+// Keys are typically "provider_id:profile_id" or "provider_id".
+class CooldownTracker {
+ public:
+  bool IsInCooldown(const std::string& key) const;
+  void RecordFailure(const std::string& key, ProviderErrorKind kind,
+                     int retry_after_seconds = 0);
+  void RecordSuccess(const std::string& key);
+  std::chrono::seconds CooldownRemaining(const std::string& key) const;
+  void Reset();
+  int FailureCount(const std::string& key) const;
+  bool TryProbe(const std::string& key);
+
+  static constexpr std::chrono::seconds kProbeInterval{30};
+
+ private:
+  static constexpr std::chrono::hours kFailureWindowDecay{24};
+
+  struct CooldownState {
+    int consecutive_failures = 0;
+    ProviderErrorKind last_error = ProviderErrorKind::kUnknown;
+    std::chrono::steady_clock::time_point cooldown_until;
+    std::chrono::steady_clock::time_point last_failure_at;
+    std::chrono::steady_clock::time_point last_probe_at;
+  };
+
+  static std::chrono::seconds ComputeCooldown(ProviderErrorKind kind,
+                                              int failure_count);
+
+  mutable std::mutex mu_;
+  std::unordered_map<std::string, CooldownState> states_;
+};
 
 bool CooldownTracker::IsInCooldown(const std::string& key) const {
   std::lock_guard<std::mutex> lock(mu_);
@@ -22,8 +57,6 @@ void CooldownTracker::RecordFailure(const std::string& key,
   auto now = std::chrono::steady_clock::now();
   auto& state = states_[key];
 
-  // Failure window decay: if the last failure was more than 24h ago,
-  // reset the consecutive failure counter so backoff restarts from base.
   if (state.consecutive_failures > 0 &&
       now - state.last_failure_at > kFailureWindowDecay) {
     state.consecutive_failures = 0;
@@ -32,10 +65,8 @@ void CooldownTracker::RecordFailure(const std::string& key,
   state.consecutive_failures++;
   state.last_error = kind;
   state.last_failure_at = now;
-  state.last_probe_at =
-      now;  // Reset probe timer so first probe waits kProbeInterval
+  state.last_probe_at = now;
 
-  // Prefer server-provided Retry-After over computed backoff
   if (retry_after_seconds > 0) {
     state.cooldown_until = now + std::chrono::seconds(retry_after_seconds);
   } else {
@@ -81,15 +112,14 @@ bool CooldownTracker::TryProbe(const std::string& key) {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = states_.find(key);
   if (it == states_.end())
-    return false;  // Not in cooldown, no probe needed
+    return false;
 
   auto now = std::chrono::steady_clock::now();
   if (now >= it->second.cooldown_until)
-    return false;  // Cooldown expired
+    return false;
 
-  // Check if enough time has passed since the last probe
   if (now - it->second.last_probe_at < kProbeInterval) {
-    return false;  // Too soon to probe again
+    return false;
   }
 
   it->second.last_probe_at = now;
@@ -98,47 +128,32 @@ bool CooldownTracker::TryProbe(const std::string& key) {
 
 std::chrono::seconds CooldownTracker::ComputeCooldown(ProviderErrorKind kind,
                                                       int failure_count) {
-  // Base cooldown per error type (seconds)
   int base_s = 0;
   int cap_s = 0;
 
   switch (kind) {
     case ProviderErrorKind::kRateLimit:
-      // 60s → 300s → 1500s → 3600s cap
       base_s = 60;
       cap_s = 3600;
       break;
-
     case ProviderErrorKind::kAuthError:
-      // Fixed 3600s (1 hour) — re-authentication unlikely to help soon
       return std::chrono::seconds(3600);
-
     case ProviderErrorKind::kBillingError:
-      // 5h → 24h cap
-      base_s = 18000;  // 5 hours
-      cap_s = 86400;   // 24 hours
+      base_s = 18000;
+      cap_s = 86400;
       break;
-
     case ProviderErrorKind::kTransient:
-      // 60s → 300s → 1500s → 3600s cap (same as rate limit)
       base_s = 60;
       cap_s = 3600;
       break;
-
     case ProviderErrorKind::kModelNotFound:
-      // No cooldown — fall back immediately
       return std::chrono::seconds(0);
-
     case ProviderErrorKind::kTimeout:
-      // 30s → 60s → 120s → 300s cap
       base_s = 30;
       cap_s = 300;
       break;
-
     case ProviderErrorKind::kContextOverflow:
-      // No cooldown — caller should compact context and retry immediately.
       return std::chrono::seconds(0);
-
     case ProviderErrorKind::kUnknown:
       base_s = 60;
       cap_s = 600;
@@ -148,8 +163,6 @@ std::chrono::seconds CooldownTracker::ComputeCooldown(ProviderErrorKind kind,
   if (base_s == 0)
     return std::chrono::seconds(0);
 
-  // Exponential backoff: base * 5^(failures-1), capped
-  // failure_count: 1 → base, 2 → base*5, 3 → base*25, ...
   int multiplier = 1;
   for (int i = 1; i < failure_count && i < 5; ++i) {
     multiplier *= 5;
