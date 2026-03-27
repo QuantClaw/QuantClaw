@@ -3,12 +3,7 @@
 
 import "quantclaw/cli/gateway_commands.hpp";
 
-#include <atomic>
-#include <chrono>
-#include <filesystem>
-#include <functional>
-#include <iostream>
-#include <thread>
+import std;
 
 import "quantclaw/channels/adapter_manager.hpp";
 import "quantclaw/config.hpp";
@@ -18,18 +13,18 @@ import quantclaw.core.prompt_builder;
 import quantclaw.core.subagent;
 import quantclaw.core.dag_runtime;
 import "quantclaw/gateway/command_queue.hpp";
-import "quantclaw/gateway/daemon_manager.hpp";
+import quantclaw.gateway.daemon_manager;
 import "quantclaw/gateway/gateway_client.hpp";
 import "quantclaw/gateway/gateway_server.hpp";
-import "quantclaw/gateway/protocol.hpp";
+import quantclaw.gateway.protocol;
 import quantclaw.mcp.mcp_tool_manager;
-import "quantclaw/platform/process.hpp";
-import "quantclaw/plugins/plugin_system.hpp";
+import quantclaw.platform.process;
+import quantclaw.plugins.plugin_system;
 import quantclaw.providers.provider_registry;
-import "quantclaw/security/exec_approval.hpp";
-import "quantclaw/security/rate_limiter.hpp";
+import quantclaw.security.exec_approval;
+import quantclaw.security.rate_limiter;
 import "quantclaw/security/rbac.hpp";
-import "quantclaw/security/tool_permissions.hpp";
+import quantclaw.security.tool_permissions;
 import "quantclaw/session/session_manager.hpp";
 import quantclaw.core.memory_manager;
 import quantclaw.core.dag_runtime;

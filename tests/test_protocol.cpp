@@ -1,9 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/gateway/protocol.hpp";
+import quantclaw.gateway.protocol;
 
-#include <gtest/gtest.h>
+import std;
+import <gtest/gtest.h>;
 
 using namespace quantclaw::gateway;
 

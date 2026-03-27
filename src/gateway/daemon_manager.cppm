@@ -1,21 +1,18 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.gateway.daemon_manager;
 
-#include <memory>
-#include <string>
-
-#include <spdlog/spdlog.h>
-
+import std;
 import "quantclaw/constants.hpp";
-import "quantclaw/platform/service.hpp";
+import quantclaw.platform.service;
 
-namespace quantclaw::gateway {
+namespace spdlog {
+class logger;
+}
 
-// Manages the QuantClaw gateway as a platform service.
-// Linux: systemd user service. Windows: background process with PID file.
-// Thin wrapper around platform::ServiceManager.
+export namespace quantclaw::gateway {
+
 class DaemonManager {
  public:
   explicit DaemonManager(std::shared_ptr<spdlog::logger> logger);

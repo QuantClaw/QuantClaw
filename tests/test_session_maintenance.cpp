@@ -4,8 +4,8 @@
 #include <filesystem>
 #include <fstream>
 
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
+import <spdlog/sinks/null_sink.h>;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/session/session_maintenance.hpp";
 

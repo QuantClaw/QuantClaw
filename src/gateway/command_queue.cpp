@@ -3,10 +3,7 @@
 
 import "quantclaw/gateway/command_queue.hpp";
 
-#include <algorithm>
-#include <iomanip>
-#include <random>
-#include <sstream>
+import std;
 
 namespace quantclaw::gateway {
 

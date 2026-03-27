@@ -7,8 +7,8 @@
 #include <thread>
 
 #include <httplib.h>
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
+import <spdlog/sinks/null_sink.h>;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/config.hpp";
 import quantclaw.core.agent_loop;

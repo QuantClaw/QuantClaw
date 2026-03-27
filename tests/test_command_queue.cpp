@@ -7,8 +7,8 @@
 #include <mutex>
 #include <thread>
 
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
+import <spdlog/sinks/null_sink.h>;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/config.hpp";
 import "quantclaw/gateway/command_queue.hpp";

@@ -6,7 +6,7 @@ module quantclaw.providers.provider_registry;
 import std;
 
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 import "quantclaw/providers/anthropic_provider.hpp";
 

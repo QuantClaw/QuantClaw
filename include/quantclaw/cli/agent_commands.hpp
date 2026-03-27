@@ -3,11 +3,9 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
+import std;
 
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 import "quantclaw/constants.hpp";
 

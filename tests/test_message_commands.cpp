@@ -3,7 +3,8 @@
 
 import quantclaw.core.message_commands;
 
-#include <gtest/gtest.h>
+import std;
+import <gtest/gtest.h>;
 
 using namespace quantclaw;
 

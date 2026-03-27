@@ -3,14 +3,11 @@
 
 import "quantclaw/security/sandbox.hpp";
 
-#include <algorithm>
-#include <cctype>
-#include <filesystem>
-#include <regex>
+import std;
 
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 #ifdef __linux__
-#include <sys/resource.h>
+import <sys/resource.h>;
 #endif
 
 namespace quantclaw {

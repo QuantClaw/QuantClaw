@@ -3,19 +3,13 @@
 
 #pragma once
 
-#include <atomic>
-#include <condition_variable>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <unordered_map>
+import std;
 
-#include <ixwebsocket/IXWebSocket.h>
+import <ixwebsocket/IXWebSocket.h>;
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
-import "quantclaw/gateway/protocol.hpp";
+import quantclaw.gateway.protocol;
 
 namespace quantclaw::gateway {
 

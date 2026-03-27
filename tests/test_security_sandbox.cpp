@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <memory>
 
-import "quantclaw/platform/process.hpp";
+import quantclaw.platform.process;
 import "quantclaw/security/sandbox.hpp";
 
 import quantclaw.test.helpers;

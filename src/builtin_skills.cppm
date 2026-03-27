@@ -1,15 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
-//
-// Built-in skills embedded at compile time from assets/skills/.
-// Each entry is {directory_name, SKILL.md_content}.
-// Onboarding writes these to ~/.quantclaw/skills/ (skips existing files).
 
-#pragma once
+export module quantclaw.builtin_skills;
 
-#include <vector>
+import std;
 
-namespace quantclaw {
+export namespace quantclaw {
 
 struct BuiltinSkill {
   const char* name;     // directory name (== skill name)

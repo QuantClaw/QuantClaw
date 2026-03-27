@@ -1,9 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/security/tool_permissions.hpp";
+import quantclaw.security.tool_permissions;
 
-#include <gtest/gtest.h>
+import <gtest/gtest.h>;
 
 class ToolPermissionsTest : public ::testing::Test {
  protected:

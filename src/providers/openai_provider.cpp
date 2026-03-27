@@ -3,11 +3,11 @@
 
 import "quantclaw/providers/openai_provider.hpp";
 
-#include <sstream>
+import std;
 
-#include <curl/curl.h>
+import <curl/curl.h>;
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 import quantclaw.providers.provider_error;
 

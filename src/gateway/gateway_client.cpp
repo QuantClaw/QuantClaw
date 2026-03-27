@@ -3,8 +3,7 @@
 
 import "quantclaw/gateway/gateway_client.hpp";
 
-#include <chrono>
-#include <sstream>
+import std;
 
 namespace quantclaw::gateway {
 

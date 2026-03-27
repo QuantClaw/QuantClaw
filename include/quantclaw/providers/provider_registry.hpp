@@ -3,14 +3,10 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <vector>
+import std;
 
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 import "quantclaw/config.hpp";
 import "quantclaw/providers/llm_provider.hpp";

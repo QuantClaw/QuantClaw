@@ -1,15 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <memory>
-
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
+import std;
+import <spdlog/sinks/null_sink.h>;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/providers/llm_provider.hpp";
 import "quantclaw/providers/openai_provider.hpp";
 
-#include <gtest/gtest.h>
+import <gtest/gtest.h>;
 
 // Mock OpenAIProvider for testing without actual API calls
 class MockOpenAIProvider : public quantclaw::OpenAIProvider {

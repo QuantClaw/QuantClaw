@@ -3,7 +3,7 @@
 
 import "quantclaw/providers/cooldown_tracker.hpp";
 
-#include <algorithm>
+import std;
 
 namespace quantclaw {
 

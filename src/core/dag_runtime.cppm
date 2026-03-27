@@ -5,7 +5,7 @@ export module quantclaw.core.dag_runtime;
 
 import std;
 import nlohmann.json;
-import "quantclaw/common/noncopyable.hpp";
+import quantclaw.common.noncopyable;
 
 namespace spdlog {
 class logger;

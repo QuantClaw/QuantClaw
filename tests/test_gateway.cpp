@@ -8,12 +8,12 @@
 #include <mutex>
 #include <thread>
 
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
+import <spdlog/sinks/null_sink.h>;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/gateway/gateway_client.hpp";
 import "quantclaw/gateway/gateway_server.hpp";
-import "quantclaw/gateway/protocol.hpp";
+import quantclaw.gateway.protocol;
 
 import quantclaw.test.helpers;
 #include <gtest/gtest.h>

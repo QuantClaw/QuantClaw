@@ -3,11 +3,11 @@
 
 #ifdef _WIN32
 
-#include <filesystem>
-#include <fstream>
+import std;
 
-import "quantclaw/platform/process.hpp";
-import "quantclaw/platform/service.hpp";
+import quantclaw.platform.service;
+
+import quantclaw.platform.process;
 
 namespace quantclaw::platform {
 

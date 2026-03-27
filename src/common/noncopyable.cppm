@@ -1,9 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.common.noncopyable;
 
-namespace quantclaw {
+export namespace quantclaw {
 
 // Base class that disables copy construction and copy assignment.
 // Move semantics are preserved — subclasses may still define move

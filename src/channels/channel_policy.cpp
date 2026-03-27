@@ -1,12 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/channels/channel_policy.hpp";
+import quantclaw.channels.channel_policy;
 
-#include <algorithm>
-#include <random>
-#include <regex>
-#include <sstream>
+import std;
 
 namespace quantclaw {
 

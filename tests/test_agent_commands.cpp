@@ -13,8 +13,8 @@
 #include <sstream>
 #include <thread>
 
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
+import <spdlog/sinks/null_sink.h>;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/cli/agent_commands.hpp";
 import "quantclaw/config.hpp";
@@ -24,7 +24,7 @@ import quantclaw.core.skill_loader;
 import quantclaw.core.prompt_builder;
 import "quantclaw/gateway/gateway_client.hpp";
 import "quantclaw/gateway/gateway_server.hpp";
-import "quantclaw/gateway/protocol.hpp";
+import quantclaw.gateway.protocol;
 import "quantclaw/providers/llm_provider.hpp";
 import "quantclaw/session/session_manager.hpp";
 import quantclaw.tools.tool_registry;

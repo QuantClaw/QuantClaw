@@ -5,7 +5,7 @@ module quantclaw.core.memory_manager;
 
 import std;
 
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 namespace quantclaw {
 

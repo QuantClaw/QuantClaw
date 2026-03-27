@@ -1,18 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <filesystem>
-#include <memory>
-#include <string>
+import std;
+import <spdlog/sinks/null_sink.h>;
+import <spdlog/spdlog.h>;
 
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
-
-#include <sqlite3.h>
+import <sqlite3.h>;
 
 import quantclaw.core.dag_runtime;
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
+import <gtest/gtest.h>;
 
 namespace {
 

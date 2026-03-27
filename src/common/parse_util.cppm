@@ -1,27 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.common.parse_util;
 
-#include <charconv>
-#include <cstdint>
-#include <limits>
-#include <optional>
-#include <string_view>
-#include <system_error>
-#include <type_traits>
+import std;
 
-// ─── Safe numeric parsing ────────────────────────────────────────────────────
-//
-// All functions return std::nullopt on:
-//   • non-numeric input
-//   • trailing non-numeric characters
-//   • out-of-[min, max] range
-//   • empty input
-//
-// Uses std::from_chars (C++17): no exceptions, no locale, no heap.
-
-namespace quantclaw {
+export namespace quantclaw {
 
 // ParseInt<T>(str, min, max)
 // T must be an integer type (checked at compile time).
@@ -44,8 +28,6 @@ std::optional<T> ParseInt(std::string_view s,
 
   return value;
 }
-
-// ── Named convenience wrappers ───────────────────────────────────────────────
 
 // Valid TCP/IP port: 1–65535.
 inline std::optional<uint16_t> ParsePort(std::string_view s) {

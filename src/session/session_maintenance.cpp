@@ -3,9 +3,7 @@
 
 import "quantclaw/session/session_maintenance.hpp";
 
-#include <algorithm>
-#include <fstream>
-#include <regex>
+import std;
 
 namespace quantclaw {
 

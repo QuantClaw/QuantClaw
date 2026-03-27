@@ -3,18 +3,12 @@
 
 import "quantclaw/cli/onboard_commands.hpp";
 
-#include <chrono>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <random>
-#include <thread>
+import std;
 
-import "quantclaw/builtin_skills.hpp";
+import quantclaw.builtin_skills;
 import "quantclaw/config.hpp";
 import "quantclaw/gateway/gateway_client.hpp";
-import "quantclaw/platform/service.hpp";
+import quantclaw.platform.service;
 
 namespace quantclaw::cli {
 

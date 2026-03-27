@@ -1,11 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <chrono>
-#include <thread>
+import std;
 
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
+import <spdlog/sinks/null_sink.h>;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/config.hpp";
 import "quantclaw/providers/cooldown_tracker.hpp";
@@ -13,7 +12,7 @@ import "quantclaw/providers/failover_resolver.hpp";
 import quantclaw.providers.provider_error;
 import "quantclaw/providers/provider_registry.hpp";
 
-#include <gtest/gtest.h>
+import <gtest/gtest.h>;
 
 using namespace quantclaw;
 

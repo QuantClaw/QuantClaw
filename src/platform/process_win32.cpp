@@ -3,18 +3,14 @@
 
 #ifdef _WIN32
 
-#include <chrono>
-#include <cstdlib>
-#include <sstream>
-#include <thread>
-#include <vector>
+import std;
 
 import "quantclaw/common/defer.hpp";
-import "quantclaw/platform/process.hpp";
+import quantclaw.platform.process;
 
 // clang-format off
-#include <windows.h>  // must precede psapi.h
-#include <psapi.h>
+import <windows.h>;  // must precede psapi.h
+import <psapi.h>;
 // clang-format on
 
 namespace quantclaw::platform {

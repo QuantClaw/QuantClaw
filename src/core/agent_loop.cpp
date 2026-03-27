@@ -3,12 +3,10 @@
 
 module quantclaw.core.agent_loop;
 
-#include <chrono>
-#include <sstream>
-#include <thread>
+import std;
 
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 import "quantclaw/providers/failover_resolver.hpp";
 import quantclaw.core.context_engine;
 import quantclaw.core.dag_runtime;
@@ -21,7 +19,7 @@ import quantclaw.core.session_compaction;
 import quantclaw.core.skill_loader;
 import quantclaw.providers.provider_registry;
 import "quantclaw/providers/llm_provider.hpp";
-import "quantclaw/gateway/protocol.hpp";
+import quantclaw.gateway.protocol;
 import "quantclaw/providers/failover_resolver.hpp";
 import quantclaw.tools.tool_registry;
 

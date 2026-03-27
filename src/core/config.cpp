@@ -3,12 +3,7 @@
 
 import "quantclaw/config.hpp";
 
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <regex>
-#include <set>
-#include <stdexcept>
+import std;
 
 namespace quantclaw {
 

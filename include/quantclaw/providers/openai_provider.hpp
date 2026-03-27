@@ -3,10 +3,8 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
-#include <spdlog/spdlog.h>
+import std;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/providers/curl_raii.hpp";
 

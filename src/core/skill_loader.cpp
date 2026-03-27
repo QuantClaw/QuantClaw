@@ -9,7 +9,7 @@ import std;
 import "quantclaw/config.hpp";
 
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 namespace quantclaw {
 

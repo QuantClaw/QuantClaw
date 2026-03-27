@@ -3,12 +3,7 @@
 
 import "quantclaw/session/session_manager.hpp";
 
-#include <algorithm>
-#include <chrono>
-#include <fstream>
-#include <iomanip>
-#include <random>
-#include <sstream>
+import std;
 
 namespace quantclaw {
 

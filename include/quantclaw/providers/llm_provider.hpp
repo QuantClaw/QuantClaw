@@ -3,9 +3,7 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
+import std;
 
 import nlohmann.json;
 

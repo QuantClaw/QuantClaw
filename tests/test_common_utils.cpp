@@ -1,12 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <vector>
+import std;
 
 import "quantclaw/common/defer.hpp";
 import "quantclaw/common/try.hpp";
 
-#include <gtest/gtest.h>
+import <gtest/gtest.h>;
 
 // ── Minimal StatusOr stand-in for QC_TRY tests ──────────────────────────────
 // (The real StatusOr lives in providers; avoid pulling in that dependency.)

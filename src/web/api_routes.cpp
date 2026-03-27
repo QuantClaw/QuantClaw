@@ -3,23 +3,16 @@
 
 import "quantclaw/web/api_routes.hpp";
 
-#include <chrono>
-#include <condition_variable>
-#include <functional>
-#include <mutex>
-#include <queue>
-#include <random>
-#include <sstream>
-#include <thread>
+import std;
 
-#include <httplib.h>
+import <httplib.h>;
 import nlohmann.json;
 
 import "quantclaw/config.hpp";
 import quantclaw.core.agent_loop;
 import quantclaw.core.prompt_builder;
 import "quantclaw/gateway/gateway_server.hpp";
-import "quantclaw/plugins/plugin_system.hpp";
+import quantclaw.plugins.plugin_system;
 import "quantclaw/session/session_manager.hpp";
 import quantclaw.tools.tool_registry;
 import "quantclaw/web/web_server.hpp";

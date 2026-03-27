@@ -6,7 +6,7 @@ module quantclaw.core.cron_scheduler;
 import std;
 
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 namespace quantclaw {
 

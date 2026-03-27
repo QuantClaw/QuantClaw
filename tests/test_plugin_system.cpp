@@ -9,10 +9,10 @@
 #include <spdlog/spdlog.h>
 
 import "quantclaw/config.hpp";
-import "quantclaw/plugins/hook_manager.hpp";
-import "quantclaw/plugins/plugin_manifest.hpp";
-import "quantclaw/plugins/plugin_registry.hpp";
-import "quantclaw/plugins/plugin_system.hpp";
+import quantclaw.plugins.hook_manager;
+import quantclaw.plugins.plugin_manifest;
+import quantclaw.plugins.plugin_registry;
+import quantclaw.plugins.plugin_system;
 
 import quantclaw.test.helpers;
 #include <gtest/gtest.h>

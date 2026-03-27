@@ -1,25 +1,19 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.plugins.sidecar_manager;
 
-#include <atomic>
-#include <chrono>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <thread>
-
+import std;
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import quantclaw.platform.ipc;
+import quantclaw.platform.process;
 
-import "quantclaw/platform/ipc.hpp";
-import "quantclaw/platform/process.hpp";
+namespace spdlog {
+class logger;
+}
 
-namespace quantclaw {
+export namespace quantclaw {
 
-// JSON-RPC 2.0 request/response for IPC with Node.js sidecar
 struct SidecarRequest {
   std::string method;
   nlohmann::json params;
@@ -37,8 +31,6 @@ struct SidecarResponse {
   static SidecarResponse FromJson(const nlohmann::json& j);
 };
 
-// Manages the Node.js sidecar subprocess lifecycle.
-// nginx-style: fork/exec, heartbeat, graceful reload/stop, crash restart.
 class SidecarManager {
  public:
   explicit SidecarManager(std::shared_ptr<spdlog::logger> logger);
@@ -49,39 +41,25 @@ class SidecarManager {
 
   struct Options {
     std::string node_binary = "node";
-    std::string sidecar_script;  // path to sidecar entry point
+    std::string sidecar_script;
     std::string pid_file;
     int heartbeat_interval_ms = 5000;
-    int heartbeat_timeout_count = 3;  // miss count before declaring dead
+    int heartbeat_timeout_count = 3;
     int graceful_stop_timeout_ms = 10000;
     int max_restarts = 10;
     std::vector<std::string> env_whitelist;
-    nlohmann::json plugin_config;  // passed to sidecar as startup config
-
-    // Deprecated: ignored. TCP port is assigned dynamically by the OS.
+    nlohmann::json plugin_config;
     std::string socket_path;
   };
 
-  // Start the sidecar process
   bool Start(const Options& opts);
-
-  // Stop the sidecar gracefully
   void Stop();
-
-  // Reload plugins (SIGHUP to sidecar on Unix, no-op on Windows)
   bool Reload();
-
-  // Send a JSON-RPC request and wait for response
   SidecarResponse Call(const std::string& method, const nlohmann::json& params,
                        int timeout_ms = 30000);
-
-  // Check if sidecar is alive
   bool IsRunning() const;
 
-  // Get sidecar PID
-  platform::ProcessId pid() const {
-    return pid_;
-  }
+  platform::ProcessId pid() const { return pid_; }
 
  private:
   void monitor_loop();
@@ -94,19 +72,15 @@ class SidecarManager {
 
   std::shared_ptr<spdlog::logger> logger_;
   Options opts_;
-
   std::atomic<platform::ProcessId> pid_{platform::kInvalidPid};
   std::atomic<bool> running_{false};
   std::atomic<bool> stopping_{false};
-
   platform::IpcHandle ipc_handle_ = platform::kInvalidIpc;
-  int ipc_port_ = 0;  // TCP port assigned after IpcServer::listen()
+  int ipc_port_ = 0;
   std::mutex ipc_mu_;
-
   std::thread monitor_thread_;
   int restart_count_ = 0;
   std::chrono::steady_clock::time_point last_restart_;
-
   std::atomic<int> rpc_id_{1};
 };
 

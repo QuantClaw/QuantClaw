@@ -1,10 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/plugins/plugin_registry.hpp";
+import quantclaw.plugins.plugin_registry;
 
-#include <algorithm>
-#include <fstream>
+import std;
 
 namespace quantclaw {
 

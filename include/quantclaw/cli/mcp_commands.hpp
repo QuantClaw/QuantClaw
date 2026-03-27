@@ -3,10 +3,8 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
-#include <spdlog/spdlog.h>
+import std;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/mcp/mcp_client.hpp";
 import "quantclaw/mcp/mcp_server.hpp";

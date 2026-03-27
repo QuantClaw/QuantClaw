@@ -3,19 +3,12 @@
 
 #pragma once
 
-#include <filesystem>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <shared_mutex>
-#include <string>
-#include <unordered_map>
-#include <vector>
+import std;
 
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
-import "quantclaw/common/noncopyable.hpp";
+import quantclaw.common.noncopyable;
 import quantclaw.core.content_block;
 
 namespace quantclaw {

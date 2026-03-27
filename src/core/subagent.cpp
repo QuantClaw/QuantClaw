@@ -3,11 +3,9 @@
 
 module;
 
-#include <algorithm>
+import std;
 import nlohmann.json;
-#include <random>
-#include <sstream>
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 module quantclaw.core.subagent;
 

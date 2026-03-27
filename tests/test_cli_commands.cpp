@@ -11,7 +11,7 @@
 #include <spdlog/spdlog.h>
 
 import "quantclaw/cli/agent_commands.hpp";
-import "quantclaw/cli/cli_manager.hpp";
+import quantclaw.cli.cli_manager;
 import "quantclaw/cli/gateway_commands.hpp";
 import "quantclaw/cli/onboard_commands.hpp";
 import "quantclaw/cli/session_commands.hpp";

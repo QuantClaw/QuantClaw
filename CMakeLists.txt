@@ -198,6 +198,22 @@ set(QUANTCLAW_CORE_SOURCES
     src/providers/provider_error.cpp
     src/providers/cooldown_tracker.cpp
     src/providers/failover_resolver.cpp
+    src/platform/process.cppm
+    src/platform/ipc.cppm
+    src/platform/service.cppm
+    src/cli/cli_manager.cppm
+    src/gateway/daemon_manager.cppm
+    src/gateway/protocol.cppm
+    src/channels/channel_policy.cppm
+    src/plugins/plugin_manifest.cppm
+    src/plugins/plugin_registry.cppm
+    src/plugins/plugin_system.cppm
+    src/plugins/hook_manager.cppm
+    src/plugins/sidecar_manager.cppm
+    src/common/noncopyable.cppm
+    src/common/parse_util.cppm
+    src/common/string_util.cppm
+    src/builtin_skills.cppm
     # Third-party module wrapper
     src/thirdparty/json.ixx
     # CLI
@@ -237,6 +253,10 @@ set(QUANTCLAW_CORE_SOURCES
     src/plugins/hook_manager.cpp
     src/plugins/plugin_system.cpp
     # Security
+    src/security/rate_limiter.cppm
+    src/security/tool_permissions.cppm
+    src/security/exec_approval.cppm
+    src/tools/browser_tool.cppm
     src/security/sandbox.cpp
     src/security/tool_permissions.cpp
     src/security/exec_approval.cpp
@@ -302,7 +322,7 @@ add_dependencies(quantclaw_core nlohmann_json_header_unit)
 target_sources(quantclaw_core
     PUBLIC
         FILE_SET CXX_MODULES
-        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
         FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/src/core/agent_loop.cppm
             ${CMAKE_CURRENT_SOURCE_DIR}/src/core/content_block.cppm
@@ -324,31 +344,30 @@ target_sources(quantclaw_core
             ${CMAKE_CURRENT_SOURCE_DIR}/src/core/usage_accumulator.cppm
             ${CMAKE_CURRENT_SOURCE_DIR}/src/core/vector_index.cppm
             ${CMAKE_CURRENT_SOURCE_DIR}/src/core/subagent.cppm
-)
-
-target_sources(quantclaw_core
-    PUBLIC
-        FILE_SET CXX_MODULES
-        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/providers
-        FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/src/providers/provider_error.cppm
             ${CMAKE_CURRENT_SOURCE_DIR}/src/providers/provider_registry.cppm
-)
-
-target_sources(quantclaw_core
-    PUBLIC
-        FILE_SET CXX_MODULES
-        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/tools
-        FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/process.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/ipc.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/service.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/cli/cli_manager.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/gateway/daemon_manager.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/gateway/protocol.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/channels/channel_policy.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/plugin_manifest.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/plugin_registry.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/plugin_system.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/hook_manager.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/sidecar_manager.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/security/rate_limiter.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/security/tool_permissions.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/security/exec_approval.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/browser_tool.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/common/noncopyable.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/common/parse_util.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/common/string_util.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/builtin_skills.cppm
             ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/tool_chain.cppm
             ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/tool_registry.cppm
-)
-
-target_sources(quantclaw_core
-    PUBLIC
-        FILE_SET CXX_MODULES
-        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp
-        FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/mcp_client.cppm
             ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/mcp_server.cppm
             ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/mcp_tool_manager.cppm

@@ -1,12 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
+import <spdlog/sinks/null_sink.h>;
+import <spdlog/spdlog.h>;
 
 import quantclaw.core.subagent;
 
-#include <gtest/gtest.h>
+import <gtest/gtest.h>;
 
 namespace quantclaw {
 

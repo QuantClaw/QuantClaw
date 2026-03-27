@@ -3,11 +3,8 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <spdlog/logger.h>
+import std;
+import <spdlog/logger.h>;
 
 namespace quantclaw::cli {
 

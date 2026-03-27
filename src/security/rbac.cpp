@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import "quantclaw/security/rbac.hpp";
-import "quantclaw/gateway/protocol.hpp";
+import quantclaw.gateway.protocol;
 
 namespace quantclaw {
 

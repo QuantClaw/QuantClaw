@@ -1,17 +1,18 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.plugins.plugin_registry;
 
-#include <map>
-#include <memory>
-
-#include <spdlog/spdlog.h>
-
+import std;
+import nlohmann.json;
 import "quantclaw/config.hpp";
-import "quantclaw/plugins/plugin_manifest.hpp";
+import quantclaw.plugins.plugin_manifest;
 
-namespace quantclaw {
+namespace spdlog {
+class logger;
+}
+
+export namespace quantclaw {
 
 enum class PluginStatus {
   kLoaded,
@@ -34,7 +35,6 @@ struct PluginRecord {
   PluginStatus status = PluginStatus::kLoaded;
   std::string error;
 
-  // Declared capabilities from manifest + sidecar
   std::vector<std::string> tool_names;
   std::vector<std::string> channel_ids;
   std::vector<std::string> provider_ids;
@@ -47,46 +47,33 @@ struct PluginRecord {
   int http_handler_count = 0;
 
   nlohmann::json config_schema;
-  nlohmann::json plugin_config;  // from config.plugins.entries[id].config
+  nlohmann::json plugin_config;
 };
 
 class PluginRegistry {
  public:
   explicit PluginRegistry(std::shared_ptr<spdlog::logger> logger);
 
-  // Discover and load all plugins
   void Discover(const QuantClawConfig& config,
                 const std::filesystem::path& workspace_dir);
 
-  // Get all plugin records
-  const std::vector<PluginRecord>& Plugins() const {
-    return plugins_;
-  }
+  const std::vector<PluginRecord>& Plugins() const { return plugins_; }
 
-  // Find a plugin by ID
   const PluginRecord* Find(const std::string& id) const;
 
-  // Get enabled plugin IDs
   std::vector<std::string> EnabledPluginIds() const;
 
-  // Check if a plugin is enabled
   bool IsEnabled(const std::string& id) const;
 
-  // Update plugin records with capabilities reported by sidecar
   void UpdateFromSidecar(const nlohmann::json& sidecar_plugin_list);
 
-  // JSON summary of all plugins
   nlohmann::json ToJson() const;
 
  private:
-  // Discovery helpers
-  std::vector<PluginCandidate>
-  discover_candidates(const QuantClawConfig& config,
-                      const std::filesystem::path& workspace_dir);
-
+  std::vector<PluginCandidate> discover_candidates(
+      const QuantClawConfig& config, const std::filesystem::path& workspace_dir);
   void scan_directory(const std::filesystem::path& dir, PluginOrigin origin,
                       std::vector<PluginCandidate>& out);
-
   bool should_enable(const std::string& plugin_id, PluginOrigin origin,
                      const QuantClawConfig& config) const;
 

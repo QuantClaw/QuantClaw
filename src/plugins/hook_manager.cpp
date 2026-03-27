@@ -1,14 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/plugins/hook_manager.hpp";
+import quantclaw.plugins.hook_manager;
 
-#include <algorithm>
-#include <future>
-#include <thread>
-#include <unordered_map>
+import std;
 
-import "quantclaw/plugins/sidecar_manager.hpp";
+import quantclaw.plugins.sidecar_manager;
 
 namespace quantclaw {
 

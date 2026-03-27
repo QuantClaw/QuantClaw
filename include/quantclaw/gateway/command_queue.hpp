@@ -19,7 +19,7 @@
 import nlohmann.json;
 #include <spdlog/spdlog.h>
 
-import "quantclaw/common/noncopyable.hpp";
+import quantclaw.common.noncopyable;
 
 namespace quantclaw::gateway {
 

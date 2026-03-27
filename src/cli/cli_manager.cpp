@@ -1,12 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/cli/cli_manager.hpp";
+import quantclaw.cli.cli_manager;
 
-#include <algorithm>
-#include <iostream>
-
-#include <spdlog/spdlog.h>
+import std;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/constants.hpp";
 

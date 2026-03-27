@@ -3,7 +3,7 @@
 
 import "quantclaw/providers/curl_raii.hpp";
 
-#include <curl/curl.h>
+import <curl/curl.h>;
 
 namespace quantclaw {
 

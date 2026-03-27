@@ -3,17 +3,11 @@
 
 #pragma once
 
-#include <atomic>
-#include <memory>
-#include <string>
-#include <thread>
-#include <unordered_map>
-#include <vector>
-
-#include <spdlog/spdlog.h>
+import std;
+import <spdlog/spdlog.h>;
 
 import "quantclaw/config.hpp";
-import "quantclaw/platform/process.hpp";
+import quantclaw.platform.process;
 
 namespace quantclaw {
 

@@ -5,7 +5,7 @@ export module quantclaw.core.agent_loop;
 
 import std;
 import nlohmann.json;
-import "quantclaw/common/noncopyable.hpp";
+import quantclaw.common.noncopyable;
 import "quantclaw/config.hpp";
 
 namespace spdlog {

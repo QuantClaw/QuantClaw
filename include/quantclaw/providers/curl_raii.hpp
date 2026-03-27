@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <stdexcept>
+import std;
 
 struct curl_slist;
 

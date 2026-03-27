@@ -1,16 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.plugins.plugin_manifest;
 
-#include <filesystem>
-#include <optional>
-#include <string>
-#include <vector>
-
+import std;
 import nlohmann.json;
 
-namespace quantclaw {
+export namespace quantclaw {
 
 struct PluginConfigUiHint {
   std::string label;
@@ -26,7 +22,7 @@ struct PluginManifest {
   std::string name;
   std::string description;
   std::string version;
-  std::string kind;  // "memory" or empty
+  std::string kind;
   std::vector<std::string> channels;
   std::vector<std::string> providers;
   std::vector<std::string> skills;

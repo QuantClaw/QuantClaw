@@ -3,20 +3,11 @@
 
 module;
 
-#include <algorithm>
-#include <cctype>
-#include <chrono>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <random>
-#include <regex>
-#include <sstream>
-#include <thread>
+import std;
 
-#include <httplib.h>
+import <httplib.h>;
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 module quantclaw.tools.tool_registry;
 
@@ -25,10 +16,10 @@ import quantclaw.core.cron_scheduler;
 import quantclaw.core.memory_search;
 import quantclaw.mcp.mcp_tool_manager;
 import quantclaw.tools.tool_chain;
-import "quantclaw/platform/process.hpp";
-import "quantclaw/security/exec_approval.hpp";
+import quantclaw.platform.process;
+import quantclaw.security.exec_approval;
 import "quantclaw/security/sandbox.hpp";
-import "quantclaw/security/tool_permissions.hpp";
+import quantclaw.security.tool_permissions;
 import "quantclaw/session/session_manager.hpp";
 
 namespace fs = std::filesystem;

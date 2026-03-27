@@ -3,13 +3,10 @@
 
 #pragma once
 
-#include <chrono>
-#include <filesystem>
-#include <string>
-#include <vector>
+import std;
 
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
 namespace quantclaw {
 

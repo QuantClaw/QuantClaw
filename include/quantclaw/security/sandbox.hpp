@@ -3,10 +3,7 @@
 
 #pragma once
 
-#include <filesystem>
-#include <regex>
-#include <string>
-#include <vector>
+import std;
 
 namespace quantclaw {
 

@@ -3,10 +3,8 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-
-#include <spdlog/spdlog.h>
+import std;
+import <spdlog/spdlog.h>;
 
 namespace quantclaw {
 class SessionManager;

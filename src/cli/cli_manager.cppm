@@ -1,14 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.cli.cli_manager;
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
+import std;
+import "quantclaw/constants.hpp";
 
-namespace quantclaw::cli {
+export namespace quantclaw::cli {
 
 class CLIManager {
  public:

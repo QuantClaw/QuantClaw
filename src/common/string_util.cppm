@@ -1,22 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.common.string_util;
 
-#include <algorithm>
-#include <cctype>
-#include <functional>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
+import std;
 
-// ─── String utilities ────────────────────────────────────────────────────────
-//
-// All functions that accept std::string_view work with std::string,
-// const char*, and string literals without copies at the call site.
-
-namespace quantclaw {
+export namespace quantclaw {
 
 // ── Whitespace trimming ──────────────────────────────────────────────────────
 
@@ -36,8 +25,7 @@ inline std::string Trim(std::string_view s) {
   return TrimLeft(TrimRight(s));
 }
 
-// ── Case conversion
-// ───────────────────────────────────────────────────────────
+// ── Case conversion ───────────────────────────────────────────────────────────
 
 inline std::string ToLower(std::string_view s) {
   std::string out(s);

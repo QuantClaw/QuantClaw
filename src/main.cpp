@@ -1,31 +1,23 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <algorithm>
-#include <cctype>
-#include <deque>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
+import std;
 
-#include <spdlog/sinks/daily_file_sink.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
+import <spdlog/sinks/daily_file_sink.h>;
+import <spdlog/sinks/stdout_color_sinks.h>;
+import <spdlog/spdlog.h>;
 
 import quantclaw.core.skill_loader;
 import quantclaw.core.memory_search;
 import "quantclaw/cli/agent_commands.hpp";
-import "quantclaw/cli/cli_manager.hpp";
+import quantclaw.cli.cli_manager;
 import "quantclaw/cli/gateway_commands.hpp";
 import "quantclaw/cli/onboard_commands.hpp";
 import "quantclaw/cli/session_commands.hpp";
-import "quantclaw/common/parse_util.hpp";
+import quantclaw.common.parse_util;
 import "quantclaw/config.hpp";
 import "quantclaw/gateway/gateway_client.hpp";
-import "quantclaw/platform/process.hpp";
+import quantclaw.platform.process;
 
 // Bring port/URL constants into scope (avoids quantclaw:: prefix for literals)
 using quantclaw::kDefaultGatewayPort;

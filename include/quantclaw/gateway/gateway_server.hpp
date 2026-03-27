@@ -3,21 +3,16 @@
 
 #pragma once
 
-#include <atomic>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <unordered_map>
+import std;
 
-#include <ixwebsocket/IXHttp.h>
-#include <ixwebsocket/IXWebSocketServer.h>
+import <ixwebsocket/IXHttp.h>;
+import <ixwebsocket/IXWebSocketServer.h>;
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 
-import "quantclaw/common/noncopyable.hpp";
-import "quantclaw/gateway/protocol.hpp";
-import "quantclaw/security/rate_limiter.hpp";
+import quantclaw.common.noncopyable;
+import quantclaw.gateway.protocol;
+import quantclaw.security.rate_limiter;
 import "quantclaw/security/rbac.hpp";
 
 namespace quantclaw::gateway {

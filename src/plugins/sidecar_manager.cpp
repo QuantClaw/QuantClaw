@@ -1,10 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/plugins/sidecar_manager.hpp";
+module quantclaw.plugins.sidecar_manager;
 
-#include <algorithm>
-#include <fstream>
+import std;
 
 namespace quantclaw {
 

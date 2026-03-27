@@ -8,7 +8,7 @@ module quantclaw.core.memory_search;
 import std;
 
 import nlohmann.json;
-#include <spdlog/spdlog.h>
+import <spdlog/spdlog.h>;
 import "quantclaw/providers/embedding_provider.hpp";
 import quantclaw.core.mmr_reranker;
 import quantclaw.core.temporal_decay;
