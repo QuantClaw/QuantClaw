@@ -9,7 +9,7 @@ import std;
 
 import nlohmann.json;
 import <spdlog/spdlog.h>;
-import "quantclaw/providers/embedding_provider.hpp";
+import quantclaw.providers.embedding_provider;
 import quantclaw.core.mmr_reranker;
 import quantclaw.core.temporal_decay;
 import quantclaw.core.vector_index;

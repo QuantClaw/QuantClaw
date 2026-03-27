@@ -6,7 +6,7 @@ module;
 module quantclaw.core.skill_loader;
 
 import std;
-import "quantclaw/config.hpp";
+import quantclaw.config;
 
 import nlohmann.json;
 import <spdlog/spdlog.h>;

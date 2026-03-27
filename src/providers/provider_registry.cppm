@@ -5,7 +5,7 @@ export module quantclaw.providers.provider_registry;
 
 import std;
 import nlohmann.json;
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.providers.llm_provider;
 
 namespace spdlog {

@@ -15,7 +15,7 @@ import quantclaw.cli.gateway_commands;
 import quantclaw.cli.onboard_commands;
 import quantclaw.cli.session_commands;
 import quantclaw.common.parse_util;
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.gateway.gateway_client;
 import quantclaw.platform.process;
 

@@ -17,7 +17,7 @@ import <spdlog/sinks/null_sink.h>;
 import <spdlog/spdlog.h>;
 
 import quantclaw.cli.agent_commands;
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.core.agent_loop;
 import quantclaw.core.memory_manager;
 import quantclaw.core.skill_loader;

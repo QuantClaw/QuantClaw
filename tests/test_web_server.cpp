@@ -6,7 +6,7 @@ import <httplib.h>;
 import <spdlog/sinks/null_sink.h>;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/web/web_server.hpp";
+import quantclaw.web.web_server;
 
 import quantclaw.test.helpers;
 import <gtest/gtest.h>;

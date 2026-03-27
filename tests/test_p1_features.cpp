@@ -14,7 +14,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.constants;
 import quantclaw.core.agent_loop;
 import quantclaw.core.context_pruner;

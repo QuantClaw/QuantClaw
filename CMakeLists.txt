@@ -195,8 +195,10 @@ endif()
 # Source files - explicitly listed
 set(QUANTCLAW_CORE_SOURCES
     src/constants.cppm
+    src/config.cppm
     src/common/defer.cppm
     src/providers/llm_provider.cppm
+    src/providers/embedding_provider.cppm
     src/providers/curl_raii.cppm
     src/providers/anthropic_provider.cppm
     src/providers/provider_registry.cpp
@@ -244,6 +246,7 @@ set(QUANTCLAW_CORE_SOURCES
     src/gateway/command_queue.cpp
     # Session
     src/session/session_manager.cpp
+    src/session/session_maintenance.cppm
     src/session/session_maintenance.cpp
     # Tools
     src/tools/tool_registry.cpp
@@ -257,6 +260,7 @@ set(QUANTCLAW_CORE_SOURCES
     src/mcp/mcp_client.cpp
     src/mcp/mcp_tool_manager.cpp
     # Channels
+    src/channels/adapter_manager.cppm
     src/channels/adapter_manager.cpp
     src/channels/channel_policy.cpp
     # Plugins
@@ -270,12 +274,15 @@ set(QUANTCLAW_CORE_SOURCES
     src/security/tool_permissions.cppm
     src/security/exec_approval.cppm
     src/tools/browser_tool.cppm
+    src/security/sandbox.cppm
     src/security/sandbox.cpp
     src/security/tool_permissions.cpp
     src/security/exec_approval.cpp
     src/security/rbac.cpp
     src/security/rate_limiter.cpp
     # Web
+    src/web/web_server.cppm
+    src/web/api_routes.cppm
     src/web/web_server.cpp
     src/web/api_routes.cpp
     # IPC - single TCP implementation for all platforms

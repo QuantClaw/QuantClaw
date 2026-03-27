@@ -4,7 +4,7 @@
 export module quantclaw.core.default_context_engine;
 
 import std;
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.core.context_engine;
 
 namespace spdlog {

@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.web.web_server;
 
 import std;
 
@@ -11,7 +11,7 @@ import <spdlog/spdlog.h>;
 
 namespace quantclaw::web {
 
-class WebServer {
+export class WebServer {
  public:
   using RequestHandler =
       std::function<std::string(const std::string&, const std::string&)>;

@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.config;
 
 import std;
 
@@ -13,7 +13,7 @@ namespace quantclaw {
 
 // --- Agent / LLM ---
 
-struct AgentConfig {
+export struct AgentConfig {
   std::string model = "anthropic/claude-sonnet-4-6";
   int max_iterations = kDefaultMaxIterations;
   double temperature = kDefaultTemperature;
@@ -41,7 +41,7 @@ struct AgentConfig {
 
 // --- Model definitions (OpenClaw multi-model format) ---
 
-struct ModelCost {
+export struct ModelCost {
   double input = 0;
   double output = 0;
   double cache_read = 0;
@@ -49,7 +49,7 @@ struct ModelCost {
   static ModelCost FromJson(const nlohmann::json& json);
 };
 
-struct ModelDefinition {
+export struct ModelDefinition {
   std::string id;    // "qwen3-max"
   std::string name;  // "Qwen3 Max"
   bool reasoning = false;
@@ -60,14 +60,14 @@ struct ModelDefinition {
   static ModelDefinition FromJson(const nlohmann::json& json);
 };
 
-struct ModelEntryConfig {
+export struct ModelEntryConfig {
   std::string alias;      // "max", "plus", "vision"
   nlohmann::json params;  // Provider-specific API params
   static ModelEntryConfig FromJson(const nlohmann::json& json);
 };
 
 // Auth profile: one API key entry within a provider's "profiles" array.
-struct AuthProfileConfig {
+export struct AuthProfileConfig {
   std::string id;           // e.g. "prod", "backup"
   std::string api_key;      // Direct key value
   std::string api_key_env;  // Env var name (resolved at startup)
@@ -76,7 +76,7 @@ struct AuthProfileConfig {
   static AuthProfileConfig FromJson(const nlohmann::json& json);
 };
 
-struct ProviderConfig {
+export struct ProviderConfig {
   std::string api_key;
   std::string base_url;
   std::string api;  // "openai-completions", "anthropic-messages"
@@ -90,7 +90,7 @@ struct ProviderConfig {
 // --- Channels (OpenClaw compatible) ---
 // Stores common fields + raw JSON for platform-specific settings
 
-struct ChannelConfig {
+export struct ChannelConfig {
   bool enabled = false;
   std::string token;
   std::vector<std::string> allowed_ids;
@@ -104,7 +104,7 @@ struct ChannelConfig {
 
 // --- Tools ---
 
-struct ToolConfig {
+export struct ToolConfig {
   bool enabled = true;
   std::vector<std::string> allowed_paths;
   std::vector<std::string> denied_paths;
@@ -115,7 +115,7 @@ struct ToolConfig {
   static ToolConfig FromJson(const nlohmann::json& json);
 };
 
-struct ToolPermissionConfig {
+export struct ToolPermissionConfig {
   std::vector<std::string> allow;  // e.g. ["group:fs", "group:runtime"]
   std::vector<std::string> deny;
 
@@ -124,7 +124,7 @@ struct ToolPermissionConfig {
 
 // --- MCP ---
 
-struct MCPServerConfig {
+export struct MCPServerConfig {
   std::string name;
   std::string url;
   int timeout = kDefaultMcpTimeoutSec;
@@ -132,7 +132,7 @@ struct MCPServerConfig {
   static MCPServerConfig FromJson(const nlohmann::json& json);
 };
 
-struct MCPConfig {
+export struct MCPConfig {
   std::vector<MCPServerConfig> servers;
 
   static MCPConfig FromJson(const nlohmann::json& json);
@@ -140,7 +140,7 @@ struct MCPConfig {
 
 // --- Gateway ---
 
-struct GatewayAuthConfig {
+export struct GatewayAuthConfig {
   std::string mode = "token";  // "token" | "none"
   std::string token;
 
@@ -152,7 +152,7 @@ struct GatewayAuthConfig {
   }
 };
 
-struct GatewayControlUiConfig {
+export struct GatewayControlUiConfig {
   bool enabled = true;
   int port = kDefaultHttpPort;  // QuantClaw HTTP/Dashboard port
 
@@ -164,7 +164,7 @@ struct GatewayControlUiConfig {
   }
 };
 
-struct GatewayConfig {
+export struct GatewayConfig {
   int port = kDefaultGatewayPort;  // QuantClaw WebSocket RPC port
   std::string bind = "loopback";
   GatewayAuthConfig auth;
@@ -175,7 +175,7 @@ struct GatewayConfig {
 
 // --- System (OpenClaw format) ---
 
-struct SystemConfig {
+export struct SystemConfig {
   std::string name = "QuantClaw";
   std::string version = "0.2.0";
   std::string log_level = "info";
@@ -199,7 +199,7 @@ struct SystemConfig {
 
 // --- Security (OpenClaw format) ---
 
-struct SecurityConfig {
+export struct SecurityConfig {
   std::string permission_level = "auto";  // "auto" | "strict" | "permissive"
   bool allow_local_execute = true;
 
@@ -213,17 +213,17 @@ struct SecurityConfig {
 
 // --- Skills ---
 
-struct SkillEntryConfig {
+export struct SkillEntryConfig {
   bool enabled = true;
   static SkillEntryConfig FromJson(const nlohmann::json& json);
 };
 
-struct SkillsLoadConfig {
+export struct SkillsLoadConfig {
   std::vector<std::string> extra_dirs;
   static SkillsLoadConfig FromJson(const nlohmann::json& json);
 };
 
-struct SkillsConfig {
+export struct SkillsConfig {
   std::string path;                       // OpenClaw: skills.path
   std::vector<std::string> auto_approve;  // OpenClaw: skills.autoApprove
   SkillsLoadConfig load;
@@ -235,7 +235,7 @@ struct SkillsConfig {
 
 // --- Top-level config ---
 
-struct QuantClawConfig {
+export struct QuantClawConfig {
   SystemConfig system;
   AgentConfig agent;
   GatewayConfig gateway;

@@ -4,7 +4,7 @@
 export module quantclaw.security.tool_permissions;
 
 import std;
-import "quantclaw/config.hpp";
+import quantclaw.config;
 
 export namespace quantclaw {
 

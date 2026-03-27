@@ -5,7 +5,7 @@ export module quantclaw.plugins.plugin_system;
 
 import std;
 import nlohmann.json;
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.plugins.hook_manager;
 import quantclaw.plugins.plugin_registry;
 import quantclaw.plugins.sidecar_manager;

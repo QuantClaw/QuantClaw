@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/channels/adapter_manager.hpp";
+import quantclaw.channels.adapter_manager;
 
 import std;
 

@@ -3,7 +3,7 @@
 
 import std;
 
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.constants;
 import quantclaw.core.agent_loop;
 import quantclaw.core.message_commands;

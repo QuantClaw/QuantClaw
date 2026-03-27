@@ -10,7 +10,7 @@
 import <spdlog/sinks/null_sink.h>;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.gateway.command_queue;
 
 #include <gtest/gtest.h>

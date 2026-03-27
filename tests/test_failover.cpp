@@ -6,7 +6,7 @@ import std;
 import <spdlog/sinks/null_sink.h>;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.providers.cooldown_tracker;
 import quantclaw.providers.failover_resolver;
 import quantclaw.providers.provider_error;

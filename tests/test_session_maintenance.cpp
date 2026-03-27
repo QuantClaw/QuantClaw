@@ -7,7 +7,7 @@
 import <spdlog/sinks/null_sink.h>;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/session/session_maintenance.hpp";
+import quantclaw.session.session_maintenance;
 
 import quantclaw.test.helpers;
 #include <gtest/gtest.h>

@@ -1,11 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.providers.embedding_provider;
 
 import std;
 
-namespace quantclaw {
+export namespace quantclaw {
 
 struct EmbeddingRequest {
   std::vector<std::string> texts;

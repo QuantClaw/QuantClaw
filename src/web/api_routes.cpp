@@ -1,21 +1,21 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import "quantclaw/web/api_routes.hpp";
+import quantclaw.web.api_routes;
 
 import std;
 
 import <httplib.h>;
 import nlohmann.json;
 
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.core.agent_loop;
 import quantclaw.core.prompt_builder;
 import quantclaw.gateway.gateway_server;
 import quantclaw.plugins.plugin_system;
 import quantclaw.session.session_manager;
 import quantclaw.tools.tool_registry;
-import "quantclaw/web/web_server.hpp";
+import quantclaw.web.web_server;
 
 namespace quantclaw::web {
 

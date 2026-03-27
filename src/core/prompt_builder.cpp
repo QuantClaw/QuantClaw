@@ -6,7 +6,7 @@ module;
 module quantclaw.core.prompt_builder;
 
 import std;
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.core.memory_manager;
 import quantclaw.core.skill_loader;
 import quantclaw.tools.tool_registry;

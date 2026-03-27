@@ -1,12 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.channels.adapter_manager;
 
 import std;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.platform.process;
 
 namespace quantclaw {
@@ -21,7 +21,7 @@ namespace quantclaw {
 // Adapters are located in:
 //   1. ~/.quantclaw/adapters/<name>_bot.js    (user-installed)
 //   2. <install_prefix>/adapters/<name>_bot.js (bundled with QuantClaw)
-class ChannelAdapterManager {
+export class ChannelAdapterManager {
  public:
   ChannelAdapterManager(
       int gateway_port, const std::string& auth_token,

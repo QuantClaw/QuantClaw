@@ -13,7 +13,7 @@ import nlohmann.json;
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.core.context_pruner;
 import quantclaw.core.memory_search;
 import quantclaw.gateway.command_queue;

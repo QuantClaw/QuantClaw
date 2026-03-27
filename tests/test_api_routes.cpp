@@ -10,7 +10,7 @@
 import <spdlog/sinks/null_sink.h>;
 import <spdlog/spdlog.h>;
 
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.core.agent_loop;
 import quantclaw.core.memory_manager;
 import quantclaw.core.skill_loader;
@@ -19,8 +19,8 @@ import quantclaw.gateway.gateway_server;
 import quantclaw.providers.llm_provider;
 import quantclaw.session.session_manager;
 import quantclaw.tools.tool_registry;
-import "quantclaw/web/api_routes.hpp";
-import "quantclaw/web/web_server.hpp";
+import quantclaw.web.api_routes;
+import quantclaw.web.web_server;
 
 import quantclaw.test.helpers;
 #include <gtest/gtest.h>

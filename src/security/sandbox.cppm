@@ -1,13 +1,13 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.security.sandbox;
 
 import std;
 
 namespace quantclaw {
 
-class Sandbox {
+export class Sandbox {
  private:
   std::filesystem::path workspace_path_;
   std::vector<std::string> allowed_paths_;
@@ -34,6 +34,6 @@ class Sandbox {
   static void ApplyResourceLimits();
 };
 
-using SecuritySandbox = Sandbox;
+export using SecuritySandbox = Sandbox;
 
 }  // namespace quantclaw

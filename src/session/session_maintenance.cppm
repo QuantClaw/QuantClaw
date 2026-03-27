@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
+export module quantclaw.session.session_maintenance;
 
 import std;
 
@@ -11,15 +11,15 @@ import <spdlog/spdlog.h>;
 namespace quantclaw {
 
 // Maintenance mode (compatible with OpenClaw session.maintenance)
-enum class MaintenanceMode {
+export enum class MaintenanceMode {
   kEnforce,  // Actively prune and rotate
   kWarn,     // Log warnings only
 };
 
-MaintenanceMode MaintenanceModeFromString(const std::string& s);
+export MaintenanceMode MaintenanceModeFromString(const std::string& s);
 
 // Session maintenance configuration
-struct SessionMaintenanceConfig {
+export struct SessionMaintenanceConfig {
   MaintenanceMode mode = MaintenanceMode::kEnforce;
 
   // Prune sessions older than this duration (0 = disabled)
@@ -43,7 +43,7 @@ struct SessionMaintenanceConfig {
 };
 
 // Result of a maintenance sweep
-struct MaintenanceResult {
+export struct MaintenanceResult {
   bool swept = false;
   int pruned_count = 0;
   int rotated_count = 0;
@@ -52,7 +52,7 @@ struct MaintenanceResult {
 };
 
 // Performs session file maintenance: pruning, rotation, and disk management
-class SessionMaintenance {
+export class SessionMaintenance {
  public:
   SessionMaintenance(const std::filesystem::path& sessions_dir,
                      std::shared_ptr<spdlog::logger> logger);

@@ -6,7 +6,7 @@ import quantclaw.cli.onboard_commands;
 import std;
 
 import quantclaw.builtin_skills;
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.gateway.gateway_client;
 import quantclaw.platform.service;
 

@@ -18,7 +18,7 @@ import quantclaw.mcp.mcp_tool_manager;
 import quantclaw.tools.tool_chain;
 import quantclaw.platform.process;
 import quantclaw.security.exec_approval;
-import "quantclaw/security/sandbox.hpp";
+import quantclaw.security.sandbox;
 import quantclaw.security.tool_permissions;
 import quantclaw.session.session_manager;
 

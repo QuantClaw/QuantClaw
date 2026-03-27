@@ -8,7 +8,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-import "quantclaw/config.hpp";
+import quantclaw.config;
 import quantclaw.plugins.hook_manager;
 import quantclaw.plugins.plugin_manifest;
 import quantclaw.plugins.plugin_registry;

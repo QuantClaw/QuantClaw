@@ -5,8 +5,8 @@ import quantclaw.cli.gateway_commands;
 
 import std;
 
-import "quantclaw/channels/adapter_manager.hpp";
-import "quantclaw/config.hpp";
+import quantclaw.channels.adapter_manager;
+import quantclaw.config;
 import quantclaw.constants;
 import quantclaw.core.agent_loop;
 import quantclaw.core.prompt_builder;
@@ -32,8 +32,8 @@ import quantclaw.core.cron_scheduler;
 import quantclaw.core.signal_handler;
 import quantclaw.core.skill_loader;
 import quantclaw.tools.tool_registry;
-import "quantclaw/web/api_routes.hpp";
-import "quantclaw/web/web_server.hpp";
+import quantclaw.web.api_routes;
+import quantclaw.web.web_server;
 
 // Forward declare from rpc_handlers.cpp
 namespace quantclaw::gateway {
