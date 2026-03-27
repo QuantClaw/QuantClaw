@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/cli/gateway_commands.hpp"
+import "quantclaw/cli/gateway_commands.hpp";
 
 #include <atomic>
 #include <chrono>
@@ -10,35 +10,35 @@
 #include <iostream>
 #include <thread>
 
-#include "quantclaw/channels/adapter_manager.hpp"
-#include "quantclaw/config.hpp"
-#include "quantclaw/constants.hpp"
+import "quantclaw/channels/adapter_manager.hpp";
+import "quantclaw/config.hpp";
+import "quantclaw/constants.hpp";
 import quantclaw.core.agent_loop;
 import quantclaw.core.prompt_builder;
 import quantclaw.core.subagent;
 import quantclaw.core.dag_runtime;
-#include "quantclaw/gateway/command_queue.hpp"
-#include "quantclaw/gateway/daemon_manager.hpp"
-#include "quantclaw/gateway/gateway_client.hpp"
-#include "quantclaw/gateway/gateway_server.hpp"
-#include "quantclaw/gateway/protocol.hpp"
+import "quantclaw/gateway/command_queue.hpp";
+import "quantclaw/gateway/daemon_manager.hpp";
+import "quantclaw/gateway/gateway_client.hpp";
+import "quantclaw/gateway/gateway_server.hpp";
+import "quantclaw/gateway/protocol.hpp";
 import quantclaw.mcp.mcp_tool_manager;
-#include "quantclaw/platform/process.hpp"
-#include "quantclaw/plugins/plugin_system.hpp"
+import "quantclaw/platform/process.hpp";
+import "quantclaw/plugins/plugin_system.hpp";
 import quantclaw.providers.provider_registry;
-#include "quantclaw/security/exec_approval.hpp"
-#include "quantclaw/security/rate_limiter.hpp"
-#include "quantclaw/security/rbac.hpp"
-#include "quantclaw/security/tool_permissions.hpp"
-#include "quantclaw/session/session_manager.hpp"
+import "quantclaw/security/exec_approval.hpp";
+import "quantclaw/security/rate_limiter.hpp";
+import "quantclaw/security/rbac.hpp";
+import "quantclaw/security/tool_permissions.hpp";
+import "quantclaw/session/session_manager.hpp";
 import quantclaw.core.memory_manager;
 import quantclaw.core.dag_runtime;
 import quantclaw.core.cron_scheduler;
 import quantclaw.core.signal_handler;
 import quantclaw.core.skill_loader;
 import quantclaw.tools.tool_registry;
-#include "quantclaw/web/api_routes.hpp"
-#include "quantclaw/web/web_server.hpp"
+import "quantclaw/web/api_routes.hpp";
+import "quantclaw/web/web_server.hpp";
 
 // Forward declare from rpc_handlers.cpp
 namespace quantclaw::gateway {

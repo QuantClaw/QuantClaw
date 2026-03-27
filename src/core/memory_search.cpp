@@ -3,14 +3,13 @@
 
 module;
 
-#include "quantclaw/providers/embedding_provider.hpp"
-
 module quantclaw.core.memory_search;
 
 import std;
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
+import "quantclaw/providers/embedding_provider.hpp";
 import quantclaw.core.mmr_reranker;
 import quantclaw.core.temporal_decay;
 import quantclaw.core.vector_index;

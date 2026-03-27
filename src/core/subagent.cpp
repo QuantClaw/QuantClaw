@@ -4,7 +4,7 @@
 module;
 
 #include <algorithm>
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <random>
 #include <sstream>
 #include <spdlog/spdlog.h>

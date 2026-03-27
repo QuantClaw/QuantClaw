@@ -8,8 +8,8 @@
 
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
-#include "quantclaw/plugins/plugin_manifest.hpp"
+import "quantclaw/config.hpp";
+import "quantclaw/plugins/plugin_manifest.hpp";
 
 namespace quantclaw {
 

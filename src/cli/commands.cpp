@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/cli/commands.hpp"
+import "quantclaw/cli/commands.hpp";
 
 namespace quantclaw::cli {
 

@@ -15,7 +15,7 @@
 import nlohmann.json;
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/gateway/protocol.hpp"
+import "quantclaw/gateway/protocol.hpp";
 
 namespace quantclaw::gateway {
 

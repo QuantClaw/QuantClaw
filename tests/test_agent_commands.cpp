@@ -16,17 +16,17 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/cli/agent_commands.hpp"
-#include "quantclaw/config.hpp"
+import "quantclaw/cli/agent_commands.hpp";
+import "quantclaw/config.hpp";
 import quantclaw.core.agent_loop;
 import quantclaw.core.memory_manager;
 import quantclaw.core.skill_loader;
 import quantclaw.core.prompt_builder;
-#include "quantclaw/gateway/gateway_client.hpp"
-#include "quantclaw/gateway/gateway_server.hpp"
-#include "quantclaw/gateway/protocol.hpp"
-#include "quantclaw/providers/llm_provider.hpp"
-#include "quantclaw/session/session_manager.hpp"
+import "quantclaw/gateway/gateway_client.hpp";
+import "quantclaw/gateway/gateway_server.hpp";
+import "quantclaw/gateway/protocol.hpp";
+import "quantclaw/providers/llm_provider.hpp";
+import "quantclaw/session/session_manager.hpp";
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;

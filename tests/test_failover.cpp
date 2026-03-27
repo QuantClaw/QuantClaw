@@ -7,11 +7,11 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
-#include "quantclaw/providers/cooldown_tracker.hpp"
-#include "quantclaw/providers/failover_resolver.hpp"
+import "quantclaw/config.hpp";
+import "quantclaw/providers/cooldown_tracker.hpp";
+import "quantclaw/providers/failover_resolver.hpp";
 import quantclaw.providers.provider_error;
-#include "quantclaw/providers/provider_registry.hpp"
+import "quantclaw/providers/provider_registry.hpp";
 
 #include <gtest/gtest.h>
 

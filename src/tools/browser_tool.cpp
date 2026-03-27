@@ -1,20 +1,13 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/tools/browser_tool.hpp"
+import quantclaw.tools.browser_tool;
 
-#include <algorithm>
-#include <chrono>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <regex>
-#include <sstream>
-#include <thread>
+import std;
 
-#include <httplib.h>
+import <httplib.h>;
 
-#include "quantclaw/common/parse_util.hpp"
+import quantclaw.common.parse_util;
 
 namespace quantclaw {
 

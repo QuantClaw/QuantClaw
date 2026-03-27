@@ -12,8 +12,8 @@
 
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
-#include "quantclaw/platform/process.hpp"
+import "quantclaw/config.hpp";
+import "quantclaw/platform/process.hpp";
 
 namespace quantclaw {
 

@@ -10,17 +10,17 @@
 #include <iomanip>
 #include <sstream>
 
-#include "quantclaw/config.hpp"
-#include "quantclaw/constants.hpp"
+import "quantclaw/config.hpp";
+import "quantclaw/constants.hpp";
 import quantclaw.core.agent_loop;
 import quantclaw.core.message_commands;
-#include "quantclaw/gateway/command_queue.hpp"
-#include "quantclaw/gateway/gateway_server.hpp"
-#include "quantclaw/gateway/protocol.hpp"
-#include "quantclaw/plugins/plugin_system.hpp"
+import "quantclaw/gateway/command_queue.hpp";
+import "quantclaw/gateway/gateway_server.hpp";
+import "quantclaw/gateway/protocol.hpp";
+import "quantclaw/plugins/plugin_system.hpp";
 import quantclaw.providers.provider_registry;
-#include "quantclaw/security/exec_approval.hpp"
-#include "quantclaw/session/session_manager.hpp"
+import "quantclaw/security/exec_approval.hpp";
+import "quantclaw/session/session_manager.hpp";
 import quantclaw.core.cron_scheduler;
 import quantclaw.core.memory_search;
 import quantclaw.core.prompt_builder;

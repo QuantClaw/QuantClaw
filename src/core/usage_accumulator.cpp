@@ -5,7 +5,7 @@ module quantclaw.core.usage_accumulator;
 
 import std;
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 
 namespace quantclaw {
 

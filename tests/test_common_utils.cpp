@@ -3,8 +3,8 @@
 
 #include <vector>
 
-#include "quantclaw/common/defer.hpp"
-#include "quantclaw/common/try.hpp"
+import "quantclaw/common/defer.hpp";
+import "quantclaw/common/try.hpp";
 
 #include <gtest/gtest.h>
 

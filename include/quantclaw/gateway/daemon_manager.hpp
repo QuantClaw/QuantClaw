@@ -8,8 +8,8 @@
 
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/constants.hpp"
-#include "quantclaw/platform/service.hpp"
+import "quantclaw/constants.hpp";
+import "quantclaw/platform/service.hpp";
 
 namespace quantclaw::gateway {
 

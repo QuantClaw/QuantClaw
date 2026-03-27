@@ -4,8 +4,8 @@
 #include <filesystem>
 #include <memory>
 
-#include "quantclaw/platform/process.hpp"
-#include "quantclaw/security/sandbox.hpp"
+import "quantclaw/platform/process.hpp";
+import "quantclaw/security/sandbox.hpp";
 
 import quantclaw.test.helpers;
 #include <gtest/gtest.h>

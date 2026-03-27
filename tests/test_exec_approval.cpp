@@ -4,7 +4,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/security/exec_approval.hpp"
+import "quantclaw/security/exec_approval.hpp";
 
 #include <gtest/gtest.h>
 

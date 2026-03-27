@@ -4,7 +4,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/tools/browser_tool.hpp"
+import "quantclaw/tools/browser_tool.hpp";
 
 #include <gtest/gtest.h>
 

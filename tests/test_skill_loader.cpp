@@ -8,7 +8,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
+import "quantclaw/config.hpp";
 import quantclaw.core.skill_loader;
 
 import quantclaw.test.helpers;

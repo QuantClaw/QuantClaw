@@ -15,14 +15,8 @@ module;
 #include <thread>
 
 #include <httplib.h>
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
-
-#include "quantclaw/platform/process.hpp"
-#include "quantclaw/security/exec_approval.hpp"
-#include "quantclaw/security/sandbox.hpp"
-#include "quantclaw/security/tool_permissions.hpp"
-#include "quantclaw/session/session_manager.hpp"
 
 module quantclaw.tools.tool_registry;
 
@@ -31,6 +25,11 @@ import quantclaw.core.cron_scheduler;
 import quantclaw.core.memory_search;
 import quantclaw.mcp.mcp_tool_manager;
 import quantclaw.tools.tool_chain;
+import "quantclaw/platform/process.hpp";
+import "quantclaw/security/exec_approval.hpp";
+import "quantclaw/security/sandbox.hpp";
+import "quantclaw/security/tool_permissions.hpp";
+import "quantclaw/session/session_manager.hpp";
 
 namespace fs = std::filesystem;
 

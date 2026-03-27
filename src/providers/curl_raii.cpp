@@ -1,7 +1,7 @@
 // Copyright 2024 QuantClaw Authors. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/providers/curl_raii.hpp"
+import "quantclaw/providers/curl_raii.hpp";
 
 #include <curl/curl.h>
 

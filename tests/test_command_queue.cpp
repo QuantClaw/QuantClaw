@@ -10,8 +10,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
-#include "quantclaw/gateway/command_queue.hpp"
+import "quantclaw/config.hpp";
+import "quantclaw/gateway/command_queue.hpp";
 
 #include <gtest/gtest.h>
 

@@ -6,8 +6,8 @@
 #include <filesystem>
 #include <fstream>
 
-#include "quantclaw/platform/process.hpp"
-#include "quantclaw/platform/service.hpp"
+import "quantclaw/platform/process.hpp";
+import "quantclaw/platform/service.hpp";
 
 namespace quantclaw::platform {
 

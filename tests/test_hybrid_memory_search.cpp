@@ -12,7 +12,7 @@ import quantclaw.core.mmr_reranker;
 import quantclaw.core.temporal_decay;
 import quantclaw.core.vector_index;
 import quantclaw.core.memory_search;
-#include "quantclaw/providers/embedding_provider.hpp"
+import "quantclaw/providers/embedding_provider.hpp";
 
 #include <gtest/gtest.h>
 

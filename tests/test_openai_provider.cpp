@@ -6,8 +6,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/providers/llm_provider.hpp"
-#include "quantclaw/providers/openai_provider.hpp"
+import "quantclaw/providers/llm_provider.hpp";
+import "quantclaw/providers/openai_provider.hpp";
 
 #include <gtest/gtest.h>
 

@@ -9,7 +9,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/web/web_server.hpp"
+import "quantclaw/web/web_server.hpp";
 
 import quantclaw.test.helpers;
 #include <gtest/gtest.h>

@@ -3,11 +3,10 @@
 
 module;
 
-#include "quantclaw/providers/llm_provider.hpp"
-
 module quantclaw.core.session_compaction;
 
 import std;
+import "quantclaw/providers/llm_provider.hpp";
 
 namespace quantclaw {
 

@@ -5,10 +5,10 @@ module quantclaw.providers.provider_registry;
 
 import std;
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/providers/anthropic_provider.hpp"
+import "quantclaw/providers/anthropic_provider.hpp";
 
 namespace quantclaw {
 

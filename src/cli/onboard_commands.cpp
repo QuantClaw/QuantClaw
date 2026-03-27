@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/cli/onboard_commands.hpp"
+import "quantclaw/cli/onboard_commands.hpp";
 
 #include <chrono>
 #include <cstdlib>
@@ -11,10 +11,10 @@
 #include <random>
 #include <thread>
 
-#include "quantclaw/builtin_skills.hpp"
-#include "quantclaw/config.hpp"
-#include "quantclaw/gateway/gateway_client.hpp"
-#include "quantclaw/platform/service.hpp"
+import "quantclaw/builtin_skills.hpp";
+import "quantclaw/config.hpp";
+import "quantclaw/gateway/gateway_client.hpp";
+import "quantclaw/platform/service.hpp";
 
 namespace quantclaw::cli {
 

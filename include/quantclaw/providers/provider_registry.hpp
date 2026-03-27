@@ -12,8 +12,8 @@
 import nlohmann.json;
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
-#include "quantclaw/providers/llm_provider.hpp"
+import "quantclaw/config.hpp";
+import "quantclaw/providers/llm_provider.hpp";
 
 namespace quantclaw {
 

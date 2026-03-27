@@ -17,7 +17,7 @@
 import nlohmann.json;
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/platform/process.hpp"
+import "quantclaw/platform/process.hpp";
 
 namespace quantclaw {
 

@@ -8,8 +8,8 @@
 
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/mcp/mcp_client.hpp"
-#include "quantclaw/mcp/mcp_server.hpp"
+import "quantclaw/mcp/mcp_client.hpp";
+import "quantclaw/mcp/mcp_server.hpp";
 
 namespace quantclaw::cli {
 

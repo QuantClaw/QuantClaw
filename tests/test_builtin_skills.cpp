@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_set>
 
-#include "quantclaw/builtin_skills.hpp"
+import "quantclaw/builtin_skills.hpp";
 
 #include <gtest/gtest.h>
 

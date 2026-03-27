@@ -1,13 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-module;
-
-#include "quantclaw/providers/llm_provider.hpp"
-
 export module quantclaw.core.multi_stage_compaction;
 
 import std;
+import "quantclaw/providers/llm_provider.hpp";
 
 namespace spdlog {
 class logger;

@@ -5,10 +5,10 @@
 
 #include <memory>
 
-#include "quantclaw/config.hpp"
-#include "quantclaw/plugins/hook_manager.hpp"
-#include "quantclaw/plugins/plugin_registry.hpp"
-#include "quantclaw/plugins/sidecar_manager.hpp"
+import "quantclaw/config.hpp";
+import "quantclaw/plugins/hook_manager.hpp";
+import "quantclaw/plugins/plugin_registry.hpp";
+import "quantclaw/plugins/sidecar_manager.hpp";
 
 // Windows SDK defines StartService/StopService as macro aliases.
 // Undefine them to avoid collision with our PluginSystem methods.

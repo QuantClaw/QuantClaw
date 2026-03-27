@@ -1,13 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-module;
-
-#include "quantclaw/config.hpp"
-
 export module quantclaw.core.default_context_engine;
 
 import std;
+import "quantclaw/config.hpp";
 import quantclaw.core.context_engine;
 
 namespace spdlog {

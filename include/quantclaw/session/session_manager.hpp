@@ -15,7 +15,7 @@
 import nlohmann.json;
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/common/noncopyable.hpp"
+import "quantclaw/common/noncopyable.hpp";
 import quantclaw.core.content_block;
 
 namespace quantclaw {

@@ -3,13 +3,12 @@
 
 module;
 
-#include "quantclaw/config.hpp"
-
 module quantclaw.core.skill_loader;
 
 import std;
+import "quantclaw/config.hpp";
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 namespace quantclaw {

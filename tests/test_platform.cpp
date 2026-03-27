@@ -4,9 +4,9 @@
 #include <filesystem>
 #include <thread>
 
-#include "quantclaw/platform/ipc.hpp"
-#include "quantclaw/platform/process.hpp"
-#include "quantclaw/platform/service.hpp"
+import "quantclaw/platform/ipc.hpp";
+import "quantclaw/platform/process.hpp";
+import "quantclaw/platform/service.hpp";
 
 #include <gtest/gtest.h>
 

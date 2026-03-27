@@ -7,12 +7,9 @@ module quantclaw.core.agent_loop;
 #include <sstream>
 #include <thread>
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
-
-#include "quantclaw/providers/llm_provider.hpp"
-#include "quantclaw/gateway/protocol.hpp"
-#include "quantclaw/providers/failover_resolver.hpp"
+import "quantclaw/providers/failover_resolver.hpp";
 import quantclaw.core.context_engine;
 import quantclaw.core.dag_runtime;
 import quantclaw.core.usage_accumulator;
@@ -23,6 +20,9 @@ import quantclaw.core.memory_manager;
 import quantclaw.core.session_compaction;
 import quantclaw.core.skill_loader;
 import quantclaw.providers.provider_registry;
+import "quantclaw/providers/llm_provider.hpp";
+import "quantclaw/gateway/protocol.hpp";
+import "quantclaw/providers/failover_resolver.hpp";
 import quantclaw.tools.tool_registry;
 
 // Bring event name constants into scope

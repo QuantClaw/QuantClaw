@@ -8,11 +8,11 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
-#include "quantclaw/plugins/hook_manager.hpp"
-#include "quantclaw/plugins/plugin_manifest.hpp"
-#include "quantclaw/plugins/plugin_registry.hpp"
-#include "quantclaw/plugins/plugin_system.hpp"
+import "quantclaw/config.hpp";
+import "quantclaw/plugins/hook_manager.hpp";
+import "quantclaw/plugins/plugin_manifest.hpp";
+import "quantclaw/plugins/plugin_registry.hpp";
+import "quantclaw/plugins/plugin_system.hpp";
 
 import quantclaw.test.helpers;
 #include <gtest/gtest.h>

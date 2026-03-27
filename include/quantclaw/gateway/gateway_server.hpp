@@ -15,10 +15,10 @@
 import nlohmann.json;
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/common/noncopyable.hpp"
-#include "quantclaw/gateway/protocol.hpp"
-#include "quantclaw/security/rate_limiter.hpp"
-#include "quantclaw/security/rbac.hpp"
+import "quantclaw/common/noncopyable.hpp";
+import "quantclaw/gateway/protocol.hpp";
+import "quantclaw/security/rate_limiter.hpp";
+import "quantclaw/security/rbac.hpp";
 
 namespace quantclaw::gateway {
 

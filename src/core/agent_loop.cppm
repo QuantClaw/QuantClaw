@@ -1,15 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-module;
-
-#include "quantclaw/common/noncopyable.hpp"
-#include "quantclaw/config.hpp"
-
 export module quantclaw.core.agent_loop;
 
 import std;
 import nlohmann.json;
+import "quantclaw/common/noncopyable.hpp";
+import "quantclaw/config.hpp";
 
 namespace spdlog {
 class logger;

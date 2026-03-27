@@ -9,14 +9,14 @@
 #include <process.h>
 #endif
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
+import "quantclaw/config.hpp";
 import quantclaw.core.context_pruner;
 import quantclaw.core.memory_search;
-#include "quantclaw/gateway/command_queue.hpp"
+import "quantclaw/gateway/command_queue.hpp";
 
 #include <gtest/gtest.h>
 

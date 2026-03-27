@@ -6,7 +6,7 @@
 #include <string>
 #include <unordered_set>
 
-#include "quantclaw/config.hpp"
+import "quantclaw/config.hpp";
 
 namespace quantclaw {
 

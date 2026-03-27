@@ -15,18 +15,17 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/cli/agent_commands.hpp"
-#include "quantclaw/cli/cli_manager.hpp"
-#include "quantclaw/cli/gateway_commands.hpp"
-#include "quantclaw/cli/onboard_commands.hpp"
-#include "quantclaw/cli/session_commands.hpp"
-#include "quantclaw/common/parse_util.hpp"
-#include "quantclaw/config.hpp"
-#include "quantclaw/gateway/gateway_client.hpp"
-#include "quantclaw/platform/process.hpp"
-
 import quantclaw.core.skill_loader;
 import quantclaw.core.memory_search;
+import "quantclaw/cli/agent_commands.hpp";
+import "quantclaw/cli/cli_manager.hpp";
+import "quantclaw/cli/gateway_commands.hpp";
+import "quantclaw/cli/onboard_commands.hpp";
+import "quantclaw/cli/session_commands.hpp";
+import "quantclaw/common/parse_util.hpp";
+import "quantclaw/config.hpp";
+import "quantclaw/gateway/gateway_client.hpp";
+import "quantclaw/platform/process.hpp";
 
 // Bring port/URL constants into scope (avoids quantclaw:: prefix for literals)
 using quantclaw::kDefaultGatewayPort;

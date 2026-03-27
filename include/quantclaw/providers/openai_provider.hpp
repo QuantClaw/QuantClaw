@@ -8,9 +8,9 @@
 
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/providers/curl_raii.hpp"
+import "quantclaw/providers/curl_raii.hpp";
 
-#include "llm_provider.hpp"
+import "quantclaw/providers/llm_provider.hpp";
 
 namespace quantclaw {
 

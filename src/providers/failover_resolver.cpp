@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/providers/failover_resolver.hpp"
+import "quantclaw/providers/failover_resolver.hpp";
 
 #include <algorithm>
 #include <chrono>

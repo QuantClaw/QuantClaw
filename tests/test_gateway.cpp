@@ -11,9 +11,9 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/gateway/gateway_client.hpp"
-#include "quantclaw/gateway/gateway_server.hpp"
-#include "quantclaw/gateway/protocol.hpp"
+import "quantclaw/gateway/gateway_client.hpp";
+import "quantclaw/gateway/gateway_server.hpp";
+import "quantclaw/gateway/protocol.hpp";
 
 import quantclaw.test.helpers;
 #include <gtest/gtest.h>

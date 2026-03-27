@@ -4,7 +4,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
+import "quantclaw/config.hpp";
 import quantclaw.core.context_engine;
 import quantclaw.core.default_context_engine;
 

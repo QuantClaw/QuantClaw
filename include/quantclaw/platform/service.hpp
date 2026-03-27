@@ -8,7 +8,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/constants.hpp"
+import "quantclaw/constants.hpp";
 
 namespace quantclaw::platform {
 

@@ -15,8 +15,8 @@
 #include <cstring>
 #include <thread>
 
-#include "quantclaw/common/defer.hpp"
-#include "quantclaw/platform/process.hpp"
+import "quantclaw/common/defer.hpp";
+import "quantclaw/platform/process.hpp";
 
 #include <poll.h>
 

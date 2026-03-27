@@ -9,8 +9,8 @@
 #include <thread>
 #include <vector>
 
-#include "quantclaw/common/defer.hpp"
-#include "quantclaw/platform/process.hpp"
+import "quantclaw/common/defer.hpp";
+import "quantclaw/platform/process.hpp";
 
 // clang-format off
 #include <windows.h>  // must precede psapi.h

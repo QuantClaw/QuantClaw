@@ -13,7 +13,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "quantclaw/platform/ipc.hpp"
+import "quantclaw/platform/ipc.hpp";
 
 #ifdef _WIN32
 // ---- Windows WinSock2 ----

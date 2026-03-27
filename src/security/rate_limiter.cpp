@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/security/rate_limiter.hpp"
+import "quantclaw/security/rate_limiter.hpp";
 
 namespace quantclaw {
 

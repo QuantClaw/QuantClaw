@@ -5,7 +5,7 @@ module quantclaw.core.dag_runtime;
 
 import std;
 
-#include <nlohmann/json.hpp>
+import nlohmann.json;
 #include <spdlog/spdlog.h>
 
 #include <sqlite3.h>

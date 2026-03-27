@@ -4,7 +4,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/channels/channel_policy.hpp"
+import "quantclaw/channels/channel_policy.hpp";
 
 #include <gtest/gtest.h>
 

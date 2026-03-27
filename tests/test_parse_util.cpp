@@ -1,7 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "quantclaw/common/parse_util.hpp"
+import "quantclaw/common/parse_util.hpp";
 
 #include <gtest/gtest.h>
 

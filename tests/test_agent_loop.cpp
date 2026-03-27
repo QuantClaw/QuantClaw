@@ -8,12 +8,12 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
+import "quantclaw/config.hpp";
 import quantclaw.core.agent_loop;
 import quantclaw.core.memory_manager;
 import quantclaw.core.skill_loader;
 import quantclaw.core.usage_accumulator;
-#include "quantclaw/providers/llm_provider.hpp"
+import "quantclaw/providers/llm_provider.hpp";
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;
