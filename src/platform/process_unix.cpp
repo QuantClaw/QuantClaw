@@ -15,6 +15,11 @@
 #include <cstring>
 #include <thread>
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <limits.h>
+#endif
+
 #include "quantclaw/common/defer.hpp"
 #include "quantclaw/platform/process.hpp"
 
@@ -275,6 +280,26 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
 }
 
 std::string executable_path() {
+#ifdef __APPLE__
+  uint32_t size = 0;
+  _NSGetExecutablePath(nullptr, &size);
+  if (size == 0) {
+    return "quantclaw";
+  }
+
+  std::string buffer(size, '\0');
+  if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
+    return "quantclaw";
+  }
+
+  char resolved[PATH_MAX];
+  if (realpath(buffer.c_str(), resolved) != nullptr) {
+    return std::string(resolved);
+  }
+
+  buffer.resize(std::strlen(buffer.c_str()));
+  return buffer;
+#else
   char buf[4096];
   ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
   if (len > 0) {
@@ -282,6 +307,7 @@ std::string executable_path() {
     return std::string(buf);
   }
   return "quantclaw";
+#endif
 }
 
 std::string home_directory() {

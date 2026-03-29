@@ -14,7 +14,9 @@
 namespace quantclaw::gateway {
 
 // Manages the QuantClaw gateway as a platform service.
-// Linux: systemd user service. Windows: background process with PID file.
+// Linux: systemd user service.
+// MacOS: launchd user agent.
+// Windows: background process with PID file.
 // Thin wrapper around platform::ServiceManager.
 class DaemonManager {
  public:

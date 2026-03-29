@@ -14,13 +14,14 @@ namespace quantclaw::platform {
 
 // Cross-platform daemon/service management.
 // Linux: systemd user service.
+// macOS: launchd user agent.
 // Windows: background process with PID file (no Windows Service for now).
 class ServiceManager {
  public:
   explicit ServiceManager(std::shared_ptr<spdlog::logger> logger);
   ~ServiceManager() = default;
 
-  // Install the service (systemd unit file on Linux, no-op on Windows).
+  // Install the service definition for the current platform.
   int install(int port = kLegacyGatewayPort);
 
   // Uninstall the service.

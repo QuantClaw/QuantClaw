@@ -23,6 +23,7 @@ TEST(PlatformProcess, HomeDirNotEmpty) {
 TEST(PlatformProcess, ExecutablePathNotEmpty) {
   std::string exe = executable_path();
   EXPECT_FALSE(exe.empty());
+  EXPECT_TRUE(std::filesystem::exists(exe));
 }
 
 TEST(PlatformProcess, ExecCaptureEcho) {
