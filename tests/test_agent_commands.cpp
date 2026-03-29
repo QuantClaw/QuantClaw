@@ -140,6 +140,7 @@ class AgentCmdMockLLM : public quantclaw::LLMProvider {
 class AgentCommandsIntegrationTest : public ::testing::Test {
  protected:
   void SetUp() override {
+    port_ = quantclaw::test::FindFreePort();
     test_dir_ = quantclaw::test::MakeTestDir("agent_cmd_test");
     workspace_dir_ = test_dir_ / "workspace";
     sessions_dir_ = test_dir_ / "sessions";
@@ -205,7 +206,7 @@ class AgentCommandsIntegrationTest : public ::testing::Test {
     }
   }
 
-  int port_ = quantclaw::test::FindFreePort();
+  int port_;
   std::filesystem::path test_dir_;
   std::filesystem::path workspace_dir_;
   std::filesystem::path sessions_dir_;
