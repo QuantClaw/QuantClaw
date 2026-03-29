@@ -15,6 +15,13 @@
 #include <cstring>
 #include <thread>
 
+#include <spdlog/spdlog.h>
+
+#ifdef __APPLE__
+#include <limits.h>
+#include <mach-o/dyld.h>
+#endif
+
 #include "quantclaw/common/defer.hpp"
 #include "quantclaw/platform/process.hpp"
 
@@ -275,6 +282,36 @@ ExecResult exec_capture(const std::string& command, int timeout_seconds,
 }
 
 std::string executable_path() {
+#ifdef __APPLE__
+  uint32_t size = 0;
+  _NSGetExecutablePath(nullptr, &size);
+  if (size == 0) {
+    spdlog::warn(
+        "Failed to determine executable path on macOS: _NSGetExecutablePath "
+        "returned a zero-length buffer");
+    return "quantclaw";
+  }
+
+  std::string buffer(size, '\0');
+  if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
+    spdlog::warn(
+        "Failed to determine executable path on macOS: _NSGetExecutablePath "
+        "could not populate a {}-byte buffer",
+        size);
+    return "quantclaw";
+  }
+
+  char resolved[PATH_MAX];
+  if (realpath(buffer.c_str(), resolved) != nullptr) {
+    return std::string(resolved);
+  }
+
+  spdlog::warn("Failed to resolve executable path on macOS via realpath: {}",
+               std::strerror(errno));
+
+  buffer.resize(std::strlen(buffer.c_str()));
+  return buffer;
+#else
   char buf[4096];
   ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
   if (len > 0) {
@@ -282,6 +319,7 @@ std::string executable_path() {
     return std::string(buf);
   }
   return "quantclaw";
+#endif
 }
 
 std::string home_directory() {

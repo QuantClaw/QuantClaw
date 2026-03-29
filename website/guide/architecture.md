@@ -316,10 +316,10 @@ quantclaw gateway              # Run gateway in foreground
 quantclaw agent "Hello!"       # Send a message
 ```
 
-### Gateway Daemon
+### Gateway Background Service
 ```bash
-quantclaw gateway install      # Install as system service
-quantclaw gateway start        # Start the daemon
+quantclaw gateway install      # Install the per-user background service
+quantclaw gateway start        # Start the background service
 quantclaw agent "Hello!"       # Connect via gateway
 ```
 

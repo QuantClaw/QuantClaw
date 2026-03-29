@@ -8,6 +8,10 @@
 #include <cstdlib>
 #include <thread>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 namespace quantclaw {
 
 std::atomic<bool> SignalHandler::shutdown_requested_{false};

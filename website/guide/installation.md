@@ -8,7 +8,7 @@ Detailed installation instructions for different platforms and use cases.
 - **CPU**: 2 cores, 2+ GHz
 - **RAM**: 4 GB
 - **Disk**: 2 GB free space
-- **OS**: Linux (Ubuntu 20.04+), Windows (WSL2), or macOS (10.15+)
+- **OS**: Linux (Ubuntu 20.04+), Windows (WSL2), or macOS 13+ on Apple Silicon
 
 ### Recommended Requirements
 - **CPU**: 4+ cores
@@ -55,7 +55,7 @@ cd quantclaw
 # Build
 mkdir build && cd build
 cmake ..
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 
 # Optional: Install system-wide
 sudo cmake --install .
@@ -93,7 +93,7 @@ git clone https://github.com/QuantClaw/QuantClaw.git
 cd quantclaw
 mkdir build && cd build
 cmake ..
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 sudo cmake --install .
 ```
 
@@ -108,8 +108,8 @@ git clone https://github.com/QuantClaw/QuantClaw.git
 cd quantclaw
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
-sudo make install
+cmake --build . --parallel
+sudo cmake --install .
 ```
 
 ## Windows Installation
@@ -207,37 +207,46 @@ docker stop quantclaw
 
 ## macOS Installation
 
-### Using Homebrew (if tap available)
+### Recommended: install script
+
 ```bash
-brew tap quantclaw/quantclaw
-brew install quantclaw
+git clone https://github.com/QuantClaw/QuantClaw.git
+cd QuantClaw
+bash scripts/install.sh --user
 ```
 
-### Build from Source
+This installs `quantclaw` into `~/.quantclaw/bin`, runs `onboard --quick`, and writes the launchd service definition to `~/Library/LaunchAgents/com.quantclaw.gateway.plist`.
+
+### Build from Source (manual)
 
 #### Install Dependencies
 ```bash
-# Using Homebrew
-brew install cmake openssl nlohmann-json spdlog
-
-# Or using MacPorts
-sudo port install cmake openssl nlohmann_json spdlog
+# Homebrew packages used by the supported build script
+brew install cmake ninja pkg-config git spdlog openssl@3 curl node
 ```
 
 #### Build
 ```bash
 git clone https://github.com/QuantClaw/QuantClaw.git
-cd quantclaw
+cd QuantClaw
 
-mkdir build && cd build
-cmake -DOPENSSL_DIR=$(brew --prefix openssl) ..
-cmake --build . -j $(sysctl -n hw.ncpu)
+# Recommended scripted build
+./scripts/build.sh --tests
 
 # Run tests
-./quantclaw_tests
+ctest --test-dir build --output-on-failure
 
-# Install
-sudo cmake --install .
+# Optional: install the background service definition
+./build/quantclaw gateway install
+```
+
+If you prefer manual CMake configuration on macOS, pass the Homebrew prefixes explicitly:
+
+```bash
+cmake -B build -G Ninja \
+  -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
+  -DCURL_ROOT="$(brew --prefix curl)"
+cmake --build build --parallel
 ```
 
 ## Post-Installation Setup
@@ -252,11 +261,7 @@ quantclaw onboard
 quantclaw onboard --quick
 ```
 
-During setup, you'll configure:
-- **API Keys**: LLM provider credentials
-- **Default Model**: Primary LLM model
-- **Workspace**: Location for files and memory
-- **Plugins**: Initial plugin selection
+During setup, QuantClaw creates the config file, workspace, and gateway auth token. Add your provider API keys afterwards by editing `~/.quantclaw/quantclaw.json`.
 
 ### Verify Installation
 
@@ -310,7 +315,7 @@ quantclaw --version
 cd quantclaw
 git pull origin main
 cd build
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 sudo cmake --install .
 ```
 

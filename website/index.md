@@ -102,7 +102,7 @@ features:
 ### Plugin Ecosystem
 - 24 lifecycle hook types (void/modifying/sync)
 - Custom tools, services, providers, commands, HTTP routes, gateway methods
-- TCP loopback IPC — works identically on Linux and Windows
+- TCP loopback IPC — works identically on Linux, macOS, and Windows
 
 ## Getting Started
 
@@ -110,15 +110,15 @@ features:
 # Clone and build
 git clone https://github.com/QuantClaw/QuantClaw.git
 cd QuantClaw
-mkdir build && cd build
-cmake .. && make -j$(nproc)
+./scripts/build.sh
 
 # Initialize
-quantclaw onboard --quick
+./build/quantclaw onboard --quick
 
-# Start gateway and chat
-quantclaw gateway start
-quantclaw agent "Hello, introduce yourself"
+# Install the background service and chat
+./build/quantclaw gateway install
+./build/quantclaw gateway start
+./build/quantclaw agent "Hello, introduce yourself"
 ```
 
 For detailed instructions, see [Getting Started](/guide/getting-started).

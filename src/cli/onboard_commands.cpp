@@ -75,7 +75,7 @@ int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
   PrintStep(3, 5, "Daemon Setup");
   if (!skip_daemon) {
     if (install_daemon ||
-        PromptYesNo("Install QuantClaw as user service (systemd)?", true)) {
+        PromptYesNo("Install QuantClaw as a background service?", true)) {
       if (SetupDaemon() != 0) {
         logger_->warn("Daemon setup failed, continuing");
       }
@@ -123,7 +123,7 @@ int OnboardCommands::InstallDaemonCommand(
       return 1;
   }
 
-  std::cout << "Installing QuantClaw as user service..." << std::endl;
+  std::cout << "Installing QuantClaw background service..." << std::endl;
   if (InstallDaemon(port)) {
     std::cout << "✓ Daemon installed successfully" << std::endl;
     std::cout << "\nManage the service:" << std::endl;
@@ -334,8 +334,7 @@ int OnboardCommands::SetupDaemon() {
       port = cfg.gateway.port;
   } catch (...) {}
 
-  std::cout << "\nSetting up QuantClaw as a user service (systemd --user)..."
-            << std::endl;
+  std::cout << "\nSetting up QuantClaw as a background service..." << std::endl;
 
   if (InstallDaemon(port)) {
     std::cout << "✓ Daemon installed successfully" << std::endl;

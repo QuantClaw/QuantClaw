@@ -84,6 +84,40 @@ jobs:
         name: test-results-linux-${{ matrix.compiler }}
         path: build/Testing/
 
+  build-test-macos:
+    name: Build & Test macOS (Apple Silicon)
+    runs-on: macos-14
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        brew install cmake ninja pkg-config git spdlog openssl@3 curl node
+
+    - name: Verify build script
+      run: |
+        bash scripts/build.sh
+
+    - name: Configure CMake tests
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_CXX_STANDARD=17 \
+          -DBUILD_TESTS=ON \
+          -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
+          -DCURL_ROOT="$(brew --prefix curl)"
+
+    - name: Build tests
+      run: cmake --build build --parallel --target quantclaw_tests
+
+    - name: Run unit tests
+      working-directory: build
+      run: ctest --output-on-failure --parallel --timeout 120
+
+    - name: Run installer smoke test
+      run: bash tests/test-install-script.sh
+
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest

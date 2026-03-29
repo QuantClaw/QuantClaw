@@ -9,7 +9,7 @@
 - **CPU**：2 核，2+ GHz
 - **RAM**：4 GB
 - **磁盘**：2 GB 可用空间
-- **OS**：Linux（Ubuntu 20.04+）、Windows（WSL2）或 macOS（10.15+）
+- **OS**：Linux（Ubuntu 20.04+）、Windows（WSL2）或 macOS 13+（官方支持 Apple Silicon）
 
 ### 推荐配置
 
@@ -43,10 +43,10 @@ cd QuantClaw
 # 编译
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
+cmake --build . --parallel
 
 # 可选：系统级安装
-sudo make install
+sudo cmake --install .
 
 # 运行测试
 ./quantclaw_tests
@@ -84,8 +84,8 @@ git clone https://github.com/QuantClaw/QuantClaw.git
 cd QuantClaw
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
-sudo make install
+cmake --build . --parallel
+sudo cmake --install .
 ```
 
 ### Arch Linux
@@ -96,8 +96,8 @@ git clone https://github.com/QuantClaw/QuantClaw.git
 cd QuantClaw
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
-sudo make install
+cmake --build . --parallel
+sudo cmake --install .
 ```
 
 ## Windows 安装
@@ -165,24 +165,43 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=C:\path\to\vcpkg\scripts\buildsystems\vcpkg.cmak
 
 ## macOS 安装
 
-### 从源码编译
+### 推荐：安装脚本
 
 ```bash
-# 安装依赖（Homebrew）
-brew install cmake openssl nlohmann-json spdlog
+git clone https://github.com/QuantClaw/QuantClaw.git
+cd QuantClaw
+bash scripts/install.sh --user
+```
+
+这会把 `quantclaw` 安装到 `~/.quantclaw/bin`，执行 `onboard --quick`，并把 launchd 服务定义写到 `~/Library/LaunchAgents/com.quantclaw.gateway.plist`。
+
+### 从源码编译（手动）
+
+```bash
+# build.sh 支持的 Homebrew 依赖
+brew install cmake ninja pkg-config git spdlog openssl@3 curl node
 
 # 编译
 git clone https://github.com/QuantClaw/QuantClaw.git
 cd QuantClaw
-mkdir build && cd build
-cmake -DOPENSSL_DIR=$(brew --prefix openssl) ..
-cmake --build . -j $(sysctl -n hw.ncpu)
+
+# 推荐：使用脚本构建
+./scripts/build.sh --tests
 
 # 运行测试
-./quantclaw_tests
+ctest --test-dir build --output-on-failure
 
-# 安装
-sudo cmake --install .
+# 可选：安装后台服务定义
+./build/quantclaw gateway install
+```
+
+如果你更想手动执行 CMake，可显式传入 Homebrew 前缀：
+
+```bash
+cmake -B build -G Ninja \
+  -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
+  -DCURL_ROOT="$(brew --prefix curl)"
+cmake --build build --parallel
 ```
 
 ## 安装后设置
@@ -197,10 +216,7 @@ quantclaw onboard
 quantclaw onboard --quick
 ```
 
-设置过程中需要配置：
-- **API Key**：LLM Provider 凭据
-- **默认模型**：主要 LLM 模型（格式：`provider/model-name`）
-- **工作空间**：文件和记忆的存储位置
+初始化过程中会创建配置文件、工作空间和网关认证 token。Provider 的 API Key 请随后手动写入 `~/.quantclaw/quantclaw.json`。
 
 ### 验证安装
 
@@ -231,8 +247,8 @@ export QUANTCLAW_GATEWAY_PORT=18800
 cd QuantClaw
 git pull origin main
 cd build
-make -j$(nproc)
-sudo make install
+cmake --build . --parallel
+sudo cmake --install .
 ```
 
 ### Docker 更新

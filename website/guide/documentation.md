@@ -23,7 +23,7 @@ git clone https://github.com/QuantClaw/quantclaw.git
 cd quantclaw
 mkdir build && cd build
 cmake ..
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 
 # 2. Configure
 quantclaw onboard --quick
