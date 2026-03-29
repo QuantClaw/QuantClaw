@@ -22,7 +22,7 @@ class DaemonManager {
  public:
   explicit DaemonManager(std::shared_ptr<spdlog::logger> logger);
 
-  int Install(int port = kLegacyGatewayPort);
+  int Install(int port = kDefaultGatewayPort);
   int Uninstall();
   int Start();
   int Stop();

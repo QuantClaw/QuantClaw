@@ -30,7 +30,7 @@ class ServiceManager {
   ~ServiceManager() = default;
 
   // Install the service definition for the current platform.
-  int install(int port = kLegacyGatewayPort);
+  int install(int port = kDefaultGatewayPort);
 
   // Uninstall the service.
   int uninstall();

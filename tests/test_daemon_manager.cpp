@@ -309,6 +309,29 @@ TEST_F(DaemonManagerTest, InstallWritesPlatformServiceDefinition) {
 #endif
 }
 
+TEST_F(DaemonManagerTest, InstallUsesDefaultGatewayPort) {
+#ifdef __APPLE__
+  install_fake_service_command("launchctl");
+#else
+  install_fake_service_command("systemctl");
+#endif
+
+  ASSERT_EQ(daemon_->Install(), 0);
+
+  std::ifstream in(expected_service_path());
+  ASSERT_TRUE(in.good());
+  std::string contents((std::istreambuf_iterator<char>(in)),
+                       std::istreambuf_iterator<char>());
+
+#ifdef __APPLE__
+  EXPECT_NE(contents.find("<string>18800</string>"), std::string::npos);
+  EXPECT_EQ(contents.find("<string>18789</string>"), std::string::npos);
+#else
+  EXPECT_NE(contents.find("gateway run --port 18800"), std::string::npos);
+  EXPECT_EQ(contents.find("gateway run --port 18789"), std::string::npos);
+#endif
+}
+
 TEST_F(DaemonManagerTest, IsRunningFallsBackToServiceManagerWithoutPidFile) {
 #ifdef __APPLE__
   install_fake_service_command("launchctl", true);

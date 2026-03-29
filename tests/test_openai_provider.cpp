@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include <nlohmann/json.hpp>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -10,6 +11,11 @@
 #include "quantclaw/providers/openai_provider.hpp"
 
 #include <gtest/gtest.h>
+
+namespace quantclaw::detail {
+std::string json_nullable_string_or_empty(const nlohmann::json& obj,
+                                          std::string_view key);
+}
 
 // Mock OpenAIProvider for testing without actual API calls
 class MockOpenAIProvider : public quantclaw::OpenAIProvider {
@@ -233,4 +239,17 @@ TEST_F(OpenAIProviderTest, ConstructionWithCustomBaseUrl) {
     quantclaw::OpenAIProvider provider("key", "https://custom.api.com/v1", 30,
                                        logger_);
   });
+}
+
+TEST(OpenAIProviderJsonTest, NullableStringReturnsEmptyForNull) {
+  nlohmann::json j = {{"finish_reason", nullptr}};
+  EXPECT_EQ(
+      quantclaw::detail::json_nullable_string_or_empty(j, "finish_reason"), "");
+}
+
+TEST(OpenAIProviderJsonTest, NullableStringReturnsValueForString) {
+  nlohmann::json j = {{"finish_reason", "stop"}};
+  EXPECT_EQ(
+      quantclaw::detail::json_nullable_string_or_empty(j, "finish_reason"),
+      "stop");
 }
