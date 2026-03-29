@@ -50,22 +50,26 @@ mkdir build && cd build
 
 # Configure and build
 cmake ..
-make -j$(nproc)
+cmake --build . --parallel
 
 # Verify the build
 ./quantclaw_tests
 
 # Install (optional)
-sudo make install
+sudo cmake --install .
 ```
 
 ### Method 3: Install Script
 
 ```bash
-sudo bash scripts/install.sh
+# macOS / per-user install
+bash scripts/install.sh --user
+
+# Linux / system-wide install
+sudo bash scripts/install.sh --system
 ```
 
-The script auto-detects your OS, installs dependencies, builds from source, and creates your workspace.
+The install script auto-detects your OS, installs dependencies, builds from source, runs onboarding, and installs the background service definition. On macOS, the default install target is `~/.quantclaw/bin`.
 
 ## Initial Setup
 
@@ -82,8 +86,8 @@ quantclaw onboard --quick
 The wizard will:
 - Create `~/.quantclaw/quantclaw.json` (configuration)
 - Create `~/.quantclaw/agents/main/workspace/` with all 8 workspace files
-- Prompt for your LLM provider and API key
-- Optionally install as a system daemon
+- Generate a gateway auth token and default configuration
+- Optionally install as a background service (`systemd --user` on Linux, `launchd` on macOS)
 
 ## Your First Session
 
@@ -91,9 +95,9 @@ The wizard will:
 
 ```bash
 # Run in foreground
-quantclaw gateway
+quantclaw gateway run
 
-# Or install and start as a background service
+# Or install and start the background service
 quantclaw gateway install
 quantclaw gateway start
 ```
@@ -216,7 +220,7 @@ sudo apt install build-essential cmake libssl-dev \
 # Rebuild with verbose output
 cd build
 cmake .. -DCMAKE_VERBOSE_MAKEFILE=ON
-make -j$(nproc)
+cmake --build . --parallel
 ```
 
 ### Gateway Won't Start

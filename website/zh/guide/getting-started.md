@@ -30,22 +30,26 @@ sudo apt install build-essential cmake libssl-dev \
 # 编译
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
+cmake --build . --parallel
 
 # 验证编译
 ./quantclaw_tests
 
 # 安装（可选）
-sudo make install
+sudo cmake --install .
 ```
 
 ### 方式二：一键安装脚本
 
 ```bash
-sudo bash scripts/install.sh
+# macOS / 当前用户安装
+bash scripts/install.sh --user
+
+# Linux / 系统级安装
+sudo bash scripts/install.sh --system
 ```
 
-脚本会自动检测系统（Ubuntu/Debian/Fedora/Arch），安装依赖、编译源码并创建工作空间。
+安装脚本会自动检测系统、安装依赖、编译源码、执行 onboarding，并安装后台服务定义。macOS 默认安装到 `~/.quantclaw/bin`。
 
 ### 方式三：Docker
 
@@ -74,8 +78,8 @@ quantclaw onboard --quick
 向导会：
 - 创建 `~/.quantclaw/quantclaw.json`（配置文件）
 - 创建 `~/.quantclaw/agents/main/workspace/`（含全部 8 个工作空间文件）
-- 引导填写 LLM Provider 和 API Key
-- 可选安装为系统守护进程
+- 生成网关认证 token 和默认配置
+- 可选安装后台服务（Linux: `systemd --user`，macOS: `launchd`）
 
 ## 第一次对话
 
@@ -83,9 +87,9 @@ quantclaw onboard --quick
 
 ```bash
 # 前台运行
-quantclaw gateway
+quantclaw gateway run
 
-# 或安装为后台服务
+# 或安装并启动后台服务
 quantclaw gateway install
 quantclaw gateway start
 ```
@@ -202,7 +206,7 @@ sudo apt install build-essential cmake libssl-dev \
 # 查看详细错误
 cd build
 cmake .. -DCMAKE_VERBOSE_MAKEFILE=ON
-make -j$(nproc)
+cmake --build . --parallel
 ```
 
 ### 网关无法启动

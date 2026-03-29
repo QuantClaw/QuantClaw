@@ -73,21 +73,21 @@ quantclaw gateway
 ```
 
 #### gateway install
-安装为系统服务（Linux: systemd，macOS: launchd）。
+安装后台服务定义（Linux: `systemd --user`，macOS: `launchd` 用户代理）。
 
 ```bash
 quantclaw gateway install
 ```
 
 #### gateway uninstall
-卸载系统服务。
+卸载后台服务定义。
 
 ```bash
 quantclaw gateway uninstall
 ```
 
 #### gateway start / stop / restart
-控制后台 Daemon。
+控制后台服务。
 
 ```bash
 quantclaw gateway start
@@ -96,7 +96,7 @@ quantclaw gateway restart
 ```
 
 #### gateway status
-查看 Daemon 是否正在运行。
+查看后台服务是否正在运行。
 
 ```bash
 quantclaw gateway status
@@ -242,13 +242,13 @@ quantclaw onboard [OPTIONS]
 
 **选项：**
 - `--quick` — 快速设置（无交互）
-- `--install-daemon` — 同时安装网关为系统服务
+- `--install-daemon` — 同时安装网关后台服务定义
 
 **示例：**
 ```bash
 quantclaw onboard                     # 交互式
 quantclaw onboard --quick             # 无交互
-quantclaw onboard --install-daemon    # 交互式 + 安装 Daemon
+quantclaw onboard --install-daemon    # 交互式 + 安装后台服务
 ```
 
 ## 对话内消息指令
@@ -286,7 +286,8 @@ quantclaw onboard --install-daemon    # 交互式 + 安装 Daemon
 # 1. 初始化
 quantclaw onboard --quick
 
-# 2. 后台启动网关
+# 2. 安装并启动后台服务
+quantclaw gateway install
 quantclaw gateway start
 
 # 3. 发送消息

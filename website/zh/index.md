@@ -102,7 +102,7 @@ features:
 ### 插件生态
 - 24 种生命周期 Hook 类型（void/modifying/sync）
 - 自定义工具、服务、Provider、命令、HTTP 路由、网关方法
-- TCP loopback IPC——Linux 和 Windows 完全一致
+- TCP loopback IPC——Linux、macOS 和 Windows 完全一致
 
 ## 快速上手
 
@@ -110,15 +110,15 @@ features:
 # 克隆并编译
 git clone https://github.com/QuantClaw/QuantClaw.git
 cd QuantClaw
-mkdir build && cd build
-cmake .. && make -j$(nproc)
+./scripts/build.sh
 
 # 初始化
-quantclaw onboard --quick
+./build/quantclaw onboard --quick
 
-# 启动网关并对话
-quantclaw gateway start
-quantclaw agent "你好，介绍一下你自己"
+# 安装后台服务并对话
+./build/quantclaw gateway install
+./build/quantclaw gateway start
+./build/quantclaw agent "你好，介绍一下你自己"
 ```
 
 详细说明请参阅[快速开始指南](/zh/guide/getting-started)。

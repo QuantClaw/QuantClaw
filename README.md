@@ -12,8 +12,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml"><img src="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus&logoColor=white" alt="C++17">
-  <img src="https://img.shields.io/badge/tests-996%20passing-brightgreen.svg" alt="996 tests passing">
-  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey.svg" alt="Linux | Windows">
+  <img src="https://img.shields.io/badge/tests-1009%20passing-brightgreen.svg" alt="1009 tests passing">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Linux | macOS | Windows">
   <a href="https://github.com/openclaw/openclaw"><img src="https://img.shields.io/badge/OpenClaw-compatible-orange.svg" alt="OpenClaw Compatible"></a>
 </p>
 
@@ -62,13 +62,13 @@ git clone https://github.com/QuantClaw/QuantClaw.git
 cd QuantClaw
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
+cmake --build . --parallel
 
 # Run tests
 ./quantclaw_tests
 
 # Install (optional)
-sudo make install
+sudo cmake --install .
 ```
 
 ### 2. Run Onboarding Wizard
@@ -77,7 +77,7 @@ sudo make install
 # Interactive setup wizard (recommended)
 quantclaw onboard
 
-# Or with automatic daemon installation
+# Or with automatic background service installation
 quantclaw onboard --install-daemon
 
 # Or quick setup without prompts
@@ -87,7 +87,7 @@ quantclaw onboard --quick
 The onboarding wizard guides you through:
 - Configuration setup (gateway port, AI model, etc.)
 - Workspace creation (SOUL.md, skills directory, etc.)
-- Optional daemon installation as system service
+- Optional background service installation (`systemd --user` on Linux, `launchd` on macOS)
 - Skills initialization
 - Setup verification
 
@@ -262,7 +262,7 @@ QuantClaw enforces automatic log cleanup on every gateway startup to prevent dis
 | Retention period | `system.logRetentionDays` | `7` | Delete `.log` files older than N days. Set to `0` to keep forever. |
 | Total size cap | `system.logMaxSizeMb` | `50` | Maximum total log storage in MiB, split across 5 rotating files (~10 MiB each). |
 
-Log files are stored at `~/.quantclaw/logs/`. The main application log (`quantclaw.log`) is size-rotated automatically by spdlog; the gateway service log (`gateway.log`, written by systemd) is time-pruned at every startup.
+Log files are stored at `~/.quantclaw/logs/`. The main application log (`quantclaw.log`) is size-rotated automatically by spdlog; the gateway service log (`gateway.log`, written via the platform service manager on Linux/macOS) is time-pruned at every startup.
 
 ### Dependencies
 
@@ -295,7 +295,7 @@ The easiest way to get started is the interactive onboarding wizard:
 # Run the full wizard
 quantclaw onboard
 
-# Install daemon automatically
+# Install the background service automatically
 quantclaw onboard --install-daemon
 
 # Quick setup (non-interactive)
@@ -306,7 +306,7 @@ The wizard creates:
 - Configuration file (`~/.quantclaw/quantclaw.json`)
 - Workspace directory (`~/.quantclaw/agents/main/workspace/`)
 - SOUL.md (agent identity file)
-- Optional systemd service for daemon mode
+- Optional per-user background service definition (`systemd --user` on Linux, `launchd` on macOS)
 
 ### Gateway (background service)
 
@@ -314,13 +314,13 @@ The wizard creates:
 # Run gateway in foreground
 quantclaw gateway
 
-# Install as system service (systemd / launchd)
+# Install the background service definition (systemd --user / launchd)
 quantclaw gateway install
 
 # Uninstall the service
 quantclaw gateway uninstall
 
-# Start / stop / restart daemon
+# Start / stop / restart the background service
 quantclaw gateway start
 quantclaw gateway stop
 quantclaw gateway restart
@@ -667,9 +667,9 @@ All helper scripts are in `scripts/`. Run them from the **repository root**.
 
 | Script | Description |
 |--------|-------------|
-| `scripts/build.sh` | Smart build wrapper: color output, `-c` clean, `--debug`, `--tests`, `--asan`/`--tsan`/`--ubsan` sanitizers, CPU auto-detect, missing-dep auto-install. |
+| `scripts/build.sh` | Smart build wrapper: color output, `-c` clean, `--debug`, `--tests`, `--asan`/`--tsan`/`--ubsan` sanitizers, CPU auto-detect, and platform-aware dependency setup including Homebrew support on macOS. |
 | `scripts/release.sh` | Build release tarball + SHA256 checksum. Reads version from `scripts/DOCKER_VERSION` or accepts an explicit version argument. Output goes to `dist/`. |
-| `scripts/install.sh` | Native install: detects OS, installs system deps, builds from source, creates workspace. Run as root: `sudo bash scripts/install.sh` |
+| `scripts/install.sh` | Native installer: `--user` installs to `~/.quantclaw/bin` (default on macOS), `--system` installs to `/usr/local/bin` (default on Linux), then runs onboarding and installs the background service definition. |
 | `scripts/format-code.sh` | Format all C++ sources with `clang-format`. Pass `--check` for a dry-run (used in CI). |
 | `scripts/format-code-docker.sh` | Same as above but runs inside Docker — no local `clang-format` required. |
 | `scripts/build_ui.sh` | Build the web Dashboard UI assets. |
@@ -755,7 +755,7 @@ Plugins use `openclaw.plugin.json` or `quantclaw.plugin.json` manifests, compati
 
 ### IPC Protocol (C++ Main Process ↔ Node.js Sidecar)
 
-The IPC between the C++ host and the sidecar uses **TCP loopback**, which works identically on Linux and Windows:
+The IPC between the C++ host and the sidecar uses **TCP loopback**, which works identically on Linux, macOS, and Windows:
 
 **Connection setup**:
 1. The C++ host binds to `127.0.0.1:0` — the OS assigns a free port.
@@ -822,13 +822,13 @@ QuantClaw aims for full compatibility with [OpenClaw](https://github.com/opencla
 |---------|-------------|
 | `chain` meta-tool | Declarative multi-step tool pipeline with `{{prev.result}}` templates |
 | `read`/`write`/`edit` tools | Dedicated file operation tools with sandbox validation |
-| Cross-platform TCP IPC | Unified Linux/Windows sidecar communication (no Unix sockets) |
+| Cross-platform TCP IPC | Unified Linux/macOS/Windows sidecar communication (no Unix sockets) |
 | C++ resource limits | `setrlimit` sandbox (CPU/memory/fsize/nproc) |
 | `viewer` RBAC role | Dedicated read-only role |
 
 ## Roadmap
 
-Currently implemented: WebSocket/HTTP gateway, multi-provider LLM with failover, session persistence, plugin ecosystem (24 hook types, sidecar TCP IPC), channel subprocess adapters, MCP tools + resources + prompts, onboarding wizard (all 7 workspace files), JSON5 config, `${VAR}` env substitution, dynamic agent iterations (32–160), budget-based context management, subagent spawning, RBAC + exec approval sandbox, real browser CDP (WebSocket), `thinking_level_change` / `custom_message` JSONL entry types, `run` + `eval` + `plugins` CLI commands — **886 passing tests** (886 C++).
+Currently implemented: WebSocket/HTTP gateway, multi-provider LLM with failover, session persistence, plugin ecosystem (24 hook types, sidecar TCP IPC), channel subprocess adapters, MCP tools + resources + prompts, onboarding wizard (all 8 workspace files), JSON5 config, `${VAR}` env substitution, dynamic agent iterations (32–160), budget-based context management, subagent spawning, RBAC + exec approval sandbox, real browser CDP (WebSocket), `thinking_level_change` / `custom_message` JSONL entry types, `run` + `eval` + `plugins` CLI commands — **1009 passing tests** (1009 C++).
 
 Not yet implemented:
 - TUI interactive mode

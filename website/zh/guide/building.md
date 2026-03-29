@@ -28,11 +28,8 @@ sudo apt-get install -y \
 ### macOS
 
 ```bash
-# Homebrew
-brew install cmake openssl nlohmann-json spdlog
-
-# 或 MacPorts
-sudo port install cmake openssl nlohmann_json spdlog
+# 受支持的 macOS 构建流依赖这些 Homebrew 包
+brew install cmake ninja pkg-config git spdlog openssl@3 curl node
 ```
 
 ### Windows（MSVC）
@@ -62,16 +59,18 @@ mkdir build && cd build
 
 # 标准构建
 cmake ..
-make -j$(nproc)
+cmake --build . --parallel
 
 # Debug 构建
 cmake .. -DCMAKE_BUILD_TYPE=Debug
-make -j$(nproc)
+cmake --build . --parallel
 
 # 指定编译器
 cmake .. -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-make -j$(nproc)
+cmake --build . --parallel
 ```
+
+> 在 macOS 上更推荐 `./scripts/build.sh`。它会自动补齐缺失的 Homebrew 依赖，并把 OpenSSL / curl 的 Homebrew 前缀传给 CMake。
 
 ### 使用 build.sh（推荐）
 
@@ -159,7 +158,7 @@ docker build -f scripts/Dockerfile.dev -t quantclaw-dev:$VERSION .
 sudo cmake --install build/
 
 # 或从 build 目录
-cd build && sudo make install
+cd build && sudo cmake --install .
 ```
 
 ## 代码格式化
@@ -180,7 +179,7 @@ cd build && sudo make install
 CI 配置位于 `.github/workflows/github-actions.yml`，在每次 PR 时自动运行：
 
 - C++ 代码格式检查（clang-format）
-- 完整 C++ 测试套件（886 项测试）
+- 完整 C++ 测试套件（1009 项测试）
 - Sidecar TypeScript 测试
 
 ## 故障排除
@@ -198,7 +197,8 @@ cmake .. -DCMAKE_VERBOSE_MAKEFILE=ON
 sudo apt-get install libssl-dev
 
 # macOS
-cmake .. -DOPENSSL_DIR=$(brew --prefix openssl)
+brew install openssl@3 curl
+cmake .. -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
 ```
 
 ### 编译器版本过低

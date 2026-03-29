@@ -65,7 +65,7 @@ git remote add upstream https://github.com/QuantClaw/quantclaw.git
 # Install dependencies (see Building Guide)
 mkdir build && cd build
 cmake ..
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 
 # Run tests
 ./quantclaw_tests

@@ -221,11 +221,11 @@ quantclaw gateway              # 前台运行网关
 quantclaw agent "你好！"       # 发送消息
 ```
 
-### 网关 Daemon
+### 网关后台服务
 
 ```bash
-quantclaw gateway install      # 安装为系统服务
-quantclaw gateway start        # 启动
+quantclaw gateway install      # 安装每用户后台服务
+quantclaw gateway start        # 启动后台服务
 quantclaw agent "你好！"       # 通过网关连接
 ```
 

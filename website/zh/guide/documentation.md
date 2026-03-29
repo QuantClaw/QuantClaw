@@ -67,7 +67,7 @@ QuantClaw 完整文档导航。
 
 ```bash
 quantclaw onboard --quick       # 初始化
-quantclaw gateway start         # 后台启动网关
+quantclaw gateway run           # 前台启动网关
 quantclaw agent "你好！"        # 发送消息
 quantclaw eval "2+2"           # 一次性查询
 quantclaw sessions list        # 查看会话
