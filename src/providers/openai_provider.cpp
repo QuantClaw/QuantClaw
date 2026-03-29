@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <sstream>
+#include <string_view>
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -14,6 +15,19 @@
 #include "quantclaw/providers/provider_error.hpp"
 
 namespace quantclaw {
+
+namespace detail {
+
+std::string json_nullable_string_or_empty(const nlohmann::json& obj,
+                                          std::string_view key) {
+  auto it = obj.find(std::string(key));
+  if (it == obj.end() || it->is_null()) {
+    return "";
+  }
+  return it->get<std::string>();
+}
+
+}  // namespace detail
 
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb,
                             std::string* userp) {
@@ -160,7 +174,8 @@ OpenAIProvider::ChatCompletion(const ChatCompletionRequest& request) {
     if (choice.contains("message")) {
       auto message = choice["message"];
       if (message.contains("content")) {
-        result.content = message["content"].get<std::string>();
+        result.content =
+            detail::json_nullable_string_or_empty(message, "content");
       }
       if (message.contains("tool_calls")) {
         for (const auto& tc : message["tool_calls"]) {
@@ -178,7 +193,8 @@ OpenAIProvider::ChatCompletion(const ChatCompletionRequest& request) {
       }
     }
     if (choice.contains("finish_reason")) {
-      result.finish_reason = choice["finish_reason"].get<std::string>();
+      result.finish_reason =
+          detail::json_nullable_string_or_empty(choice, "finish_reason");
     }
   }
 
@@ -363,7 +379,8 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
       continue;
     const auto& choice = j["choices"][0];
     const auto& delta = choice.value("delta", nlohmann::json::object());
-    std::string finish_reason = choice.value("finish_reason", "");
+    std::string finish_reason =
+        detail::json_nullable_string_or_empty(choice, "finish_reason");
 
     // Handle text content delta
     if (delta.contains("content") && !delta["content"].is_null()) {
