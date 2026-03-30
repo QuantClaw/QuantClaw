@@ -8,7 +8,7 @@ Detailed installation instructions for different platforms and use cases.
 - **CPU**: 2 cores, 2+ GHz
 - **RAM**: 4 GB
 - **Disk**: 2 GB free space
-- **OS**: Linux (Ubuntu 20.04+), Windows (WSL2), or macOS (10.15+)
+- **OS**: Linux (Ubuntu 20.04+), Windows (native or WSL2), or macOS 13+ on Apple Silicon
 
 ### Recommended Requirements
 - **CPU**: 4+ cores
@@ -55,7 +55,7 @@ cd quantclaw
 # Build
 mkdir build && cd build
 cmake ..
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 
 # Optional: Install system-wide
 sudo cmake --install .
@@ -93,7 +93,7 @@ git clone https://github.com/QuantClaw/QuantClaw.git
 cd quantclaw
 mkdir build && cd build
 cmake ..
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 sudo cmake --install .
 ```
 
@@ -108,8 +108,8 @@ git clone https://github.com/QuantClaw/QuantClaw.git
 cd quantclaw
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
-sudo make install
+cmake --build . --parallel
+sudo cmake --install .
 ```
 
 ## Windows Installation
@@ -180,7 +180,64 @@ REM Then configure with toolchain
 cmake .. -DCMAKE_TOOLCHAIN_FILE=C:\path\to\vcpkg\scripts\buildsystems\vcpkg.cmake
 ```
 
-> **Windows compatibility notes:**
+#### Gateway Service Setup (解决权限问题)
+
+Windows 环境下，Gateway 服务启动需要特殊处理：
+
+**方案一：使用计划任务（推荐）**
+
+```powershell
+# 以管理员身份运行 PowerShell
+cd path\to\QuantClaw
+powershell -ExecutionPolicy Bypass -File scripts\gateway-setup-windows.ps1
+```
+
+此脚本会：
+- ✅ 创建计划任务（开机自动启动）
+- ✅ 生成启动辅助脚本
+- ✅ 创建默认配置文件
+- ✅ 设置日志目录
+
+**方案二：手动启动（无需管理员权限）**
+
+```batch
+REM 双击运行或在命令行执行
+scripts\gateway-manual.bat
+
+REM 或直接运行
+build\Release\quantclaw.exe gateway run
+```
+
+**方案三：WSL2 替代方案**
+
+如果遇到 Windows 权限问题，推荐使用 WSL2：
+
+```powershell
+# 安装 WSL2
+wsl --install
+
+# 在 WSL2 中使用 Linux 安装方式
+wsl
+cd ~/QuantClaw
+# ... follow Linux build steps
+```
+
+#### 常见问题
+
+**Q: `gateway install` 命令失败？**
+
+A: Windows 上的 `gateway install` 当前仅创建后台进程，不会自动创建计划任务。请使用上述方案一或方案二。
+
+**Q: 端口被占用？**
+
+A: 修改配置文件 `~\.quantclaw\quantclaw.json` 中的 `gateway.port` 值。
+
+**Q: 杀毒软件拦截？**
+
+A: 将 `quantclaw.exe` 添加到杀毒软件白名单。
+
+#### Windows Compatibility Notes
+
 > - `NOMINMAX` is defined automatically to prevent conflicts between Windows API macros and C++ `std::min`/`std::max`.
 > - `bcrypt` is linked automatically to satisfy Windows crypto/TLS library dependencies (for example, mbedtls).
 > - `HTTPLIB_REQUIRE_ZLIB` is explicitly set to `OFF` when ZLIB is not present, preventing stale CMake cache issues on minimal environments.
@@ -207,37 +264,47 @@ docker stop quantclaw
 
 ## macOS Installation
 
-### Using Homebrew (if tap available)
+### Recommended: install script
+
 ```bash
-brew tap quantclaw/quantclaw
-brew install quantclaw
+git clone https://github.com/QuantClaw/QuantClaw.git
+cd QuantClaw
+bash scripts/install.sh --user
 ```
 
-### Build from Source
+This installs `quantclaw` into `~/.quantclaw/bin`, runs `onboard --quick`, and writes the launchd service definition to `~/Library/LaunchAgents/com.quantclaw.gateway.plist`.
+
+### Build from Source (manual)
 
 #### Install Dependencies
 ```bash
-# Using Homebrew
-brew install cmake openssl nlohmann-json spdlog
-
-# Or using MacPorts
-sudo port install cmake openssl nlohmann_json spdlog
+# Homebrew packages used by the supported build script
+brew install cmake ninja pkg-config git spdlog openssl@3 curl node
 ```
 
 #### Build
 ```bash
 git clone https://github.com/QuantClaw/QuantClaw.git
-cd quantclaw
+cd QuantClaw
 
-mkdir build && cd build
-cmake -DOPENSSL_DIR=$(brew --prefix openssl) ..
-cmake --build . -j $(sysctl -n hw.ncpu)
+# Recommended scripted build
+./scripts/build.sh --tests
 
 # Run tests
-./quantclaw_tests
+ctest --test-dir build --output-on-failure
 
-# Install
-sudo cmake --install .
+# Optional: install the background service definition
+./build/quantclaw gateway install
+```
+
+If you prefer manual CMake configuration on macOS, pass the Homebrew prefixes explicitly:
+
+```bash
+brew install openssl@3 curl
+cmake -B build -G Ninja \
+  -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
+  -DCURL_ROOT="$(brew --prefix curl)"
+cmake --build build --parallel
 ```
 
 ## Post-Installation Setup
@@ -252,11 +319,7 @@ quantclaw onboard
 quantclaw onboard --quick
 ```
 
-During setup, you'll configure:
-- **API Keys**: LLM provider credentials
-- **Default Model**: Primary LLM model
-- **Workspace**: Location for files and memory
-- **Plugins**: Initial plugin selection
+During setup, QuantClaw creates the config file, workspace, and gateway auth token. Add your provider API keys afterwards by editing `~/.quantclaw/quantclaw.json`.
 
 ### Verify Installation
 
@@ -310,7 +373,7 @@ quantclaw --version
 cd quantclaw
 git pull origin main
 cd build
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 sudo cmake --install .
 ```
 

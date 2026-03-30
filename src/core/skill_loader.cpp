@@ -14,6 +14,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "quantclaw/platform/process.hpp"
+
 namespace quantclaw {
 
 SkillLoader::SkillLoader(std::shared_ptr<spdlog::logger> logger)
@@ -103,10 +105,7 @@ bool SkillLoader::CheckSkillGating(const SkillMetadata& skill) {
   for (const auto& config_file : skill.config_files) {
     std::string expanded = config_file;
     if (expanded.size() >= 2 && expanded.substr(0, 2) == "~/") {
-      const char* home = std::getenv("HOME");
-      if (home) {
-        expanded = std::string(home) + expanded.substr(1);
-      }
+      expanded = platform::home_directory() + expanded.substr(1);
     }
     if (!std::filesystem::exists(expanded)) {
       logger_->debug("Skill gating failed: config '{}' not found", config_file);
@@ -199,9 +198,7 @@ bool SkillLoader::InstallSkill(const SkillMetadata& skill) {
     } else if (eff_method == "brew") {
       cmd = "brew install " + eff_formula;
     } else if (eff_method == "download") {
-      const char* home = std::getenv("HOME");
-      std::string bin_dir =
-          std::string(home ? home : "/tmp") + "/.quantclaw/bin";
+      std::string bin_dir = platform::home_directory() + "/.quantclaw/bin";
       std::filesystem::create_directories(bin_dir);
       std::string dest =
           bin_dir + "/" + (eff_binary.empty() ? "downloaded" : eff_binary);
@@ -748,11 +745,7 @@ SkillLoader::LoadSkills(const SkillsConfig& skills_config,
   std::vector<std::filesystem::path> dirs;
   dirs.push_back(workspace_path / "skills");
 
-  std::string home_str;
-  const char* home = std::getenv("HOME");
-  if (home)
-    home_str = home;
-  dirs.push_back(std::filesystem::path(home_str.empty() ? "/tmp" : home_str) /
+  dirs.push_back(std::filesystem::path(platform::home_directory()) /
                  ".quantclaw" / "skills");
 
   for (const auto& extra : skills_config.load.extra_dirs) {

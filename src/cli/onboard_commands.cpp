@@ -14,6 +14,7 @@
 #include "quantclaw/builtin_skills.hpp"
 #include "quantclaw/config.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
+#include "quantclaw/platform/process.hpp"
 #include "quantclaw/platform/service.hpp"
 
 namespace quantclaw::cli {
@@ -75,7 +76,7 @@ int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
   PrintStep(3, 5, "Daemon Setup");
   if (!skip_daemon) {
     if (install_daemon ||
-        PromptYesNo("Install QuantClaw as user service (systemd)?", true)) {
+        PromptYesNo("Install QuantClaw as a background service?", true)) {
       if (SetupDaemon() != 0) {
         logger_->warn("Daemon setup failed, continuing");
       }
@@ -123,7 +124,7 @@ int OnboardCommands::InstallDaemonCommand(
       return 1;
   }
 
-  std::cout << "Installing QuantClaw as user service..." << std::endl;
+  std::cout << "Installing QuantClaw background service..." << std::endl;
   if (InstallDaemon(port)) {
     std::cout << "✓ Daemon installed successfully" << std::endl;
     std::cout << "\nManage the service:" << std::endl;
@@ -334,8 +335,7 @@ int OnboardCommands::SetupDaemon() {
       port = cfg.gateway.port;
   } catch (...) {}
 
-  std::cout << "\nSetting up QuantClaw as a user service (systemd --user)..."
-            << std::endl;
+  std::cout << "\nSetting up QuantClaw as a background service..." << std::endl;
 
   if (InstallDaemon(port)) {
     std::cout << "✓ Daemon installed successfully" << std::endl;
@@ -357,8 +357,7 @@ int OnboardCommands::SetupDaemon() {
 // Returns 0 if at least one skill was installed or all were already present,
 // 1 if every skill installation attempt failed.
 int OnboardCommands::SetupSkills() {
-  const char* home = std::getenv("HOME");
-  std::string home_str = home ? home : "/tmp";
+  std::string home_str = quantclaw::platform::home_directory();
   auto skills_dir = std::filesystem::path(home_str) / ".quantclaw" / "skills";
 
   try {
@@ -417,8 +416,7 @@ int OnboardCommands::SetupSkills() {
 int OnboardCommands::VerifySetup() {
   std::cout << "\nVerifying setup..." << std::endl;
 
-  const char* home = std::getenv("HOME");
-  std::string home_str = home ? home : "/tmp";
+  std::string home_str = quantclaw::platform::home_directory();
 
   // Check config
   std::string config_path = QuantClawConfig::DefaultConfigPath();
@@ -483,8 +481,7 @@ int OnboardCommands::VerifySetup() {
 }
 
 bool OnboardCommands::CreateWorkspaceDirectory() {
-  const char* home = std::getenv("HOME");
-  std::string home_str = home ? home : "/tmp";
+  std::string home_str = quantclaw::platform::home_directory();
 
   try {
     // QuantClaw agent ID: main
@@ -602,8 +599,7 @@ bool OnboardCommands::CreateConfigFile(const std::string& model, int port,
 
 bool OnboardCommands::CreateWorkspaceFile(const std::string& filename,
                                           const std::string& content) {
-  const char* home = std::getenv("HOME");
-  std::string home_str = home ? home : "/tmp";
+  std::string home_str = quantclaw::platform::home_directory();
   auto path = std::filesystem::path(home_str) /
               ".quantclaw/agents/main/workspace" / filename;
 

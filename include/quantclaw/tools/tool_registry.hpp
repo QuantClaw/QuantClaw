@@ -74,7 +74,7 @@ class ToolRegistry {
   std::unordered_map<std::string, std::shared_ptr<BgSession>> bg_sessions_;
 
   // Workspace root for file-tool path validation
-  std::string workspace_path_ = "~/.quantclaw/workspace";
+  std::string workspace_path_ = "~/.quantclaw/agents/main/workspace";
 
  public:
   explicit ToolRegistry(std::shared_ptr<spdlog::logger> logger);

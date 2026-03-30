@@ -6,15 +6,14 @@
 #include <algorithm>
 #include <fstream>
 
+#include "quantclaw/platform/process.hpp"
+
 namespace quantclaw {
 
 namespace {
 
 std::filesystem::path get_quantclaw_home() {
-  const char* home = std::getenv("HOME");
-  if (!home)
-    return "/tmp/.quantclaw";
-  return std::filesystem::path(home) / ".quantclaw";
+  return std::filesystem::path(platform::home_directory()) / ".quantclaw";
 }
 
 // Bundled plugins enabled by default (matching OpenClaw)

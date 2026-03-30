@@ -3,7 +3,10 @@
 
 #include "quantclaw/providers/openai_provider.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <sstream>
+#include <string_view>
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -12,6 +15,19 @@
 #include "quantclaw/providers/provider_error.hpp"
 
 namespace quantclaw {
+
+namespace detail {
+
+std::string json_nullable_string_or_empty(const nlohmann::json& obj,
+                                          std::string_view key) {
+  auto it = obj.find(std::string(key));
+  if (it == obj.end() || it->is_null()) {
+    return "";
+  }
+  return it->get<std::string>();
+}
+
+}  // namespace detail
 
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb,
                             std::string* userp) {
@@ -158,7 +174,8 @@ OpenAIProvider::ChatCompletion(const ChatCompletionRequest& request) {
     if (choice.contains("message")) {
       auto message = choice["message"];
       if (message.contains("content")) {
-        result.content = message["content"].get<std::string>();
+        result.content =
+            detail::json_nullable_string_or_empty(message, "content");
       }
       if (message.contains("tool_calls")) {
         for (const auto& tc : message["tool_calls"]) {
@@ -176,7 +193,8 @@ OpenAIProvider::ChatCompletion(const ChatCompletionRequest& request) {
       }
     }
     if (choice.contains("finish_reason")) {
-      result.finish_reason = choice["finish_reason"].get<std::string>();
+      result.finish_reason =
+          detail::json_nullable_string_or_empty(choice, "finish_reason");
     }
   }
 
@@ -271,6 +289,49 @@ struct StreamContext {
   std::vector<PendingToolCall> pending_tool_calls;
 };
 
+static bool HasNonWhitespace(const std::string& value) {
+  return std::any_of(value.begin(), value.end(),
+                     [](unsigned char ch) { return !std::isspace(ch); });
+}
+
+static std::vector<ToolCall> TakeCompleteToolCalls(StreamContext* ctx,
+                                                   bool drop_incomplete) {
+  std::vector<ToolCall> complete;
+  std::vector<StreamContext::PendingToolCall> remaining;
+
+  for (const auto& pending : ctx->pending_tool_calls) {
+    nlohmann::json parsed_arguments = nlohmann::json::object();
+    bool invalid_arguments = false;
+    if (HasNonWhitespace(pending.arguments)) {
+      parsed_arguments =
+          nlohmann::json::parse(pending.arguments, nullptr, false);
+      invalid_arguments = parsed_arguments.is_discarded();
+    }
+
+    if (pending.id.empty() || !HasNonWhitespace(pending.name) ||
+        invalid_arguments) {
+      if (!drop_incomplete) {
+        remaining.push_back(pending);
+      } else if (ctx->logger) {
+        ctx->logger->warn(
+            "Dropping incomplete streamed tool call: id='{}', name='{}', "
+            "arguments_len={}",
+            pending.id, pending.name, pending.arguments.size());
+      }
+      continue;
+    }
+
+    ToolCall tc;
+    tc.id = pending.id;
+    tc.name = pending.name;
+    tc.arguments = std::move(parsed_arguments);
+    complete.push_back(std::move(tc));
+  }
+
+  ctx->pending_tool_calls = std::move(remaining);
+  return complete;
+}
+
 static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
                                   void* userp) {
   auto* ctx = static_cast<StreamContext*>(userp);
@@ -298,20 +359,13 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
     if (data == "[DONE]") {
       // Emit any accumulated tool calls before stream end
       if (!ctx->pending_tool_calls.empty()) {
+        auto complete = TakeCompleteToolCalls(ctx, true);
         ChatCompletionResponse tc_resp;
         tc_resp.finish_reason = "tool_calls";
-        for (const auto& ptc : ctx->pending_tool_calls) {
-          ToolCall tc;
-          tc.id = ptc.id;
-          tc.name = ptc.name;
-          tc.arguments = nlohmann::json::parse(ptc.arguments, nullptr, false);
-          if (tc.arguments.is_discarded()) {
-            tc.arguments = nlohmann::json::object();
-          }
-          tc_resp.tool_calls.push_back(tc);
+        tc_resp.tool_calls = std::move(complete);
+        if (!tc_resp.tool_calls.empty()) {
+          ctx->callback(tc_resp);
         }
-        ctx->pending_tool_calls.clear();
-        ctx->callback(tc_resp);
       }
 
       ChatCompletionResponse end_resp;
@@ -328,7 +382,8 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
       continue;
     const auto& choice = j["choices"][0];
     const auto& delta = choice.value("delta", nlohmann::json::object());
-    std::string finish_reason = choice.value("finish_reason", "");
+    std::string finish_reason =
+        detail::json_nullable_string_or_empty(choice, "finish_reason");
 
     // Handle text content delta
     if (delta.contains("content") && !delta["content"].is_null()) {
@@ -365,20 +420,13 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
 
     // If finish_reason is "tool_calls", emit accumulated tool calls now
     if (finish_reason == "tool_calls" && !ctx->pending_tool_calls.empty()) {
+      auto complete = TakeCompleteToolCalls(ctx, false);
       ChatCompletionResponse tc_resp;
       tc_resp.finish_reason = "tool_calls";
-      for (const auto& ptc : ctx->pending_tool_calls) {
-        ToolCall tc;
-        tc.id = ptc.id;
-        tc.name = ptc.name;
-        tc.arguments = nlohmann::json::parse(ptc.arguments, nullptr, false);
-        if (tc.arguments.is_discarded()) {
-          tc.arguments = nlohmann::json::object();
-        }
-        tc_resp.tool_calls.push_back(tc);
+      tc_resp.tool_calls = std::move(complete);
+      if (!tc_resp.tool_calls.empty()) {
+        ctx->callback(tc_resp);
       }
-      ctx->pending_tool_calls.clear();
-      ctx->callback(tc_resp);
     }
   }
 

@@ -143,6 +143,7 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   auto tool_registry = std::make_shared<quantclaw::ToolRegistry>(logger_);
   tool_registry->RegisterBuiltinTools();
   tool_registry->RegisterChainTool();
+  tool_registry->SetWorkspace(workspace_dir.string());
 
   // Discover and register MCP tools
   auto mcp_tool_manager =
@@ -566,7 +567,7 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
 }
 
 int GatewayCommands::InstallCommand(const std::vector<std::string>& args) {
-  int port = kLegacyGatewayPort;
+  int port = kDefaultGatewayPort;
   for (size_t i = 0; i < args.size(); ++i) {
     const auto& arg = args[i];
     if (arg == "--port" && i + 1 < args.size()) {
@@ -622,7 +623,9 @@ int GatewayCommands::CallCommand(const std::vector<std::string>& args) {
 }
 
 int GatewayCommands::StartCommand(const std::vector<std::string>& /*args*/) {
-  logger_->info("Note: 'gateway start' attempts to start a systemd service.");
+  logger_->info(
+      "Note: 'gateway start' uses the platform service manager when "
+      "installed.");
   logger_->info("For foreground mode, use: quantclaw gateway run");
   gateway::DaemonManager daemon(logger_);
   return daemon.Start();

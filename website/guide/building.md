@@ -27,11 +27,8 @@ sudo apt-get install -y \
 ### macOS
 
 ```bash
-# Homebrew
-brew install cmake openssl nlohmann-json spdlog
-
-# Or MacPorts
-sudo port install cmake openssl nlohmann_json spdlog
+# Homebrew packages used by the supported macOS build flow
+brew install cmake ninja pkg-config git spdlog openssl@3 curl node
 ```
 
 ### Windows (MSVC)
@@ -64,11 +61,13 @@ mkdir build && cd build
 cmake ..
 
 # Build (use multiple cores for speed)
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 
 # Optional: Install system-wide
 sudo cmake --install .
 ```
+
+> On macOS, prefer `./scripts/build.sh`. It installs missing Homebrew packages automatically and wires the Homebrew OpenSSL/curl prefixes into CMake.
 
 ### Windows (Command Prompt)
 
@@ -133,15 +132,17 @@ cmake -DCMAKE_BUILD_TYPE=Debug ..
 # Disable tests
 cmake -DBUILD_TESTS=OFF ..
 
-# Disable sidecar (Node.js plugin system)
-cmake -DWITH_SIDECAR=OFF ..
+# Enable AddressSanitizer
+cmake -DENABLE_ASAN=ON -DCMAKE_BUILD_TYPE=Debug ..
 
-# Enable TLS support
-cmake -DWITH_TLS=ON ..
+# Enable ThreadSanitizer
+cmake -DENABLE_TSAN=ON -DCMAKE_BUILD_TYPE=Debug ..
 
-# Enable Avro serialization
-cmake -WITH_AVRO=ON ..
+# Enable UndefinedBehaviorSanitizer
+cmake -DENABLE_UBSAN=ON -DCMAKE_BUILD_TYPE=Debug ..
 ```
+
+`ENABLE_ASAN` and `ENABLE_TSAN` are mutually exclusive.
 
 ### Compiler-Specific Options
 
@@ -173,14 +174,14 @@ cmake --install .
 ### Enable Sanitizers (for debugging)
 
 ```bash
-# Memory sanitizer
-cmake -DCMAKE_CXX_FLAGS="-fsanitize=address" ..
+# AddressSanitizer
+cmake -DENABLE_ASAN=ON -DCMAKE_BUILD_TYPE=Debug ..
 
-# Thread sanitizer
-cmake -DCMAKE_CXX_FLAGS="-fsanitize=thread" ..
+# ThreadSanitizer
+cmake -DENABLE_TSAN=ON -DCMAKE_BUILD_TYPE=Debug ..
 
-# Undefined behavior sanitizer
-cmake -DCMAKE_CXX_FLAGS="-fsanitize=undefined" ..
+# UndefinedBehaviorSanitizer
+cmake -DENABLE_UBSAN=ON -DCMAKE_BUILD_TYPE=Debug ..
 ```
 
 ### Optimize for Size
@@ -224,15 +225,16 @@ Install system dependencies:
 # Ubuntu
 sudo apt-get install libssl-dev nlohmann-json3-dev libspdlog-dev
 
-# Then configure with system packages
-cmake -DUSE_SYSTEM_LIBS=ON ..
+# Then configure normally
+cmake ..
 ```
 
 ### Custom Dependency Paths
 
 ```bash
-cmake -DOPENSSL_DIR=/path/to/openssl \
-      -DNLOHMANN_JSON_DIR=/path/to/nlohmann-json ..
+brew install openssl@3 curl
+cmake -DOPENSSL_ROOT_DIR=/path/to/openssl \
+  -DCURL_ROOT="$(brew --prefix curl)" ..
 ```
 
 ## Cross-Compilation
@@ -321,8 +323,8 @@ cmake -DCMAKE_CXX_STANDARD=17 ..
 sudo apt-get install libssl-dev
 
 # macOS
-brew install openssl
-cmake -DOPENSSL_DIR=$(brew --prefix openssl) ..
+brew install openssl@3 curl
+cmake -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" ..
 
 # Windows - Download from openssl.org
 ```
@@ -399,25 +401,16 @@ ctest --verbose
 
 ### Coverage Report
 
-```bash
-cmake -DENABLE_COVERAGE=ON ..
-cmake --build .
-ctest
-# Generate coverage report
-```
+QuantClaw does not currently expose a dedicated `ENABLE_COVERAGE` CMake option.
+If you need coverage, configure a separate build directory with your compiler's
+coverage flags and run `ctest` there.
 
 ## Performance Profiling
 
 ### Build with Profiling
 
-```bash
-cmake -DENABLE_PROFILING=ON ..
-cmake --build .
-
-# Run and profile
-perf record ./quantclaw agent
-perf report
-```
+QuantClaw does not currently expose a dedicated `ENABLE_PROFILING` CMake option.
+Use your platform profiler against a normal `Debug` or `RelWithDebInfo` build.
 
 ### Memory Profiling
 
@@ -425,8 +418,7 @@ perf report
 # Valgrind
 valgrind --leak-check=full ./quantclaw agent
 
-# Google Perftools
-cmake -WITH_PERFTOOLS=ON ..
+# Then use your profiler of choice on the resulting binary
 ```
 
 ## Clean Build
@@ -441,7 +433,7 @@ git clean -xfd build/
 # Rebuild from scratch
 mkdir build && cd build
 cmake ..
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 ```
 
 ## Development Workflow
@@ -450,7 +442,7 @@ cmake --build . -j$(nproc)
 
 ```bash
 # After code changes, rebuild only affected files
-cmake --build . -j$(nproc)
+cmake --build . --parallel
 
 # Don't do `make clean` unless necessary
 ```
@@ -492,7 +484,7 @@ If package manager versions are too old:
 ```bash
 wget https://github.com/Kitware/CMake/releases/download/v3.28.0/cmake-3.28.0.tar.gz
 tar xzf cmake-3.28.0.tar.gz && cd cmake-3.28.0
-./bootstrap && make -j$(nproc) && sudo make install
+./bootstrap && make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)" && sudo make install
 ```
 
 ### Install Modern GCC

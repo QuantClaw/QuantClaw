@@ -14,13 +14,15 @@
 namespace quantclaw::gateway {
 
 // Manages the QuantClaw gateway as a platform service.
-// Linux: systemd user service. Windows: background process with PID file.
+// Linux: systemd user service.
+// macOS: launchd user agent.
+// Windows: background process with PID file.
 // Thin wrapper around platform::ServiceManager.
 class DaemonManager {
  public:
   explicit DaemonManager(std::shared_ptr<spdlog::logger> logger);
 
-  int Install(int port = kLegacyGatewayPort);
+  int Install(int port = kDefaultGatewayPort);
   int Uninstall();
   int Start();
   int Stop();

@@ -2,8 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <atomic>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+
+#ifdef _WIN32
+#define test_setenv(name, value) _putenv_s(name, value)
+#define test_unsetenv(name) _putenv_s(name, "")
+#else
+#define test_setenv(name, value) setenv(name, value, 1)
+#define test_unsetenv(name) unsetenv(name)
+#endif
 
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
@@ -181,6 +190,64 @@ TEST_F(PluginRegistryTest, DiscoverEmptyDirectory) {
   quantclaw::QuantClawConfig config;
   reg.Discover(config, test_dir_);
   EXPECT_TRUE(reg.Plugins().empty());
+}
+
+TEST_F(PluginRegistryTest, DiscoverGlobalPluginsFromPlatformHome) {
+  auto test_home = quantclaw::test::MakeTestDir("quantclaw_plugin_home_test");
+  auto get_or_empty = [](const char* name) -> std::string {
+    const char* value = std::getenv(name);
+    return value ? value : "";
+  };
+
+  const std::string orig_home = get_or_empty("HOME");
+#ifdef _WIN32
+  const std::string orig_userprofile = get_or_empty("USERPROFILE");
+  test_unsetenv("HOME");
+  if (test_setenv("USERPROFILE", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set USERPROFILE environment variable";
+  }
+#else
+  if (test_setenv("HOME", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set HOME environment variable";
+  }
+#endif
+
+  auto restore_env = [&]() {
+#ifdef _WIN32
+    if (!orig_userprofile.empty()) {
+      test_setenv("USERPROFILE", orig_userprofile.c_str());
+    } else {
+      test_unsetenv("USERPROFILE");
+    }
+#endif
+    if (!orig_home.empty()) {
+      test_setenv("HOME", orig_home.c_str());
+    } else {
+      test_unsetenv("HOME");
+    }
+  };
+
+  try {
+    auto plugin_dir = test_home / ".quantclaw" / "plugins" / "global-plugin";
+    fs::create_directories(plugin_dir);
+    {
+      std::ofstream ofs(plugin_dir / "openclaw.plugin.json");
+      ofs << R"({"id":"global-plugin","name":"Global Plugin"})";
+    }
+
+    quantclaw::PluginRegistry reg(logger_);
+    quantclaw::QuantClawConfig config;
+    reg.Discover(config, test_dir_);
+
+    EXPECT_NE(reg.Find("global-plugin"), nullptr);
+  } catch (...) {
+    restore_env();
+    fs::remove_all(test_home);
+    throw;
+  }
+
+  restore_env();
+  fs::remove_all(test_home);
 }
 
 TEST_F(PluginRegistryTest, DiscoverPluginsFromConfigPaths) {

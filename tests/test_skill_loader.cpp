@@ -1,9 +1,18 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+
+#ifdef _WIN32
+#define test_setenv(name, value) _putenv_s(name, value)
+#define test_unsetenv(name) _putenv_s(name, "")
+#else
+#define test_setenv(name, value) setenv(name, value, 1)
+#define test_unsetenv(name) unsetenv(name)
+#endif
 
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
@@ -588,6 +597,74 @@ skillKey: "my-key"
   ASSERT_EQ(skills.size(), 1);
   EXPECT_EQ(skills[0].homepage, "https://example.com");
   EXPECT_EQ(skills[0].skill_key, "my-key");
+}
+
+TEST_F(SkillLoaderTest, LoadSkillsUsesPlatformHomeForUserSkillDirectory) {
+  auto test_home =
+      quantclaw::test::MakeTestDir("quantclaw_user_skills_home_test");
+  auto get_or_empty = [](const char* name) -> std::string {
+    const char* value = std::getenv(name);
+    return value ? value : "";
+  };
+
+  const std::string orig_home = get_or_empty("HOME");
+#ifdef _WIN32
+  const std::string orig_userprofile = get_or_empty("USERPROFILE");
+  test_unsetenv("HOME");
+  if (test_setenv("USERPROFILE", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set USERPROFILE environment variable";
+  }
+#else
+  if (test_setenv("HOME", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set HOME environment variable";
+  }
+#endif
+
+  auto restore_env = [&]() {
+#ifdef _WIN32
+    if (!orig_userprofile.empty()) {
+      test_setenv("USERPROFILE", orig_userprofile.c_str());
+    } else {
+      test_unsetenv("USERPROFILE");
+    }
+#endif
+    if (!orig_home.empty()) {
+      test_setenv("HOME", orig_home.c_str());
+    } else {
+      test_unsetenv("HOME");
+    }
+  };
+
+  try {
+    auto skill_dir = test_home / ".quantclaw" / "skills" / "global-skill";
+    std::filesystem::create_directories(skill_dir);
+    {
+      std::ofstream f(skill_dir / "SKILL.md");
+      f << "---\nname: global-skill\ndescription: From user dir\n---\nGlobal.";
+    }
+
+    quantclaw::SkillsConfig config;
+    auto workspace = quantclaw::test::MakeTestDir("quantclaw_empty_workspace");
+    auto skills = skill_loader_->LoadSkills(config, workspace);
+
+    bool found = false;
+    for (const auto& skill : skills) {
+      if (skill.name == "global-skill") {
+        found = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(found);
+
+    std::filesystem::remove_all(workspace);
+  } catch (...) {
+    restore_env();
+    std::filesystem::remove_all(test_home);
+    throw;
+  }
+
+  restore_env();
+  std::filesystem::remove_all(test_home);
 }
 
 // ── Search skill

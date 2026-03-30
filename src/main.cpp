@@ -566,15 +566,9 @@ int main(int argc, char* argv[]) {
 
          if (sub == "list") {
            // Multi-directory skill loading
-           std::string home_str;
-           const char* home = std::getenv("HOME");
-           if (home)
-             home_str = home;
-           else
-             home_str = "/tmp";
-
-           auto workspace_path = std::filesystem::path(home_str) /
-                                 ".quantclaw/agents/main/workspace";
+           auto workspace_path =
+               std::filesystem::path(quantclaw::platform::home_directory()) /
+               ".quantclaw/agents/main/workspace";
 
            // Load config for skills settings
            quantclaw::SkillsConfig skills_config;
@@ -615,15 +609,9 @@ int main(int argc, char* argv[]) {
            }
            const std::string& skill_name = args[1];
 
-           std::string home_str;
-           const char* home = std::getenv("HOME");
-           if (home)
-             home_str = home;
-           else
-             home_str = "/tmp";
-
-           auto workspace_path = std::filesystem::path(home_str) /
-                                 ".quantclaw/agents/main/workspace";
+           auto workspace_path =
+               std::filesystem::path(quantclaw::platform::home_directory()) /
+               ".quantclaw/agents/main/workspace";
 
            quantclaw::SkillsConfig skills_config;
            try {
@@ -679,10 +667,9 @@ int main(int argc, char* argv[]) {
                    << "] Config file: " << config_path << std::endl;
 
          // Check workspace
-         const char* home = std::getenv("HOME");
-         std::string home_str = home ? home : "/tmp";
-         auto workspace = std::filesystem::path(home_str) /
-                          ".quantclaw/agents/main/workspace";
+         auto workspace =
+             std::filesystem::path(quantclaw::platform::home_directory()) /
+             ".quantclaw/agents/main/workspace";
          bool ws_ok = std::filesystem::exists(workspace);
          std::cout << "[" << (ws_ok ? "OK" : "!!")
                    << "] Workspace: " << workspace.string() << std::endl;
@@ -720,9 +707,8 @@ int main(int argc, char* argv[]) {
          for (int i = 1; i < argc; ++i)
            args.push_back(argv[i]);
 
-         const char* home = std::getenv("HOME");
-         std::string home_str = home ? home : "/tmp";
-         std::string cron_file = home_str + "/.quantclaw/cron.json";
+         std::string cron_file =
+             quantclaw::platform::home_directory() + "/.quantclaw/cron.json";
 
          if (args.empty() || args[0] == "list") {
            try {
@@ -868,10 +854,9 @@ int main(int argc, char* argv[]) {
            } catch (const std::exception&) {}
 
            // Fallback: offline search
-           const char* home = std::getenv("HOME");
-           std::string home_str = home ? home : "/tmp";
-           auto workspace = std::filesystem::path(home_str) /
-                            ".quantclaw/agents/main/workspace";
+           auto workspace =
+               std::filesystem::path(quantclaw::platform::home_directory()) /
+               ".quantclaw/agents/main/workspace";
 
            quantclaw::MemorySearch search(logger);
            search.IndexDirectory(workspace);

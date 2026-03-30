@@ -3,10 +3,13 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <thread>
+#include <vector>
 
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
@@ -60,6 +63,7 @@ class RpcMockLLMProvider : public quantclaw::LLMProvider {
  public:
   bool stream_should_fail = false;
   std::string stream_error_message = "mock stream failure";
+  std::vector<std::string> stream_chunks = {"mock reply"};
 
   quantclaw::ChatCompletionResponse
   ChatCompletion(const quantclaw::ChatCompletionRequest&) override {
@@ -77,12 +81,20 @@ class RpcMockLLMProvider : public quantclaw::LLMProvider {
       throw std::runtime_error(stream_error_message);
     }
 
-    quantclaw::ChatCompletionResponse delta;
-    delta.content = "mock reply";
-    callback(delta);
+    std::string full_response;
+    for (const auto& chunk_text : stream_chunks) {
+      if (chunk_text.empty()) {
+        continue;
+      }
+
+      quantclaw::ChatCompletionResponse delta;
+      delta.content = chunk_text;
+      callback(delta);
+      full_response += chunk_text;
+    }
 
     quantclaw::ChatCompletionResponse end;
-    end.content = "mock reply";
+    end.content = full_response;
     end.is_stream_end = true;
     callback(end);
   }
@@ -298,7 +310,95 @@ TEST_F(RpcHandlersTest, ChatSendPropagatesStreamingErrors) {
   // Reset mock state to avoid test pollution
   mock_llm_->stream_should_fail = false;
   mock_llm_->stream_error_message.clear();
+  client->Disconnect();
+}
 
+TEST_F(RpcHandlersTest, ChatSendEmitsCumulativeDeltaAndStructuredFinalEvent) {
+  mock_llm_->stream_chunks = {"mock ", "reply"};
+
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  std::mutex events_mutex;
+  std::condition_variable events_cv;
+  std::vector<nlohmann::json> chat_events;
+
+  client->Subscribe("chat",
+                    [&](const std::string&, const nlohmann::json& payload) {
+                      {
+                        std::lock_guard<std::mutex> lock(events_mutex);
+                        chat_events.push_back(payload);
+                      }
+                      events_cv.notify_all();
+                    });
+
+  auto result = client->Call("chat.send",
+                             {{"message", "Hello"},
+                              {"sessionKey", "main"},
+                              {"idempotencyKey", "run-test-2"}},
+                             10000);
+  EXPECT_EQ(result["response"], "mock reply");
+
+  {
+    std::unique_lock<std::mutex> lock(events_mutex);
+    ASSERT_TRUE(events_cv.wait_for(lock, std::chrono::seconds(3),
+                                   [&] { return chat_events.size() >= 3; }));
+    ASSERT_GE(chat_events.size(), 3u);
+    EXPECT_EQ(chat_events[0].value("state", ""), "delta");
+    EXPECT_EQ(chat_events[0]["message"].value("content", ""), "mock ");
+    EXPECT_EQ(chat_events[1].value("state", ""), "delta");
+    EXPECT_EQ(chat_events[1]["message"].value("content", ""), "mock reply");
+    EXPECT_EQ(chat_events.back().value("state", ""), "final");
+    EXPECT_EQ(chat_events.back()["message"].value("content", ""), "mock reply");
+    EXPECT_EQ(chat_events.back().value("runId", ""), "run-test-2");
+    EXPECT_EQ(chat_events.back().value("sessionKey", ""), "main");
+  }
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersTest, ChatSendEmitsErrorEventInsteadOfBlankFinalOnFailure) {
+  mock_llm_->stream_should_fail = true;
+  mock_llm_->stream_error_message = "mock chat stream blew up";
+
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  std::mutex events_mutex;
+  std::condition_variable events_cv;
+  std::vector<nlohmann::json> chat_events;
+
+  client->Subscribe("chat",
+                    [&](const std::string&, const nlohmann::json& payload) {
+                      {
+                        std::lock_guard<std::mutex> lock(events_mutex);
+                        chat_events.push_back(payload);
+                      }
+                      events_cv.notify_all();
+                    });
+
+  EXPECT_THROW(client->Call("chat.send",
+                            {{"message", "Hello"},
+                             {"sessionKey", "main"},
+                             {"idempotencyKey", "run-test-3"}},
+                            10000),
+               std::runtime_error);
+
+  {
+    std::unique_lock<std::mutex> lock(events_mutex);
+    ASSERT_TRUE(events_cv.wait_for(lock, std::chrono::seconds(3),
+                                   [&] { return !chat_events.empty(); }));
+    ASSERT_FALSE(chat_events.empty());
+    EXPECT_EQ(chat_events.back().value("state", ""), "error");
+    EXPECT_NE(chat_events.back()
+                  .value("errorMessage", "")
+                  .find("mock chat stream blew up"),
+              std::string::npos);
+  }
+
+  mock_llm_->stream_should_fail = false;
+  mock_llm_->stream_error_message.clear();
+  mock_llm_->stream_chunks = {"mock reply"};
   client->Disconnect();
 }
 

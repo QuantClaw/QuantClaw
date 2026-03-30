@@ -5,14 +5,15 @@
 
 #include <filesystem>
 
+#include "quantclaw/platform/process.hpp"
+
 namespace quantclaw {
 
 namespace {
 
 std::string find_sidecar_script() {
   // Look for sidecar entry point in standard locations
-  const char* home = std::getenv("HOME");
-  std::string home_str = home ? home : "/tmp";
+  std::string home_str = platform::home_directory();
 
   std::vector<std::string> candidates = {
       home_str + "/.quantclaw/sidecar/index.js",

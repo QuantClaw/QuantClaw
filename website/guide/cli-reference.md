@@ -75,21 +75,21 @@ quantclaw gateway
 ```
 
 #### gateway install
-Install as a system service (systemd on Linux, launchd on macOS).
+Install the background service definition (`systemd --user` on Linux, `launchd` user agent on macOS).
 
 ```bash
 quantclaw gateway install
 ```
 
 #### gateway uninstall
-Remove the system service.
+Remove the background service definition.
 
 ```bash
 quantclaw gateway uninstall
 ```
 
 #### gateway start / stop / restart
-Control the background daemon.
+Control the background service.
 
 ```bash
 quantclaw gateway start
@@ -98,7 +98,7 @@ quantclaw gateway restart
 ```
 
 #### gateway status
-Check whether the gateway daemon is running.
+Check whether the gateway background service is running.
 
 ```bash
 quantclaw gateway status
@@ -329,13 +329,13 @@ quantclaw onboard [OPTIONS]
 
 **Options:**
 - `--quick` — Quick setup with defaults (non-interactive)
-- `--install-daemon` — Also install the gateway as a system service
+- `--install-daemon` — Also install the gateway background service definition
 
 **Examples:**
 ```bash
 quantclaw onboard                     # Interactive
 quantclaw onboard --quick             # Non-interactive
-quantclaw onboard --install-daemon    # Interactive + install daemon
+quantclaw onboard --install-daemon    # Interactive + install background service
 ```
 
 ## In-Conversation Message Commands
@@ -373,7 +373,8 @@ While chatting, prefix a message with a slash command to control the session:
 # 1. Initial setup
 quantclaw onboard --quick
 
-# 2. Start gateway in background
+# 2. Install and start the background service
+quantclaw gateway install
 quantclaw gateway start
 
 # 3. Send a message

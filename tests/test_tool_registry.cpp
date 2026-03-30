@@ -1,9 +1,18 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+
+#ifdef _WIN32
+#define test_setenv(name, value) _putenv_s(name, value)
+#define test_unsetenv(name) _putenv_s(name, "")
+#else
+#define test_setenv(name, value) setenv(name, value, 1)
+#define test_unsetenv(name) unsetenv(name)
+#endif
 
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
@@ -242,4 +251,123 @@ TEST_F(ToolRegistryTest, EmptyRegistryNoTools) {
   auto empty = std::make_unique<quantclaw::ToolRegistry>(logger_);
   EXPECT_TRUE(empty->GetToolSchemas().empty());
   EXPECT_FALSE(empty->HasTool("read"));
+}
+
+TEST_F(ToolRegistryTest, DefaultWorkspaceUsesAgentWorkspaceLayoutForReadTool) {
+  auto test_home =
+      quantclaw::test::MakeTestDir("quantclaw_default_workspace_test");
+  auto get_or_empty = [](const char* name) -> std::string {
+    const char* value = std::getenv(name);
+    return value ? value : "";
+  };
+
+  const std::string orig_home = get_or_empty("HOME");
+#ifdef _WIN32
+  const std::string orig_userprofile = get_or_empty("USERPROFILE");
+  test_unsetenv("HOME");
+  if (test_setenv("USERPROFILE", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set USERPROFILE environment variable";
+  }
+#else
+  if (test_setenv("HOME", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set HOME environment variable";
+  }
+#endif
+
+  auto restore_env = [&]() {
+#ifdef _WIN32
+    if (!orig_userprofile.empty()) {
+      test_setenv("USERPROFILE", orig_userprofile.c_str());
+    } else {
+      test_unsetenv("USERPROFILE");
+    }
+#endif
+    if (!orig_home.empty()) {
+      test_setenv("HOME", orig_home.c_str());
+    } else {
+      test_unsetenv("HOME");
+    }
+  };
+
+  try {
+    auto workspace = test_home / ".quantclaw" / "agents" / "main" / "workspace";
+    std::filesystem::create_directories(workspace);
+    auto test_file = workspace / "default-workspace.txt";
+    {
+      std::ofstream file(test_file);
+      file << "workspace ok";
+    }
+
+    auto registry = std::make_unique<quantclaw::ToolRegistry>(logger_);
+    registry->RegisterBuiltinTools();
+
+    auto result = registry->ExecuteTool("read", {{"path", test_file.string()}});
+    EXPECT_EQ(result, "workspace ok");
+  } catch (...) {
+    restore_env();
+    std::filesystem::remove_all(test_home);
+    throw;
+  }
+
+  restore_env();
+  std::filesystem::remove_all(test_home);
+}
+
+TEST_F(ToolRegistryTest, MemoryGetUsesPlatformHomeWhenWorkspaceNotInjected) {
+  auto test_home = quantclaw::test::MakeTestDir("quantclaw_memory_get_home");
+  auto get_or_empty = [](const char* name) -> std::string {
+    const char* value = std::getenv(name);
+    return value ? value : "";
+  };
+
+  const std::string orig_home = get_or_empty("HOME");
+#ifdef _WIN32
+  const std::string orig_userprofile = get_or_empty("USERPROFILE");
+  test_unsetenv("HOME");
+  if (test_setenv("USERPROFILE", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set USERPROFILE environment variable";
+  }
+#else
+  if (test_setenv("HOME", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set HOME environment variable";
+  }
+#endif
+
+  auto restore_env = [&]() {
+#ifdef _WIN32
+    if (!orig_userprofile.empty()) {
+      test_setenv("USERPROFILE", orig_userprofile.c_str());
+    } else {
+      test_unsetenv("USERPROFILE");
+    }
+#endif
+    if (!orig_home.empty()) {
+      test_setenv("HOME", orig_home.c_str());
+    } else {
+      test_unsetenv("HOME");
+    }
+  };
+
+  try {
+    auto workspace = test_home / ".quantclaw" / "agents" / "main" / "workspace";
+    std::filesystem::create_directories(workspace);
+    {
+      std::ofstream file(workspace / "MEMORY.md");
+      file << "memory ok";
+    }
+
+    auto registry = std::make_unique<quantclaw::ToolRegistry>(logger_);
+    registry->RegisterBuiltinTools();
+
+    auto result = registry->ExecuteTool("memory_get", {{"path", "MEMORY.md"}});
+    auto json = nlohmann::json::parse(result);
+    EXPECT_EQ(json["content"], "memory ok");
+  } catch (...) {
+    restore_env();
+    std::filesystem::remove_all(test_home);
+    throw;
+  }
+
+  restore_env();
+  std::filesystem::remove_all(test_home);
 }

@@ -83,7 +83,7 @@ void CLIManager::ShowHelp() const {
   std::cout << "Examples:" << std::endl;
   std::cout << "  quantclaw gateway              Start gateway (foreground)"
             << std::endl;
-  std::cout << "  quantclaw gateway install       Install as system service"
+  std::cout << "  quantclaw gateway install       Install as background service"
             << std::endl;
   std::cout << "  quantclaw gateway status         Show gateway status"
             << std::endl;

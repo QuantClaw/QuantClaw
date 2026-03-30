@@ -657,7 +657,7 @@ std::string QuantClawConfig::ExpandHome(const std::string& path) {
       home = std::getenv("USERPROFILE");
 #endif
     if (home) {
-      expanded = std::string(home) + expanded.substr(1);
+      expanded = (std::filesystem::path(home) / expanded.substr(2)).string();
     }
   }
   return expanded;

@@ -92,7 +92,10 @@ static std::string generate_id(const std::string& prefix = "bg") {
 // ---------------------------------------------------------------------------
 
 ToolRegistry::ToolRegistry(std::shared_ptr<spdlog::logger> logger)
-    : logger_(logger) {
+    : logger_(logger),
+      workspace_path_((fs::path(platform::home_directory()) / ".quantclaw" /
+                       "agents" / "main" / "workspace")
+                          .string()) {
   logger_->info("ToolRegistry initialized");
 }
 
@@ -1437,13 +1440,8 @@ std::string ToolRegistry::memory_search_tool(const nlohmann::json& params) {
   if (query.empty())
     throw std::runtime_error("query is required");
 
-  const char* home = std::getenv("HOME");
-  std::string home_str = home ? home : "/tmp";
-  auto workspace =
-      std::filesystem::path(home_str) / ".quantclaw/agents/main/workspace";
-
   MemorySearch search(logger_);
-  search.IndexDirectory(workspace);
+  search.IndexDirectory(workspace_path_);
   auto results = search.Search(query, max_results);
 
   nlohmann::json arr = nlohmann::json::array();
@@ -1468,11 +1466,7 @@ std::string ToolRegistry::memory_get_tool(const nlohmann::json& params) {
   std::string rel_path = params.value("path", "");
   if (rel_path.empty())
     throw std::runtime_error("path is required");
-
-  const char* home = std::getenv("HOME");
-  std::string home_str = home ? home : "/tmp";
-  auto workspace =
-      std::filesystem::path(home_str) / ".quantclaw/agents/main/workspace";
+  auto workspace = std::filesystem::path(workspace_path_);
   auto full_path = workspace / rel_path;
 
   // Security: must remain inside workspace

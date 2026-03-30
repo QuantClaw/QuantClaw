@@ -30,9 +30,11 @@ success() { echo -e "${GREEN}[build]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[build]${NC} $*"; }
 die()     { echo -e "${RED}[build] ERROR:${NC} $*" >&2; exit 1; }
 
+HOST_OS="$(uname -s)"
+
 # ── CPU cores ────────────────────────────────────────────────────────────────
 detect_cores() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [[ "$HOST_OS" == "Darwin" ]]; then
         sysctl -n hw.logicalcpu
     elif [[ -f /proc/cpuinfo ]]; then
         grep -c ^processor /proc/cpuinfo
@@ -91,8 +93,44 @@ check_dep() {
     fi
 }
 
-check_dep cmake cmake   cmake   cmake
-check_dep ninja ninja-build ninja ninja
+ensure_brew() {
+    command -v brew &>/dev/null || die "Homebrew is required on macOS."
+}
+
+ensure_brew_package() {
+    local pkg="$1"
+    brew list --versions "$pkg" &>/dev/null && return 0
+    info "Installing missing Homebrew package: $pkg"
+    if ! brew install "$pkg"; then
+        die "Failed to install $pkg via Homebrew"
+    fi
+}
+
+CMAKE_EXTRA_ARGS=()
+
+if [[ "$HOST_OS" == "Darwin" ]]; then
+    ensure_brew
+    for pkg in cmake ninja pkg-config git spdlog openssl@3 curl; do
+        ensure_brew_package "$pkg"
+    done
+    if [[ $BUILD_SIDECAR -eq 1 ]]; then
+        ensure_brew_package node
+    fi
+
+    HOMEBREW_PREFIX="$(brew --prefix)"
+    OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+    CURL_PREFIX="$(brew --prefix curl)"
+    export CMAKE_PREFIX_PATH="${HOMEBREW_PREFIX}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}"
+    export PKG_CONFIG_PATH="${OPENSSL_PREFIX}/lib/pkgconfig:${CURL_PREFIX}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+    CMAKE_EXTRA_ARGS+=(
+        "-DOPENSSL_ROOT_DIR=${OPENSSL_PREFIX}"
+        "-DCURL_ROOT=${CURL_PREFIX}"
+    )
+else
+    check_dep git git git git
+    check_dep cmake cmake cmake cmake
+    check_dep ninja ninja-build ninja ninja
+fi
 
 # ── Clean ─────────────────────────────────────────────────────────────────────
 if [[ $CLEAN -eq 1 && -d "$BUILD_DIR" ]]; then
@@ -117,7 +155,8 @@ cmake -B "$BUILD_DIR" -S "$ROOT" \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
     -DCMAKE_CXX_STANDARD=17 \
     -DBUILD_TESTS="$BUILD_TESTS" \
-    ${SANITIZER_FLAG:+"$SANITIZER_FLAG"}
+    ${SANITIZER_FLAG:+"$SANITIZER_FLAG"} \
+    "${CMAKE_EXTRA_ARGS[@]}"
 
 # ── C++ build ─────────────────────────────────────────────────────────────────
 info "Building C++ (${CPU_CORES} cores)..."
@@ -128,7 +167,7 @@ if [[ $BUILD_SIDECAR -eq 1 ]]; then
     SIDECAR_DIR="$ROOT/sidecar"
     if [[ -f "$SIDECAR_DIR/package.json" ]]; then
         if ! command -v node &>/dev/null; then
-            warn "node not found — skipping sidecar build (use --no-sidecar to suppress)"
+            die "node not found — install Node.js or use --no-sidecar"
         else
             info "Building sidecar..."
             cd "$SIDECAR_DIR"

@@ -8,6 +8,10 @@
 #include <cstdlib>
 #include <thread>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 namespace quantclaw {
 
 std::atomic<bool> SignalHandler::shutdown_requested_{false};
@@ -41,9 +45,9 @@ bool SignalHandler::ShouldShutdown() {
 void SignalHandler::signal_handler(int signum) {
   if (signum == SIGINT || signum == SIGTERM) {
     // Prevent re-entrant shutdown: if already requested, force-exit.
-    // Use _exit() which is async-signal-safe, unlike std::signal/std::raise.
+    // Use std::_Exit() which is async-signal-safe and portable.
     if (shutdown_requested_.exchange(true)) {
-      _exit(128 + signum);
+      std::_Exit(128 + signum);
       return;
     }
     if (shutdown_callback_) {
