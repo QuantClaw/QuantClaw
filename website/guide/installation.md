@@ -8,7 +8,7 @@ Detailed installation instructions for different platforms and use cases.
 - **CPU**: 2 cores, 2+ GHz
 - **RAM**: 4 GB
 - **Disk**: 2 GB free space
-- **OS**: Linux (Ubuntu 20.04+), Windows (WSL2), or macOS 13+ on Apple Silicon
+- **OS**: Linux (Ubuntu 20.04+), Windows (native or WSL2), or macOS 13+ on Apple Silicon
 
 ### Recommended Requirements
 - **CPU**: 4+ cores
@@ -300,6 +300,7 @@ ctest --test-dir build --output-on-failure
 If you prefer manual CMake configuration on macOS, pass the Homebrew prefixes explicitly:
 
 ```bash
+brew install openssl@3 curl
 cmake -B build -G Ninja \
   -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
   -DCURL_ROOT="$(brew --prefix curl)"

@@ -265,9 +265,13 @@ TEST_F(ToolRegistryTest, DefaultWorkspaceUsesAgentWorkspaceLayoutForReadTool) {
 #ifdef _WIN32
   const std::string orig_userprofile = get_or_empty("USERPROFILE");
   test_unsetenv("HOME");
-  test_setenv("USERPROFILE", test_home.string().c_str());
+  if (test_setenv("USERPROFILE", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set USERPROFILE environment variable";
+  }
 #else
-  test_setenv("HOME", test_home.string().c_str());
+  if (test_setenv("HOME", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set HOME environment variable";
+  }
 #endif
 
   auto restore_env = [&]() {
@@ -320,9 +324,13 @@ TEST_F(ToolRegistryTest, MemoryGetUsesPlatformHomeWhenWorkspaceNotInjected) {
 #ifdef _WIN32
   const std::string orig_userprofile = get_or_empty("USERPROFILE");
   test_unsetenv("HOME");
-  test_setenv("USERPROFILE", test_home.string().c_str());
+  if (test_setenv("USERPROFILE", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set USERPROFILE environment variable";
+  }
 #else
-  test_setenv("HOME", test_home.string().c_str());
+  if (test_setenv("HOME", test_home.string().c_str()) != 0) {
+    GTEST_SKIP() << "Failed to set HOME environment variable";
+  }
 #endif
 
   auto restore_env = [&]() {

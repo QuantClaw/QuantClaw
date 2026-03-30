@@ -43,12 +43,18 @@ class DaemonManagerTest : public ::testing::Test {
     orig_userprofile_ = get_or_empty("USERPROFILE");
     orig_home_ = get_or_empty("HOME");
     orig_path_ = get_or_empty("PATH");
-    test_setenv("USERPROFILE", test_home_.string().c_str());
-    test_setenv("HOME", test_home_.string().c_str());
+    if (test_setenv("USERPROFILE", test_home_.string().c_str()) != 0) {
+      GTEST_SKIP() << "Failed to set USERPROFILE environment variable";
+    }
+    if (test_setenv("HOME", test_home_.string().c_str()) != 0) {
+      GTEST_SKIP() << "Failed to set HOME environment variable";
+    }
 #else
     orig_home_ = get_or_empty("HOME");
     orig_path_ = get_or_empty("PATH");
-    test_setenv("HOME", test_home_.string().c_str());
+    if (test_setenv("HOME", test_home_.string().c_str()) != 0) {
+      GTEST_SKIP() << "Failed to set HOME environment variable";
+    }
 #endif
 
     auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();

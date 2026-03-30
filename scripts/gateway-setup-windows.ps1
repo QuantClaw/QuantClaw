@@ -162,7 +162,8 @@ if ($choice -eq 'y') {
         $process = Get-Process -Name "quantclaw" -ErrorAction SilentlyContinue | Select-Object -First 1
     }
     if ($process) {
-        Write-Host "✓ Gateway 进程正在运行 (PID: $($process.Id))" -ForegroundColor Green
+        $pid = if ($process.ProcessId) { $process.ProcessId } else { $process.Id }
+        Write-Host "✓ Gateway 进程正在运行 (PID: $pid)" -ForegroundColor Green
     } else {
         Write-Host "⚠ 未检测到 Gateway 进程，可能需要手动检查" -ForegroundColor Yellow
     }

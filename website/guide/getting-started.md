@@ -10,7 +10,7 @@ QuantClaw is a high-performance C++17 implementation of OpenClaw, an AI agent fr
 
 Before you start, make sure you have:
 
-- **Linux (Ubuntu 20.04+)** or **Windows 10+ (WSL2)**
+- **Linux (Ubuntu 20.04+)**, **Windows 10+ (native or WSL2)**, or **macOS 13+ on Apple Silicon**
 - **C++17 compatible compiler** (GCC 7+, Clang 5+)
 - **CMake 3.15+**
 - **Node.js 16+** (for plugin support)

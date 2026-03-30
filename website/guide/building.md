@@ -232,7 +232,9 @@ cmake ..
 ### Custom Dependency Paths
 
 ```bash
-cmake -DOPENSSL_ROOT_DIR=/path/to/openssl ..
+brew install openssl@3 curl
+cmake -DOPENSSL_ROOT_DIR=/path/to/openssl \
+  -DCURL_ROOT="$(brew --prefix curl)" ..
 ```
 
 ## Cross-Compilation
