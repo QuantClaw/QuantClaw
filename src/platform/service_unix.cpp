@@ -15,6 +15,10 @@
 #include <limits>
 #include <string_view>
 
+#ifdef __APPLE__
+#include <libproc.h>
+#endif
+
 #include "quantclaw/platform/process.hpp"
 #include "quantclaw/platform/service.hpp"
 
