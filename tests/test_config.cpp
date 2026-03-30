@@ -222,7 +222,7 @@ TEST_F(ConfigTest, ExpandHomeUsesUserProfileWhenHomeMissing) {
   test_unsetenv("HOME");
   test_setenv("USERPROFILE", fake_home.string().c_str());
 
-  DEFER({
+  auto cleanup = quantclaw::MakeDefer([&]() noexcept {
     if (!orig_home.empty()) {
       test_setenv("HOME", orig_home.c_str());
     } else {
