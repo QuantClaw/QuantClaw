@@ -18,6 +18,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+#include "quantclaw/common/defer.hpp"
 #include "quantclaw/config.hpp"
 #include "quantclaw/core/agent_loop.hpp"
 #include "quantclaw/core/memory_manager.hpp"
