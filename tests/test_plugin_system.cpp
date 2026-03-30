@@ -17,6 +17,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+#include "quantclaw/common/defer.hpp"
 #include "quantclaw/config.hpp"
 #include "quantclaw/plugins/hook_manager.hpp"
 #include "quantclaw/plugins/plugin_manifest.hpp"
@@ -212,7 +213,7 @@ TEST_F(PluginRegistryTest, DiscoverGlobalPluginsFromPlatformHome) {
   }
 #endif
 
-  auto restore_env = [&]() {
+  DEFER({
 #ifdef _WIN32
     if (!orig_userprofile.empty()) {
       test_setenv("USERPROFILE", orig_userprofile.c_str());
@@ -225,29 +226,21 @@ TEST_F(PluginRegistryTest, DiscoverGlobalPluginsFromPlatformHome) {
     } else {
       test_unsetenv("HOME");
     }
-  };
-
-  try {
-    auto plugin_dir = test_home / ".quantclaw" / "plugins" / "global-plugin";
-    fs::create_directories(plugin_dir);
-    {
-      std::ofstream ofs(plugin_dir / "openclaw.plugin.json");
-      ofs << R"({"id":"global-plugin","name":"Global Plugin"})";
-    }
-
-    quantclaw::PluginRegistry reg(logger_);
-    quantclaw::QuantClawConfig config;
-    reg.Discover(config, test_dir_);
-
-    EXPECT_NE(reg.Find("global-plugin"), nullptr);
-  } catch (...) {
-    restore_env();
     fs::remove_all(test_home);
-    throw;
+  });
+
+  auto plugin_dir = test_home / ".quantclaw" / "plugins" / "global-plugin";
+  fs::create_directories(plugin_dir);
+  {
+    std::ofstream ofs(plugin_dir / "openclaw.plugin.json");
+    ofs << R"({"id":"global-plugin","name":"Global Plugin"})";
   }
 
-  restore_env();
-  fs::remove_all(test_home);
+  quantclaw::PluginRegistry reg(logger_);
+  quantclaw::QuantClawConfig config;
+  reg.Discover(config, test_dir_);
+
+  EXPECT_NE(reg.Find("global-plugin"), nullptr);
 }
 
 TEST_F(PluginRegistryTest, DiscoverPluginsFromConfigPaths) {
