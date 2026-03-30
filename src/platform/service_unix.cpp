@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <charconv>
+#include <climits>
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
@@ -216,7 +217,12 @@ int ServiceManager::install(int port) {
       << "    <key>HOME</key>\n"
       << "    <string>" << detail::xml_escape(home_directory()) << "</string>\n"
       << "    <key>PATH</key>\n"
-      << "    <string>" << detail::xml_escape(std::getenv("PATH") ? std::getenv("PATH") : "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin") << "</string>\n"
+      << "    <string>"
+      << detail::xml_escape(std::getenv("PATH")
+                                ? std::getenv("PATH")
+                                : "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/"
+                                  "bin:/opt/homebrew/bin")
+      << "</string>\n"
       << "    <key>QUANTCLAW_LOG_LEVEL</key>\n"
       << "    <string>info</string>\n"
       << "  </dict>\n"

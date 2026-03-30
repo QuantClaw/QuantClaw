@@ -9,6 +9,7 @@
 
 #include <cerrno>
 #include <chrono>
+#include <climits>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -18,7 +19,6 @@
 #include <spdlog/spdlog.h>
 
 #ifdef __APPLE__
-#include <limits.h>
 #include <mach-o/dyld.h>
 #endif
 
