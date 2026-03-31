@@ -17,6 +17,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { RpcServer } from "./rpc-server.js";
 import { HookDispatcher } from "./hook-dispatcher.js";
+import { seedBuiltinProviders } from "./local-provider.js";
 import { ToolExecutor } from "./tool-executor.js";
 import { createPluginRuntime } from "./plugin-runtime-shim.js";
 import { loadPlugins } from "./plugin-loader.js";
@@ -27,7 +28,6 @@ import type {
   HttpRouteEntry,
   ChannelEntry,
   ServiceEntry,
-  ProviderEntry,
   CommandEntry,
   GatewayMethodEntry,
   CliEntry,
@@ -239,6 +239,7 @@ function createRpcMethods(opts: {
         id: p.provider.id,
         label: p.provider.label,
         aliases: p.provider.aliases,
+        baseUrl: p.provider.baseUrl,
       }));
     },
 
@@ -382,6 +383,10 @@ async function main(): Promise<void> {
     sdkShimPath,
   });
   pluginRecords = loadResult.records;
+
+  // Seed the built-in local provider so the provider listing always shows it,
+  // even when no plugin registers its own provider metadata.
+  seedBuiltinProviders(registries, startupConfig);
 
   // Start plugin services.
   await startServices(registries.services, config, startupConfig.workspace_dir);

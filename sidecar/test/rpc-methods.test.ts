@@ -11,6 +11,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { HookDispatcher } from "../src/hook-dispatcher.js";
 import { ToolExecutor } from "../src/tool-executor.js";
+import {
+  seedBuiltinProviders,
+  DEFAULT_LOCAL_PROVIDER_URL,
+  BUILTIN_LOCAL_PROVIDER_ID,
+} from "../src/local-provider.js";
 import type {
   PluginLogger,
   PluginRecord,
@@ -182,6 +187,7 @@ describe("plugin.providers", () => {
       id: "custom-llm",
       label: "Custom LLM",
       aliases: ["custom", "my-llm"],
+      baseUrl: "https://example.invalid/v1",
       auth: [],
     };
     regs.providers.push({ pluginId: "p1", provider });
@@ -191,12 +197,14 @@ describe("plugin.providers", () => {
       id: p.provider.id,
       label: p.provider.label,
       aliases: p.provider.aliases,
+      baseUrl: p.provider.baseUrl,
     }));
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("custom-llm");
     expect(result[0].label).toBe("Custom LLM");
     expect(result[0].aliases).toEqual(["custom", "my-llm"]);
+    expect(result[0].baseUrl).toBe("https://example.invalid/v1");
   });
 
   it("handles providers without aliases", () => {
@@ -213,6 +221,32 @@ describe("plugin.providers", () => {
     }));
 
     expect(result[0].aliases).toBeUndefined();
+  });
+
+  it("seeded builtin local provider is returned by plugin.providers with kind:none", () => {
+    seedBuiltinProviders(regs, { enabled_plugins: [] });
+
+    const result = regs.providers.map((p) => ({
+      pluginId: p.pluginId,
+      id: p.provider.id,
+      label: p.provider.label,
+      baseUrl: p.provider.baseUrl,
+      authKind: p.provider.auth[0]?.kind,
+    }));
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(BUILTIN_LOCAL_PROVIDER_ID);
+    expect(result[0].baseUrl).toBe(DEFAULT_LOCAL_PROVIDER_URL);
+    expect(result[0].authKind).toBe("none");
+  });
+
+  it("seeded builtin local provider respects custom url from startup config", () => {
+    seedBuiltinProviders(regs, {
+      enabled_plugins: [],
+      local_provider_url: "http://127.0.0.1:9999",
+    });
+
+    expect(regs.providers[0].provider.baseUrl).toBe("http://127.0.0.1:9999");
   });
 });
 

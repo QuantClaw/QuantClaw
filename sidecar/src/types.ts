@@ -207,6 +207,7 @@ export interface ProviderPlugin {
   docsPath?: string;
   aliases?: string[];
   envVars?: string[];
+  baseUrl?: string;
   models?: Record<string, unknown>;
   auth: ProviderAuthMethod[];
   formatApiKey?: (cred: Record<string, unknown>) => string;
@@ -216,7 +217,7 @@ export interface ProviderAuthMethod {
   id: string;
   label: string;
   hint?: string;
-  kind: "oauth" | "api_key" | "token" | "device_code" | "custom";
+  kind: "oauth" | "api_key" | "token" | "device_code" | "custom" | "none";
   run: (ctx: Record<string, unknown>) => Promise<Record<string, unknown>>;
 }
 
@@ -406,5 +407,6 @@ export interface PluginRuntime {
 export interface SidecarStartupConfig {
   enabled_plugins: string[];
   workspace_dir?: string;
+  local_provider_url?: string;
   plugins?: Record<string, Record<string, unknown>>;
 }
