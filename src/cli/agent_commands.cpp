@@ -94,15 +94,15 @@ int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
 
     // Only stream directly to stdout in interactive terminals.
     if (stream_to_stdout) {
-      client->Subscribe(
-          "agent.text_delta",
-          [&saw_stream_output](const std::string&,
-                               const nlohmann::json& payload) {
-            if (payload.contains("text")) {
-              saw_stream_output = true;
-              std::cout << payload["text"].get<std::string>() << std::flush;
-            }
-          });
+      client->Subscribe("agent.text_delta",
+                        [&saw_stream_output](const std::string&,
+                                             const nlohmann::json& payload) {
+                          if (payload.contains("text")) {
+                            saw_stream_output = true;
+                            std::cout << payload["text"].get<std::string>()
+                                      << std::flush;
+                          }
+                        });
       client->Subscribe(
           "agent.message_end",
           [&saw_stream_output](const std::string&, const nlohmann::json&) {
