@@ -72,6 +72,7 @@ void MemoryManager::LoadWorkspaceFiles() {
   }
 
   logger_->info("Workspace files loaded successfully");
+  rebuild_search_index();
 }
 
 std::string MemoryManager::ReadIdentityFile(const std::string& filename) const {
@@ -87,38 +88,112 @@ std::string MemoryManager::ReadToolsFile() const {
   return ReadIdentityFile("TOOLS.md");
 }
 
-std::vector<std::string>
-MemoryManager::SearchMemory(const std::string& query) const {
-  std::vector<std::string> results;
-
-  std::vector<std::string> identity_files = {"SOUL.md", "USER.md", "MEMORY.md",
-                                             "AGENTS.md", "TOOLS.md"};
-  for (const auto& filename : identity_files) {
-    try {
-      auto content = ReadIdentityFile(filename);
-      if (content.find(query) != std::string::npos) {
-        results.push_back("File: " + filename + "\nContent: " + content);
-      }
-    } catch (const std::exception&) {
-      // Skip files that can't be read
+// Tokenize text into lowercase alphanumeric words (same convention as the
+// MMR reranker) without heap-allocating a full token collection.
+static void tokenize_into(std::string_view text,
+                          std::unordered_set<std::string>& out) {
+  std::size_t start = std::string_view::npos;
+  for (std::size_t i = 0; i <= text.size(); ++i) {
+    bool alnum =
+        i < text.size() && std::isalnum(static_cast<unsigned char>(text[i]));
+    if (alnum) {
+      if (start == std::string_view::npos)
+        start = i;
+    } else if (start != std::string_view::npos) {
+      std::string tok(text.substr(start, i - start));
+      for (char& c : tok)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      out.insert(std::move(tok));
+      start = std::string_view::npos;
     }
+  }
+}
+
+void MemoryManager::rebuild_search_index() {
+  std::unordered_map<std::string, std::unordered_set<std::string>> new_index;
+
+  auto index_file = [&](const std::string& label,
+                        const std::filesystem::path& path) {
+    try {
+      auto content = read_file_content(path);
+      std::unordered_set<std::string> tokens;
+      tokenize_into(content, tokens);
+      for (auto& tok : tokens) {
+        new_index[tok].insert(label);
+      }
+    } catch (const std::exception&) {}
+  };
+
+  for (const auto& name :
+       {"SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"}) {
+    index_file(name, workspace_path_ / name);
   }
 
   auto memory_dir = workspace_path_ / "memory";
   if (std::filesystem::exists(memory_dir)) {
     for (const auto& entry : std::filesystem::directory_iterator(memory_dir)) {
       if (entry.is_regular_file() && entry.path().extension() == ".md") {
-        try {
-          auto content = read_file_content(entry.path());
-          if (content.find(query) != std::string::npos) {
-            results.push_back("File: " + entry.path().string() +
-                              "\nContent: " + content);
-          }
-        } catch (const std::exception&) {}
+        index_file(entry.path().string(), entry.path());
       }
     }
   }
 
+  std::unique_lock<std::shared_mutex> lock(cache_mutex_);
+  token_index_ = std::move(new_index);
+}
+
+std::vector<std::string>
+MemoryManager::SearchMemory(const std::string& query) const {
+  // Tokenize the query and look up each token in the inverted index.
+  // Files that match all query tokens are returned (AND semantics).
+  std::unordered_set<std::string> query_tokens;
+  tokenize_into(query, query_tokens);
+
+  if (query_tokens.empty()) {
+    return {};
+  }
+
+  // Candidate files: start with the set for the first token, intersect the rest
+  std::unordered_set<std::string> candidates;
+  {
+    std::shared_lock<std::shared_mutex> lock(cache_mutex_);
+    bool first = true;
+    for (const auto& tok : query_tokens) {
+      auto it = token_index_.find(tok);
+      if (it == token_index_.end()) {
+        // Token not found — no file can satisfy all tokens
+        return {};
+      }
+      if (first) {
+        candidates = it->second;
+        first = false;
+      } else {
+        std::unordered_set<std::string> intersection;
+        for (const auto& f : candidates) {
+          if (it->second.count(f))
+            intersection.insert(f);
+        }
+        candidates = std::move(intersection);
+      }
+      if (candidates.empty())
+        return {};
+    }
+  }
+
+  // Read and return matched files
+  std::vector<std::string> results;
+  results.reserve(candidates.size());
+  for (const auto& label : candidates) {
+    try {
+      // label is either a bare filename (identity files) or an absolute path
+      std::filesystem::path path =
+          std::filesystem::path(label).is_absolute()
+              ? std::filesystem::path(label)
+              : workspace_path_ / label;
+      auto content = read_file_content(path);
+      results.push_back("File: " + label + "\nContent: " + content);
+    } catch (const std::exception&) {}
+  }
   return results;
 }
 
@@ -253,6 +328,7 @@ void MemoryManager::StartFileWatcher() {
             logger_->info("File changed: {}", name);
             cb_copy = change_callback_;
           }
+          rebuild_search_index();
           if (cb_copy)
             cb_copy(std::string(name));
         }

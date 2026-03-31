@@ -92,6 +92,9 @@ DagRuntime::DagRuntime(const std::string& db_path,
   db_ = db;
   con_ = con;
   init_schema();
+  if (db_ != nullptr && con_ != nullptr) {
+    prepare_statements();
+  }
   enabled_ = db_ != nullptr && con_ != nullptr;
   if (enabled_ && logger_) {
     logger_->info("DAG runtime enabled with DuckDB db: {}", db_path);
@@ -100,6 +103,18 @@ DagRuntime::DagRuntime(const std::string& db_path,
 
 DagRuntime::~DagRuntime() {
   std::lock_guard<std::mutex> lock(db_mu_);
+  // Destroy cached prepared statements before closing the connection
+  auto destroy = [](void*& raw) {
+    if (raw) {
+      auto s = static_cast<duckdb_prepared_statement>(raw);
+      duckdb_destroy_prepare(&s);
+      raw = nullptr;
+    }
+  };
+  destroy(stmt_insert_run_);
+  destroy(stmt_insert_node_);
+  destroy(stmt_insert_edge_);
+  destroy(stmt_finalize_run_);
   if (con_) {
     auto con = static_cast<duckdb_connection>(con_);
     duckdb_disconnect(&con);
@@ -234,6 +249,46 @@ CREATE INDEX IF NOT EXISTS idx_dag_edges_run_id ON dag_edges(run_id);
   }
 }
 
+void DagRuntime::prepare_statements() {
+  std::lock_guard<std::mutex> lock(db_mu_);
+  auto con = static_cast<duckdb_connection>(con_);
+  if (!con) return;
+
+  struct Entry {
+    const char* sql;
+    void** out;
+  };
+
+  const Entry stmts[] = {
+      {"INSERT INTO dag_runs(run_id, session_key, status, user_message, "
+       "created_at) VALUES(?, ?, ?, ?, ?);",
+       &stmt_insert_run_},
+      {"INSERT INTO dag_nodes(node_id, run_id, node_type, payload_json, "
+       "created_at) VALUES(?, ?, ?, ?, ?);",
+       &stmt_insert_node_},
+      {"INSERT INTO dag_edges(run_id, from_node_id, to_node_id, edge_type, "
+       "created_at) VALUES(?, ?, ?, ?, ?);",
+       &stmt_insert_edge_},
+      {"UPDATE dag_runs SET status=?, finished_at=?, error=? WHERE run_id=?;",
+       &stmt_finalize_run_},
+  };
+
+  for (const auto& e : stmts) {
+    duckdb_prepared_statement s;
+    if (duckdb_prepare(con, e.sql, &s) == DuckDBError) {
+      if (logger_) {
+        logger_->error("DAG prepare_statements failed for '{}': {}", e.sql,
+                       duckdb_prepare_error(s));
+      }
+      duckdb_destroy_prepare(&s);
+      // Disable the runtime — a missing cached statement is a fatal setup error
+      enabled_ = false;
+      return;
+    }
+    *e.out = s;
+  }
+}
+
 std::string DagRuntime::make_id(const std::string& prefix) const {
   thread_local std::mt19937 rng(std::random_device{}());
   std::uniform_int_distribution<uint32_t> dist;
@@ -263,29 +318,14 @@ void DagRuntime::insert_run(const std::string& run_id,
                             const std::string& session_key,
                             const std::string& user_message) {
   std::lock_guard<std::mutex> lock(db_mu_);
-  auto con = static_cast<duckdb_connection>(con_);
-  if (!con) {
-    return;
-  }
+  auto stmt = static_cast<duckdb_prepared_statement>(stmt_insert_run_);
+  if (!stmt) return;
 
-  const char* sql =
-      "INSERT INTO dag_runs(run_id, session_key, status, user_message, "
-      "created_at) VALUES(?, ?, ?, ?, ?);";
-  duckdb_prepared_statement stmt;
-  if (duckdb_prepare(con, sql, &stmt) == DuckDBError) {
-    if (logger_) {
-      logger_->error("DAG insert_run prepare failed: {}",
-                     duckdb_prepare_error(stmt));
-    }
-    duckdb_destroy_prepare(&stmt);
-    return;
-  }
-
+  auto now = now_iso8601();
   duckdb_bind_varchar(stmt, 1, run_id.c_str());
   duckdb_bind_varchar(stmt, 2, session_key.c_str());
   duckdb_bind_varchar(stmt, 3, "running");
   duckdb_bind_varchar(stmt, 4, user_message.c_str());
-  auto now = now_iso8601();
   duckdb_bind_varchar(stmt, 5, now.c_str());
 
   duckdb_result result;
@@ -294,30 +334,14 @@ void DagRuntime::insert_run(const std::string& run_id,
                    duckdb_result_error(&result));
   }
   duckdb_destroy_result(&result);
-  duckdb_destroy_prepare(&stmt);
 }
 
 void DagRuntime::insert_node(const std::string& node_id,
                              const std::string& run_id, DagNodeType type,
                              const nlohmann::json& payload) {
   std::lock_guard<std::mutex> lock(db_mu_);
-  auto con = static_cast<duckdb_connection>(con_);
-  if (!con) {
-    return;
-  }
-
-  const char* sql =
-      "INSERT INTO dag_nodes(node_id, run_id, node_type, payload_json, "
-      "created_at) VALUES(?, ?, ?, ?, ?);";
-  duckdb_prepared_statement stmt;
-  if (duckdb_prepare(con, sql, &stmt) == DuckDBError) {
-    if (logger_) {
-      logger_->error("DAG insert_node prepare failed: {}",
-                     duckdb_prepare_error(stmt));
-    }
-    duckdb_destroy_prepare(&stmt);
-    return;
-  }
+  auto stmt = static_cast<duckdb_prepared_statement>(stmt_insert_node_);
+  if (!stmt) return;
 
   auto payload_text = payload.dump();
   auto now = now_iso8601();
@@ -335,7 +359,6 @@ void DagRuntime::insert_node(const std::string& node_id,
                    duckdb_result_error(&result));
   }
   duckdb_destroy_result(&result);
-  duckdb_destroy_prepare(&stmt);
 }
 
 void DagRuntime::insert_edge(const std::string& run_id,
@@ -343,23 +366,8 @@ void DagRuntime::insert_edge(const std::string& run_id,
                              const std::string& to_node_id,
                              const std::string& edge_type) {
   std::lock_guard<std::mutex> lock(db_mu_);
-  auto con = static_cast<duckdb_connection>(con_);
-  if (!con) {
-    return;
-  }
-
-  const char* sql =
-      "INSERT INTO dag_edges(run_id, from_node_id, to_node_id, edge_type, "
-      "created_at) VALUES(?, ?, ?, ?, ?);";
-  duckdb_prepared_statement stmt;
-  if (duckdb_prepare(con, sql, &stmt) == DuckDBError) {
-    if (logger_) {
-      logger_->error("DAG insert_edge prepare failed: {}",
-                     duckdb_prepare_error(stmt));
-    }
-    duckdb_destroy_prepare(&stmt);
-    return;
-  }
+  auto stmt = static_cast<duckdb_prepared_statement>(stmt_insert_edge_);
+  if (!stmt) return;
 
   auto now = now_iso8601();
   duckdb_bind_varchar(stmt, 1, run_id.c_str());
@@ -374,29 +382,14 @@ void DagRuntime::insert_edge(const std::string& run_id,
                    duckdb_result_error(&result));
   }
   duckdb_destroy_result(&result);
-  duckdb_destroy_prepare(&stmt);
 }
 
 void DagRuntime::finalize_run(const std::string& run_id,
                               const std::string& status,
                               const std::string& error) {
   std::lock_guard<std::mutex> lock(db_mu_);
-  auto con = static_cast<duckdb_connection>(con_);
-  if (!con) {
-    return;
-  }
-
-  const char* sql =
-      "UPDATE dag_runs SET status=?, finished_at=?, error=? WHERE run_id=?;";
-  duckdb_prepared_statement stmt;
-  if (duckdb_prepare(con, sql, &stmt) == DuckDBError) {
-    if (logger_) {
-      logger_->error("DAG finalize_run prepare failed: {}",
-                     duckdb_prepare_error(stmt));
-    }
-    duckdb_destroy_prepare(&stmt);
-    return;
-  }
+  auto stmt = static_cast<duckdb_prepared_statement>(stmt_finalize_run_);
+  if (!stmt) return;
 
   auto now = now_iso8601();
   duckdb_bind_varchar(stmt, 1, status.c_str());
@@ -410,7 +403,6 @@ void DagRuntime::finalize_run(const std::string& run_id,
                    duckdb_result_error(&result));
   }
   duckdb_destroy_result(&result);
-  duckdb_destroy_prepare(&stmt);
 }
 
 }  // namespace quantclaw

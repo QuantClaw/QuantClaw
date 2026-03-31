@@ -40,12 +40,18 @@ class MemoryManager {
   std::string read_file_content(const std::filesystem::path& filepath) const;
   void write_file_content(const std::filesystem::path& filepath,
                           const std::string& content) const;
+  void rebuild_search_index();
 
   std::filesystem::path workspace_path_;
   std::filesystem::path base_dir_;
   std::string agent_id_ = "default";
   std::shared_ptr<spdlog::logger> logger_;
   mutable std::shared_mutex cache_mutex_;
+
+  // Inverted index: lowercase token → set of file paths that contain it.
+  // Rebuilt on LoadWorkspaceFiles and whenever a watched file changes.
+  // Guarded by cache_mutex_ (already declared below).
+  std::unordered_map<std::string, std::unordered_set<std::string>> token_index_;
 
   std::unique_ptr<std::thread> watcher_thread_;
   std::atomic<bool> watching_{false};

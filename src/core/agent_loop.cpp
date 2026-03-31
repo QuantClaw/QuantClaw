@@ -684,6 +684,29 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
                       ContentBlock::MakeToolResult(tc.id, result));
                   request.messages.push_back(results_msg);
                   new_messages.push_back(results_msg);
+                } catch (const nlohmann::json::exception& e) {
+                  std::string error_content =
+                      "JSON serialization error: " + std::string(e.what());
+                  logger_->error("Tool '{}' JSON error: {}", tc.name, e.what());
+                  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+                    dag_runtime_->EmitNode(
+                        &dag_turn, DagNodeType::kToolResult,
+                        nlohmann::json{{"toolUseId", tc.id},
+                                       {"content", error_content},
+                                       {"isError", true}});
+                  }
+                  if (callback) {
+                    callback({events::kToolResult,
+                              {{"tool_use_id", tc.id},
+                               {"content", error_content},
+                               {"is_error", true}}});
+                  }
+                  Message results_msg;
+                  results_msg.role = "user";
+                  results_msg.content.push_back(
+                      ContentBlock::MakeToolResult(tc.id, error_content));
+                  request.messages.push_back(results_msg);
+                  new_messages.push_back(results_msg);
                 } catch (const std::exception& e) {
                   std::string error_content = "Error: " + std::string(e.what());
                   if (dag_runtime_ && dag_runtime_->IsEnabled()) {
@@ -889,6 +912,12 @@ AgentLoop::handle_tool_calls(const std::vector<nlohmann::json>& tool_calls) {
       results.push_back(result);
       logger_->info("Tool execution successful");
 
+    } catch (const nlohmann::json::exception& e) {
+      logger_->error("Tool '{}' JSON serialization error: {}",
+                     tool_call.value("function", nlohmann::json{})
+                               .value("name", std::string{"unknown"}),
+                     e.what());
+      results.push_back("JSON serialization error: " + std::string(e.what()));
     } catch (const std::exception& e) {
       logger_->error("Tool execution failed: {}", e.what());
       results.push_back("Error executing tool: " + std::string(e.what()));

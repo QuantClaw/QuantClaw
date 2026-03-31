@@ -59,6 +59,7 @@ class DagRuntime : public Noncopyable {
 
  private:
   void init_schema();
+  void prepare_statements();
   std::string make_id(const std::string& prefix) const;
   std::string now_iso8601() const;
 
@@ -78,6 +79,12 @@ class DagRuntime : public Noncopyable {
   void* con_ = nullptr;
   bool enabled_ = false;
   std::unordered_map<std::string, std::string> latest_run_by_session_;
+  // Cached prepared statements — prepared once after schema init, reused per call.
+  // Stored as void* to avoid exposing duckdb types in the module interface.
+  void* stmt_insert_run_ = nullptr;
+  void* stmt_insert_node_ = nullptr;
+  void* stmt_insert_edge_ = nullptr;
+  void* stmt_finalize_run_ = nullptr;
 };
 
 }  // namespace quantclaw
