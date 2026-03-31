@@ -6,9 +6,7 @@
 module;
 
 #include <cerrno>
-
 #include <cstdlib>
-
 #include <poll.h>
 #include <sys/resource.h>
 #include <sys/wait.h>

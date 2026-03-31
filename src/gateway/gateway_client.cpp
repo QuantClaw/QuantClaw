@@ -4,12 +4,12 @@
 module;
 
 #include <ixwebsocket/IXWebSocket.h>
-#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 module quantclaw.gateway.gateway_client;
 
 import std;
+import nlohmann.json;
 import quantclaw.gateway.protocol;
 
 namespace quantclaw::gateway {

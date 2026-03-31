@@ -167,8 +167,8 @@ struct RpcResponse {
 struct RpcEvent {
   std::string event;
   nlohmann::json payload;
-  std::optional<uint64_t> seq;
-  std::optional<uint64_t> state_version;
+  std::optional<std::uint64_t> seq;
+  std::optional<std::uint64_t> state_version;
 
   nlohmann::json ToJson() const {
     nlohmann::json j = {{"type", "event"}, {"event", event}, {"payload", payload}};
@@ -182,7 +182,7 @@ struct RpcEvent {
 
 struct ConnectChallenge {
   std::string nonce;
-  int64_t timestamp;
+  std::int64_t timestamp;
 
   nlohmann::json ToJson() const {
     return {{"type", "event"},

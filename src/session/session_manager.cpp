@@ -3,12 +3,12 @@
 
 module;
 
-#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 module quantclaw.session.session_manager;
 
 import std;
+import nlohmann.json;
 import quantclaw.core.content_block;
 
 namespace quantclaw {
@@ -440,18 +440,18 @@ void SessionManager::LoadStore() {
     file >> j;
     file.close();
 
-    for (const auto& [key, value] : j.items()) {
+    for (auto it = j.begin(); it != j.end(); ++it) {
       SessionInfo info;
-      info.session_key = key;
-      info.session_id = value.value("sessionId", "");
-      info.updated_at = value.value("updatedAt", "");
-      info.created_at = value.value("createdAt", "");
-      info.display_name = value.value("displayName", "");
-      info.channel = value.value("channel", "cli");
-      info.spawned_by = value.value("spawnedBy", "");
-      info.spawn_depth = value.value("spawnDepth", 0);
-      info.subagent_role = value.value("subagentRole", "");
-      store_[key] = info;
+      info.session_key = it.key();
+      info.session_id = it.value().value("sessionId", "");
+      info.updated_at = it.value().value("updatedAt", "");
+      info.created_at = it.value().value("createdAt", "");
+      info.display_name = it.value().value("displayName", "");
+      info.channel = it.value().value("channel", "cli");
+      info.spawned_by = it.value().value("spawnedBy", "");
+      info.spawn_depth = it.value().value("spawnDepth", 0);
+      info.subagent_role = it.value().value("subagentRole", "");
+      store_[it.key()] = info;
     }
 
     logger_->info("Loaded {} sessions from store", store_.size());

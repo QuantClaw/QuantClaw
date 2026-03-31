@@ -3,12 +3,12 @@
 
 module;
 
-#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 module quantclaw.session.session_maintenance;
 
 import std;
+import nlohmann.json;
 
 namespace quantclaw {
 

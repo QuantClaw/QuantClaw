@@ -7,9 +7,6 @@ module;
 
 #include <cerrno>
 #include <csignal>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
 #include <spdlog/spdlog.h>
 #include <sys/resource.h>
 #include <sys/wait.h>

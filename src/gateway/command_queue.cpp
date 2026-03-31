@@ -3,12 +3,12 @@
 
 module;
 
-#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 module quantclaw.gateway.command_queue;
 
 import std;
+import nlohmann.json;
 
 namespace quantclaw::gateway {
 

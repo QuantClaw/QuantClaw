@@ -3,11 +3,8 @@
 
 module;
 
-#include <cstddef>
-#include <cstdint>
 #include <ixwebsocket/IXHttp.h>
 #include <ixwebsocket/IXWebSocketServer.h>
-#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 module quantclaw.gateway.gateway_server;
@@ -16,6 +13,7 @@ import quantclaw.gateway.protocol;
 import quantclaw.security.rbac;
 import quantclaw.security.rate_limiter;
 import std;
+import nlohmann.json;
 
 namespace quantclaw::gateway {
 

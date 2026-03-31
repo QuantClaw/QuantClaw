@@ -30,8 +30,8 @@ std::optional<T> ParseInt(std::string_view s,
 }
 
 // Valid TCP/IP port: 1–65535.
-inline std::optional<uint16_t> ParsePort(std::string_view s) {
-  return ParseInt<uint16_t>(s, 1, 65535);
+inline std::optional<std::uint16_t> ParsePort(std::string_view s) {
+  return ParseInt<std::uint16_t>(s, 1, 65535);
 }
 
 // Positive integer (≥ 1), commonly used for counts / limits.

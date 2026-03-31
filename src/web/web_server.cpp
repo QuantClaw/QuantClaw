@@ -4,12 +4,12 @@
 module;
 
 #include <httplib.h>
-#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 module quantclaw.web.web_server;
 
 import std;
+import nlohmann.json;
 
 namespace quantclaw::web {
 

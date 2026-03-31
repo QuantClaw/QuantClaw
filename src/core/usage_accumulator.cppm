@@ -12,9 +12,9 @@ export namespace quantclaw {
 class UsageAccumulator {
  public:
   struct Stats {
-    int64_t input_tokens = 0;
-    int64_t output_tokens = 0;
-    int64_t total_tokens = 0;
+    std::int64_t input_tokens = 0;
+    std::int64_t output_tokens = 0;
+    std::int64_t total_tokens = 0;
     int turns = 0;
   };
 

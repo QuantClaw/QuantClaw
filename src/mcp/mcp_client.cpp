@@ -3,7 +3,6 @@
 
 module;
 
-#include <cstddef>
 #include <curl/curl.h>
 #include <spdlog/spdlog.h>
 
