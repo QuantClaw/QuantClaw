@@ -213,7 +213,7 @@ TEST_F(PluginRegistryTest, DiscoverGlobalPluginsFromPlatformHome) {
   }
 #endif
 
-  DEFER({
+  auto cleanup = [&]() {
 #ifdef _WIN32
     if (!orig_userprofile.empty()) {
       test_setenv("USERPROFILE", orig_userprofile.c_str());
@@ -226,8 +226,11 @@ TEST_F(PluginRegistryTest, DiscoverGlobalPluginsFromPlatformHome) {
     } else {
       test_unsetenv("HOME");
     }
-    fs::remove_all(test_home);
-  });
+    std::error_code ec;
+    fs::remove_all(test_home, ec);
+  };
+
+  DEFER(cleanup());
 
   auto plugin_dir = test_home / ".quantclaw" / "plugins" / "global-plugin";
   fs::create_directories(plugin_dir);
