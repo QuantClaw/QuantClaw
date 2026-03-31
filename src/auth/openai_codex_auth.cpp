@@ -349,9 +349,8 @@ std::string BuildOpenAICodexAuthorizeUrl(const std::string& state,
       << "&redirect_uri=" << url_encode(redirect_uri)
       << "&scope=" << url_encode(kScope)
       << "&code_challenge=" << url_encode(code_challenge)
-      << "&code_challenge_method=S256"
-      << "&state=" << url_encode(state) << "&id_token_add_organizations=true"
-      << "&codex_cli_simplified_flow=true"
+      << "&code_challenge_method=S256" << "&state=" << url_encode(state)
+      << "&id_token_add_organizations=true" << "&codex_cli_simplified_flow=true"
       << "&originator=pi";
   return out.str();
 }
