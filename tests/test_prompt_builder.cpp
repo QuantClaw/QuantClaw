@@ -9,6 +9,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
 import quantclaw.core.memory_manager;
 import quantclaw.core.skill_loader;
 import quantclaw.core.prompt_builder;

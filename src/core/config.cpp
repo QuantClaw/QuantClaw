@@ -1,7 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.config;
+module;
+
+#include <cstdlib>  // for getenv
+
+module quantclaw.config;
 
 import std;
 
@@ -119,7 +123,9 @@ static void expand_env_in_json(nlohmann::json& j) {
       s = substitute_env_vars(s);
     }
   } else if (j.is_object()) {
-    for (auto& [key, value] : j.items()) {
+    for (auto it = j.begin(); it != j.end(); ++it) {
+      auto key = it.key();
+      auto value = it.value();
       expand_env_in_json(value);
     }
   } else if (j.is_array()) {
@@ -323,7 +329,9 @@ SkillsConfig SkillsConfig::FromJson(const nlohmann::json& json) {
   }
 
   if (json.contains("entries") && json["entries"].is_object()) {
-    for (const auto& [key, value] : json["entries"].items()) {
+    for (auto it = json["entries"].begin(); it != json["entries"].end(); ++it) {
+      auto key = it.key();
+      const auto value = it.value();
       config.entries[key] = SkillEntryConfig::FromJson(value);
     }
   }
@@ -408,7 +416,9 @@ QuantClawConfig QuantClawConfig::FromJsonExpanded(const nlohmann::json& json) {
   // provider)
   // ================================================================
   if (json.contains("providers") && json["providers"].is_object()) {
-    for (const auto& [key, value] : json["providers"].items()) {
+    for (auto it = json["providers"].begin(); it != json["providers"].end(); ++it) {
+      auto key = it.key();
+      const auto value = it.value();
       config.providers[key] = ProviderConfig::FromJson(value);
     }
   }
@@ -419,7 +429,9 @@ QuantClawConfig QuantClawConfig::FromJsonExpanded(const nlohmann::json& json) {
   if (json.contains("models") && json["models"].is_object() &&
       json["models"].contains("providers") &&
       json["models"]["providers"].is_object()) {
-    for (const auto& [id, val] : json["models"]["providers"].items()) {
+    for (auto it = json["models"]["providers"].begin(); it != json["models"]["providers"].end(); ++it) {
+      auto id = it.key();
+      const auto val = it.value();
       config.model_providers[id] = ProviderConfig::FromJson(val);
     }
   }
@@ -432,8 +444,10 @@ QuantClawConfig QuantClawConfig::FromJsonExpanded(const nlohmann::json& json) {
       json["agents"]["defaults"].is_object() &&
       json["agents"]["defaults"].contains("models") &&
       json["agents"]["defaults"]["models"].is_object()) {
-    for (const auto& [key, val] :
-         json["agents"]["defaults"]["models"].items()) {
+    for (auto it = json["agents"]["defaults"]["models"].begin();
+         it != json["agents"]["defaults"]["models"].end(); ++it) {
+      auto key = it.key();
+      auto val = it.value();
       config.model_entries[key] = ModelEntryConfig::FromJson(val);
     }
   }
@@ -459,7 +473,9 @@ QuantClawConfig QuantClawConfig::FromJsonExpanded(const nlohmann::json& json) {
   // Channels — store full raw JSON per channel for adapter passthrough
   // ================================================================
   if (json.contains("channels") && json["channels"].is_object()) {
-    for (const auto& [key, value] : json["channels"].items()) {
+    for (auto it = json["channels"].begin(); it != json["channels"].end(); ++it) {
+      auto key = it.key();
+      const auto value = it.value();
       config.channels[key] = ChannelConfig::FromJson(value);
     }
   }
@@ -542,8 +558,8 @@ QuantClawConfig QuantClawConfig::FromJsonExpanded(const nlohmann::json& json) {
     if (tools_json.contains("allow") || tools_json.contains("deny")) {
       config.tools_permission = ToolPermissionConfig::FromJson(tools_json);
     } else {
-      for (const auto& [key, value] : tools_json.items()) {
-        config.tools[key] = ToolConfig::FromJson(value);
+      for (auto it = tools_json.begin(); it != tools_json.end(); ++it) {
+        config.tools[it.key()] = ToolConfig::FromJson(it.value());
       }
     }
   }

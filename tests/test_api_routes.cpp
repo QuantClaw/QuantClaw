@@ -11,6 +11,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
+import nlohmann.json;
 import quantclaw.config;
 import quantclaw.core.agent_loop;
 import quantclaw.core.memory_manager;

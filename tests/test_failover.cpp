@@ -6,7 +6,9 @@
 #include <gtest/gtest.h>
 
 import std;
+import nlohmann.json;
 import quantclaw.config;
+import quantclaw.providers.llm_provider;
 import quantclaw.providers.cooldown_tracker;
 import quantclaw.providers.failover_resolver;
 import quantclaw.providers.provider_error;

@@ -51,7 +51,10 @@ class MemoryManager {
   std::atomic<bool> watching_{false};
   mutable std::mutex watcher_mutex_;
   FileChangeCallback change_callback_;
-  std::unordered_map<std::string, std::filesystem::file_time_type> file_mtimes_;
+  // Self-pipe used to unblock the inotify poll loop on shutdown.
+  // [0] = read end (owned by watcher thread), [1] = write end (written by StopFileWatcher).
+  // Both are initialised to -1 and opened only while the watcher is active.
+  int wakeup_pipe_[2]{-1, -1};
 };
 
 }  // namespace quantclaw

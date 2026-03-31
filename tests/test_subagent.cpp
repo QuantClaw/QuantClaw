@@ -5,6 +5,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
 import quantclaw.core.subagent;
 
 namespace quantclaw {

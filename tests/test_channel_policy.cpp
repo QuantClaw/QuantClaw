@@ -5,6 +5,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
+import nlohmann.json;
 import quantclaw.channels.channel_policy;
 
 static std::shared_ptr<spdlog::logger> make_null_logger() {

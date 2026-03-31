@@ -8,6 +8,7 @@
 import quantclaw.tools.tool_chain;
 
 import std;
+import nlohmann.json;
 
 class ToolChainTest : public ::testing::Test {
  protected:

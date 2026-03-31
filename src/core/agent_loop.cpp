@@ -42,32 +42,60 @@ static int compute_effective_max_iterations(const AgentConfig& cfg) {
   return cfg.DynamicMaxIterations();
 }
 
-// Truncate a tool result if it exceeds the limit (head + tail with ellipsis)
+// Truncate a tool result if it exceeds the limit (head + tail with ellipsis).
+// Uses iterator-based line counting to avoid O(S) heap allocation for the
+// full line vector; only the tail window of keep_lines offsets is stored.
 static std::string truncate_tool_result(const std::string& result,
                                         int max_chars, int keep_lines) {
   if (static_cast<int>(result.size()) <= max_chars)
     return result;
 
-  // Split into lines
-  std::vector<std::string> lines;
-  std::istringstream stream(result);
-  std::string line;
-  while (std::getline(stream, line))
-    lines.push_back(line);
+  // First pass: count total lines and record the byte-offset of each newline
+  // boundary. We only need the last keep_lines offsets, so maintain a circular
+  // buffer of size keep_lines — O(keep_lines) space rather than O(S).
+  int total_lines = 0;
+  // tail_offsets[i] = start position of the (total_lines - keep_lines + i)-th line
+  std::vector<std::size_t> tail_offsets(static_cast<std::size_t>(keep_lines), 0);
+  std::size_t pos = 0;
+  std::size_t head_end = 0; // byte position just after the keep_lines-th '\n'
 
-  if (static_cast<int>(lines.size()) <= keep_lines * 2)
+  while (pos <= result.size()) {
+    std::size_t nl = result.find('\n', pos);
+    if (nl == std::string::npos)
+      nl = result.size();
+
+    // Record start of this line in the circular tail buffer
+    tail_offsets[static_cast<std::size_t>(total_lines) %
+                 static_cast<std::size_t>(keep_lines)] = pos;
+
+    total_lines++;
+    if (total_lines == keep_lines)
+      head_end = nl + 1; // first keep_lines lines end here
+
+    pos = nl + 1;
+    if (nl == result.size())
+      break;
+  }
+
+  if (total_lines <= keep_lines * 2)
     return result;
 
+  int omitted = total_lines - keep_lines * 2;
+
+  // Head: result[0..head_end)
   std::string truncated;
-  for (int i = 0; i < keep_lines; ++i) {
-    truncated += lines[i] + "\n";
-  }
-  int omitted = static_cast<int>(lines.size()) - keep_lines * 2;
+  truncated.reserve(head_end + 64 +
+                    result.size() - tail_offsets[static_cast<std::size_t>(
+                                        total_lines) %
+                                    static_cast<std::size_t>(keep_lines)]);
+  truncated.append(result, 0, head_end);
   truncated += "\n... [" + std::to_string(omitted) + " lines omitted] ...\n\n";
-  for (int i = static_cast<int>(lines.size()) - keep_lines;
-       i < static_cast<int>(lines.size()); ++i) {
-    truncated += lines[i] + "\n";
-  }
+
+  // Tail: oldest entry in the circular buffer is where the tail window starts
+  std::size_t tail_start =
+      tail_offsets[static_cast<std::size_t>(total_lines) %
+                   static_cast<std::size_t>(keep_lines)];
+  truncated.append(result, tail_start, std::string::npos);
   return truncated;
 }
 

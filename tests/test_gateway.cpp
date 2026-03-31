@@ -12,6 +12,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
 import quantclaw.gateway.gateway_client;
 import quantclaw.gateway.gateway_server;
 import quantclaw.gateway.protocol;

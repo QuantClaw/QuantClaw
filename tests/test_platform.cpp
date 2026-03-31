@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
 
+import std;
 import quantclaw.platform.ipc;
 import quantclaw.platform.process;
 import quantclaw.platform.service;

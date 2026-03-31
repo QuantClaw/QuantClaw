@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <gtest/gtest.h>
+
+import std;
+import nlohmann.json;
+import quantclaw.config;
 import quantclaw.security.tool_permissions;
 
 class ToolPermissionsTest : public ::testing::Test {

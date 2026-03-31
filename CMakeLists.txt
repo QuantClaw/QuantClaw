@@ -207,6 +207,7 @@ set(QUANTCLAW_CORE_SOURCES
     # Providers
     src/providers/provider_registry.cpp
     # Core
+    src/core/config.cpp
     src/core/agent_loop.cpp
     src/core/cron_scheduler.cpp
     src/core/dag_runtime.cpp
@@ -313,6 +314,7 @@ set(QUANTCLAW_CORE_MODULE_SOURCES
     src/cli/onboard_commands.cppm
     src/cli/session_commands.cppm
     src/gateway/daemon_manager.cppm
+    src/gateway/rpc_handlers.cppm
     src/gateway/protocol.cppm
     src/gateway/gateway_server.cppm
     src/gateway/gateway_client.cppm

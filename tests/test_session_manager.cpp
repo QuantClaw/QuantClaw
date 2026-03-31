@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 
 import std;
+import quantclaw.providers.llm_provider;
 import nlohmann.json;
 
 import quantclaw.core.content_block;

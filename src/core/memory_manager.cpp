@@ -4,6 +4,10 @@
 module;
 
 #include <spdlog/spdlog.h>
+#include <sys/inotify.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
 
 module quantclaw.core.memory_manager;
 
@@ -156,53 +160,113 @@ void MemoryManager::StartFileWatcher() {
   if (watching_) {
     return;
   }
-  watching_ = true;
 
-  // Record current mtimes
-  {
-    std::lock_guard<std::mutex> lock(watcher_mutex_);
-    for (const auto& name :
-         {"SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"}) {
-      auto path = workspace_path_ / name;
-      if (std::filesystem::exists(path)) {
-        file_mtimes_[name] = std::filesystem::last_write_time(path);
-      }
-    }
+  // Create self-pipe for clean shutdown signalling
+  if (::pipe2(wakeup_pipe_, O_CLOEXEC) != 0) {
+    logger_->error("Failed to create wakeup pipe for file watcher: {}",
+                   std::strerror(errno));
+    return;
   }
 
+  watching_ = true;
+
   watcher_thread_ = std::make_unique<std::thread>([this]() {
+    // Set up inotify instance watching the workspace directory
+    int ifd = ::inotify_init1(IN_CLOEXEC | IN_NONBLOCK);
+    if (ifd < 0) {
+      logger_->error("inotify_init1 failed: {}", std::strerror(errno));
+      return;
+    }
+
+    int wd = ::inotify_add_watch(
+        ifd, workspace_path_.c_str(),
+        IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE);
+    if (wd < 0) {
+      logger_->error("inotify_add_watch failed for {}: {}",
+                     workspace_path_.string(), std::strerror(errno));
+      ::close(ifd);
+      return;
+    }
+
+    // Watched identity filenames for fast lookup
+    static constexpr std::array<std::string_view, 5> kWatched{
+        "SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"};
+
+    // poll(2) monitors both the inotify fd and the read end of the wake pipe
+    std::array<::pollfd, 2> pfds{};
+    pfds[0] = {ifd,              POLLIN, 0};
+    pfds[1] = {wakeup_pipe_[0],  POLLIN, 0};
+
+    // Buffer sized for a reasonable batch of events
+    alignas(struct inotify_event)
+        char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
+
     while (watching_) {
-      std::this_thread::sleep_for(std::chrono::seconds(5));
-      if (!watching_) {
+      pfds[0].revents = 0;
+      pfds[1].revents = 0;
+
+      int nready = ::poll(pfds.data(), pfds.size(), -1 /*block indefinitely*/);
+      if (nready < 0) {
+        if (errno == EINTR)
+          continue;
+        logger_->error("poll() in file watcher failed: {}", std::strerror(errno));
         break;
       }
 
-      for (const auto& name :
-           {"SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"}) {
-        auto path = workspace_path_ / name;
-        if (!std::filesystem::exists(path)) {
-          continue;
-        }
-        auto mtime = std::filesystem::last_write_time(path);
+      // Shutdown signal received via self-pipe
+      if (pfds[1].revents & POLLIN)
+        break;
 
-        FileChangeCallback cb_copy;
-        {
-          std::lock_guard<std::mutex> lock(watcher_mutex_);
-          auto it = file_mtimes_.find(name);
-          if (it == file_mtimes_.end() || it->second != mtime) {
-            file_mtimes_[name] = mtime;
+      if (!(pfds[0].revents & POLLIN))
+        continue;
+
+      // Drain all pending inotify events
+      while (true) {
+        ssize_t n = ::read(ifd, buf, sizeof(buf));
+        if (n < 0) {
+          if (errno == EAGAIN || errno == EWOULDBLOCK)
+            break; // no more events right now
+          logger_->error("read() on inotify fd failed: {}", std::strerror(errno));
+          break;
+        }
+
+        for (ssize_t offset = 0; offset < n; ) {
+          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+          const auto* ev =
+              reinterpret_cast<const struct inotify_event*>(buf + offset);
+          offset += static_cast<ssize_t>(sizeof(struct inotify_event) +
+                                         ev->len);
+
+          if (ev->len == 0 || ev->name[0] == '\0')
+            continue;
+
+          std::string_view name(ev->name);
+          bool is_watched = std::any_of(
+              kWatched.begin(), kWatched.end(),
+              [&](std::string_view w) { return w == name; });
+          if (!is_watched)
+            continue;
+
+          FileChangeCallback cb_copy;
+          {
+            std::lock_guard<std::mutex> lock(watcher_mutex_);
             logger_->info("File changed: {}", name);
             cb_copy = change_callback_;
           }
-        }
-        if (cb_copy) {
-          cb_copy(name);
+          if (cb_copy)
+            cb_copy(std::string(name));
         }
       }
     }
+
+    ::inotify_rm_watch(ifd, wd);
+    ::close(ifd);
+    // Drain and close the read end of the wake pipe
+    ::close(wakeup_pipe_[0]);
+    wakeup_pipe_[0] = -1;
   });
 
-  logger_->info("File watcher started for workspace: {}",
+  logger_->info("File watcher started (inotify) for workspace: {}",
                 workspace_path_.string());
 }
 
@@ -210,6 +274,13 @@ void MemoryManager::StopFileWatcher() {
   if (!watching_)
     return;
   watching_ = false;
+  // Unblock the poll() call in the watcher thread via the self-pipe
+  if (wakeup_pipe_[1] >= 0) {
+    const char byte = 1;
+    ::write(wakeup_pipe_[1], &byte, 1);
+    ::close(wakeup_pipe_[1]);
+    wakeup_pipe_[1] = -1;
+  }
   if (watcher_thread_ && watcher_thread_->joinable()) {
     watcher_thread_->join();
   }

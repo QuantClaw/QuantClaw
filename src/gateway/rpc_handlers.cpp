@@ -1,7 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
 #include <spdlog/spdlog.h>
+
+module quantclaw.gateway.rpc_handlers;
 
 import std;
 import nlohmann.json;

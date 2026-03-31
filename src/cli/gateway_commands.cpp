@@ -41,26 +41,7 @@ import quantclaw.core.skill_loader;
 import quantclaw.tools.tool_registry;
 import quantclaw.web.api_routes;
 import quantclaw.web.web_server;
-
-// Forward declare from rpc_handlers.cpp
-namespace quantclaw::gateway {
-void register_rpc_handlers(
-    GatewayServer& server,
-    std::shared_ptr<quantclaw::SessionManager> session_manager,
-    std::shared_ptr<quantclaw::AgentLoop> agent_loop,
-    std::shared_ptr<quantclaw::PromptBuilder> prompt_builder,
-    std::shared_ptr<quantclaw::ToolRegistry> tool_registry,
-    const quantclaw::QuantClawConfig& config,
-    std::shared_ptr<spdlog::logger> logger,
-    std::function<void()> reload_fn = nullptr,
-    std::shared_ptr<quantclaw::ProviderRegistry> provider_registry = nullptr,
-    std::shared_ptr<quantclaw::SkillLoader> skill_loader = nullptr,
-    std::shared_ptr<quantclaw::CronScheduler> cron_scheduler = nullptr,
-    std::shared_ptr<quantclaw::ExecApprovalManager> exec_approval_mgr = nullptr,
-    quantclaw::PluginSystem* plugin_system = nullptr,
-    gateway::CommandQueue* command_queue = nullptr,
-    std::string log_file_path = {});
-}
+import quantclaw.gateway.rpc_handlers;
 
 namespace quantclaw::cli {
 

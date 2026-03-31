@@ -13,8 +13,11 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
 import nlohmann.json;
 import quantclaw.config;
+import quantclaw.core.content_block;
+import quantclaw.providers.llm_provider;
 import quantclaw.core.context_pruner;
 import quantclaw.core.memory_search;
 import quantclaw.gateway.command_queue;

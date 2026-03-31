@@ -7,6 +7,7 @@
 #include <duckdb.h>
 
 import std;
+import quantclaw.providers.llm_provider;
 import nlohmann.json;
 
 import quantclaw.core.dag_runtime;

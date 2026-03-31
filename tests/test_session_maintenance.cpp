@@ -8,6 +8,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
+import nlohmann.json;
 import quantclaw.session.session_maintenance;
 
 import quantclaw.test.helpers;

@@ -97,6 +97,9 @@ static std::string capture_stderr(std::function<void()> fn) {
 }
 #else
 #include <unistd.h>
+
+import std;
+import quantclaw.providers.llm_provider;
 static std::string capture_stdout(std::function<void()> fn) {
   fflush(stdout);
   int pipefd[2];

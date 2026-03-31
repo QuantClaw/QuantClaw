@@ -14,6 +14,8 @@ import quantclaw.test.helpers;
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+import std;
 #endif
 
 class SandboxTest : public ::testing::Test {

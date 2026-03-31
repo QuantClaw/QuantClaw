@@ -9,6 +9,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
+import nlohmann.json;
 import quantclaw.config;
 import quantclaw.plugins.hook_manager;
 import quantclaw.plugins.plugin_manifest;

@@ -9,6 +9,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
 import quantclaw.core.mmr_reranker;
 import quantclaw.core.temporal_decay;
 import quantclaw.core.vector_index;

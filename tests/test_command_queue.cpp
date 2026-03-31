@@ -11,6 +11,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
+import nlohmann.json;
 import quantclaw.config;
 import quantclaw.gateway.command_queue;
 

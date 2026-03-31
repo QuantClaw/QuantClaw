@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 import std;
+import nlohmann.json;
 import quantclaw.web.web_server;
 
 import quantclaw.test.helpers;

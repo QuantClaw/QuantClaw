@@ -12,6 +12,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
+import nlohmann.json;
 import quantclaw.config;
 import quantclaw.core.agent_loop;
 import quantclaw.core.memory_manager;
@@ -26,34 +28,8 @@ import quantclaw.tools.tool_chain;
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;
-
-// Forward declare register_rpc_handlers
-namespace quantclaw {
-class ProviderRegistry;
-class SkillLoader;
-class CronScheduler;
-class ExecApprovalManager;
-class PluginSystem;
-}  // namespace quantclaw
-namespace quantclaw::gateway {
-class CommandQueue;
-void register_rpc_handlers(
-    GatewayServer& server,
-    std::shared_ptr<quantclaw::SessionManager> session_manager,
-    std::shared_ptr<quantclaw::AgentLoop> agent_loop,
-    std::shared_ptr<quantclaw::PromptBuilder> prompt_builder,
-    std::shared_ptr<quantclaw::ToolRegistry> tool_registry,
-    const quantclaw::QuantClawConfig& config,
-    std::shared_ptr<spdlog::logger> logger,
-    std::function<void()> reload_fn = nullptr,
-    std::shared_ptr<quantclaw::ProviderRegistry> provider_registry = nullptr,
-    std::shared_ptr<quantclaw::SkillLoader> skill_loader = nullptr,
-    std::shared_ptr<quantclaw::CronScheduler> cron_scheduler = nullptr,
-    std::shared_ptr<quantclaw::ExecApprovalManager> exec_approval_mgr = nullptr,
-    quantclaw::PluginSystem* plugin_system = nullptr,
-    quantclaw::gateway::CommandQueue* command_queue = nullptr,
-    std::string log_file_path = {});
-}  // namespace quantclaw::gateway
+import quantclaw.gateway.rpc_handlers;
+import quantclaw.gateway.command_queue;
 
 // --- Mock LLM Provider ---
 

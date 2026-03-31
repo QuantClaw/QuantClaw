@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 import std;
+import nlohmann.json;
 import quantclaw.providers.provider_registry;
 
 namespace quantclaw {

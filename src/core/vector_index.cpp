@@ -46,15 +46,13 @@ VectorIndex::Search(const std::vector<float>& query, int top_k) const {
         {entry.id, entry.content, entry.source, entry.line_number, sim});
   }
 
-  // Sort by similarity descending
-  std::sort(results.begin(), results.end(),
-            [](const VectorSearchResult& a, const VectorSearchResult& b) {
-              return a.score > b.score;
-            });
-
-  if (static_cast<int>(results.size()) > top_k) {
-    results.resize(top_k);
-  }
+  // Partial sort: only order the top_k elements, reducing O(N log N) to O(N log K)
+  auto cmp = [](const VectorSearchResult& a, const VectorSearchResult& b) {
+    return a.score > b.score;
+  };
+  int k = std::min(top_k, static_cast<int>(results.size()));
+  std::partial_sort(results.begin(), results.begin() + k, results.end(), cmp);
+  results.resize(k);
   return results;
 }
 

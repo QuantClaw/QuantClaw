@@ -9,19 +9,24 @@ namespace quantclaw {
 
 namespace {
 
-std::unordered_set<std::string> tokenize_to_set(const std::string& text) {
+std::unordered_set<std::string> tokenize_to_set(std::string_view text) {
   std::unordered_set<std::string> tokens;
-  std::string word;
-  for (char c : text) {
-    if (std::isalnum(static_cast<unsigned char>(c))) {
-      word += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    } else if (!word.empty()) {
-      tokens.insert(word);
-      word.clear();
+  std::size_t start = std::string_view::npos;
+  for (std::size_t i = 0; i <= text.size(); ++i) {
+    bool alnum = i < text.size() &&
+                 std::isalnum(static_cast<unsigned char>(text[i]));
+    if (alnum) {
+      if (start == std::string_view::npos)
+        start = i;
+    } else if (start != std::string_view::npos) {
+      // Construct token in-place: lowercase the slice without a temporary string
+      std::string token(text.substr(start, i - start));
+      for (char& c : token)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      tokens.insert(std::move(token));
+      start = std::string_view::npos;
     }
   }
-  if (!word.empty())
-    tokens.insert(word);
   return tokens;
 }
 

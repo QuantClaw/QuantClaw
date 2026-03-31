@@ -9,6 +9,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
 import quantclaw.mcp.mcp_server;
 import quantclaw.tools.tool_registry;
 

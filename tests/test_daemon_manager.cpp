@@ -22,6 +22,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
 import quantclaw.gateway.daemon_manager;
 
 import quantclaw.test.helpers;
