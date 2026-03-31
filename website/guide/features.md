@@ -206,7 +206,7 @@ quantclaw cron remove TASK_ID
 
 ## 📊 Performance Optimizations
 
-- **C++17 Native**: Direct compilation for target platform
+- **C++23 Native**: Direct compilation for target platform using C++23 modules
 - **Efficient Memory**: Context compaction and pruning
 - **Fast Startup**: Lazy initialization of modules
 - **Concurrent Operations**: Multi-threaded request handling

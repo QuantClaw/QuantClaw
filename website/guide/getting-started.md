@@ -4,15 +4,15 @@ Welcome to QuantClaw! This guide will help you get up and running in just a few 
 
 ## What is QuantClaw?
 
-QuantClaw is a high-performance C++17 implementation of OpenClaw, an AI agent framework designed to run locally on your machine. It can execute commands, control browsers, manage files, and integrate with various chat platforms — with minimal memory footprint and no runtime dependencies.
+QuantClaw is a high-performance C++23 implementation of OpenClaw, an AI agent framework designed to run locally on your machine. It can execute commands, control browsers, manage files, and integrate with various chat platforms — with minimal memory footprint and no runtime dependencies.
 
 ## Prerequisites
 
 Before you start, make sure you have:
 
-- **Linux (Ubuntu 20.04+)** or **Windows 10+ (WSL2)**
-- **C++17 compatible compiler** (GCC 7+, Clang 5+)
-- **CMake 3.15+**
+- **Linux (Ubuntu 24.04+ recommended)** or **Windows 11+ (WSL2 with Ubuntu 24.04)**
+- **C++23 compiler with modules support** — GCC 16+ (recommended for `-fmodules-ts` support)
+- **CMake 3.20+** (for C++23 modules support)
 - **Node.js 16+** (for plugin support)
 - **An LLM API key** (OpenAI, Anthropic, or any compatible provider)
 

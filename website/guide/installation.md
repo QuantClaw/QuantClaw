@@ -38,14 +38,19 @@ quantclaw --version
 
 #### Build from Source
 ```bash
-# Install build dependencies
+# Install GCC 16+ for C++23 modules support
 sudo apt-get update
+sudo apt-get install -y gcc-16 g++-16
+
+# Set GCC 16 as default
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+
+# Install build dependencies
 sudo apt-get install -y \
-  build-essential \
   cmake \
   git \
   libssl-dev \
-  nlohmann-json3-dev \
   libspdlog-dev
 
 # Clone repository

@@ -286,7 +286,6 @@ export class QuantClawApp extends LitElement {
   @state() usageVisibleColumns: string[] = [
     "channel",
     "agent",
-    "provider",
     "model",
     "messages",
     "tools",

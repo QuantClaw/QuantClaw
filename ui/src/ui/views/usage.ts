@@ -610,16 +610,10 @@ export function renderUsage(props: UsageProps) {
           </select>
           <div class="chart-toggle">
             <button
-              class="toggle-btn ${isTokenMode ? "active" : ""}"
+              class="toggle-btn active"
               @click=${() => props.onChartModeChange("tokens")}
             >
               Tokens
-            </button>
-            <button
-              class="toggle-btn ${!isTokenMode ? "active" : ""}"
-              @click=${() => props.onChartModeChange("cost")}
-            >
-              Cost
             </button>
           </div>
           <button
@@ -776,7 +770,7 @@ export function renderUsage(props: UsageProps) {
             props.onDailyChartModeChange,
             props.onSelectDay,
           )}
-          ${displayTotals ? renderCostBreakdownCompact(displayTotals, props.chartMode) : nothing}
+          ${displayTotals ? renderCostBreakdownCompact(displayTotals, "tokens") : nothing}
         </div>
       </div>
       <div class="usage-grid-right">

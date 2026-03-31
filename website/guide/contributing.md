@@ -61,10 +61,18 @@ git remote add upstream https://github.com/QuantClaw/quantclaw.git
 
 ### Build and Test
 
+QuantClaw uses C++23 modules, which requires GCC 16+ with `-fmodules-ts` support:
+
 ```bash
-# Install dependencies (see Building Guide)
-mkdir build && cd build
-cmake ..
+# Install GCC 16+ (see Building Guide for detailed setup)
+# Ubuntu/Debian:
+sudo apt-get install gcc-16 g++-16
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+
+# Build using the gcc16-ninja preset
+mkdir build-cmake43 && cd build-cmake43
+cmake .. --preset gcc16-ninja
 cmake --build . -j$(nproc)
 
 # Run tests
@@ -73,6 +81,8 @@ cmake --build . -j$(nproc)
 # Test locally
 quantclaw --version
 ```
+
+**Note:** See the [Building Guide](/guide/building) for C++23 modules details, compiler requirements, and platform-specific instructions.
 
 ## Making Changes
 

@@ -721,7 +721,6 @@ function renderSessionsCard(
           <select
             @change=${(e: Event) => onSessionSortChange((e.target as HTMLSelectElement).value as typeof sessionSort)}
           >
-            <option value="cost" ?selected=${sessionSort === "cost"}>Cost</option>
             <option value="errors" ?selected=${sessionSort === "errors"}>Errors</option>
             <option value="messages" ?selected=${sessionSort === "messages"}>Messages</option>
             <option value="recent" ?selected=${sessionSort === "recent"}>Recent</option>

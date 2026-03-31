@@ -1,6 +1,6 @@
 # Architecture Overview
 
-QuantClaw's architecture is designed for performance, reliability, and extensibility.
+QuantClaw's architecture is designed for performance, reliability, and extensibility. Built in C++23 with modules for cleaner separation of concerns and faster incremental builds.
 
 ## System Architecture
 

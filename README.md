@@ -5,13 +5,13 @@
 <h1 align="center">QuantClaw</h1>
 
 <p align="center">
-  <strong>High-performance personal AI assistant in C++17</strong>
+  <strong>High-performance personal AI assistant in C++23 with Modules</strong>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml"><img src="https://github.com/QuantClaw/QuantClaw/actions/workflows/github-actions.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus&logoColor=white" alt="C++17">
+  <img src="https://img.shields.io/badge/C%2B%2B-23-00599C.svg?logo=cplusplus&logoColor=white" alt="C++23">
   <img src="https://img.shields.io/badge/tests-996%20passing-brightgreen.svg" alt="996 tests passing">
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey.svg" alt="Linux | Windows">
   <a href="https://github.com/openclaw/openclaw"><img src="https://img.shields.io/badge/OpenClaw-compatible-orange.svg" alt="OpenClaw Compatible"></a>
@@ -27,7 +27,7 @@ QuantClaw is a native C++ implementation of the [OpenClaw](https://github.com/op
 
 ## Features
 
-- **Blazing Fast**: C++17 native performance with minimal overhead
+- **Blazing Fast**: C++23 native performance with minimal overhead
 - **Memory Efficient**: Small memory footprint, suitable for resource-constrained environments
 - **OpenClaw Compatible**: Works with OpenClaw workspace files, skills, and configuration
 - **Dual Protocol**: WebSocket RPC gateway + HTTP REST API

@@ -7,31 +7,39 @@ Complete guide to building QuantClaw from source code.
 ### All Platforms
 
 - **Git** - Version control
-- **CMake** - Build system (3.15+)
-- **C++17 Compiler** - GCC 7+, Clang 6+, or MSVC 2017+
+- **CMake** - Build system (3.20+ required for C++23 modules support)
+- **C++23 Compiler** - GCC 16+ with `-fmodules-ts` flag
 - **Node.js** - 16+ (for plugin system)
 
 ### Linux (Ubuntu/Debian)
 
 ```bash
+# Install GCC 16+ (for C++23 modules support)
+sudo apt-get install -y gcc-16 g++-16
+
+# Set GCC 16 as default
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+
+# Install build dependencies
 sudo apt-get install -y \
-  build-essential \
   cmake \
   git \
   libssl-dev \
-  nlohmann-json3-dev \
   libspdlog-dev \
   pkg-config
 ```
 
 ### macOS
 
+> **Note:** GCC with C++23 modules support (`-fmodules-ts`) is recommended. Clang support for C++23 modules is still in development.
+
 ```bash
-# Homebrew
-brew install cmake openssl nlohmann-json spdlog
+# Homebrew - install GCC 16+
+brew install gcc@16 cmake openssl spdlog
 
 # Or MacPorts
-sudo port install cmake openssl nlohmann_json spdlog
+sudo port install gcc16 cmake openssl spdlog
 ```
 
 ### Windows (MSVC)
@@ -58,10 +66,10 @@ git checkout v1.0.0
 
 ```bash
 # Create build directory
-mkdir build && cd build
+mkdir build-cmake43 && cd build-cmake43
 
-# Configure build
-cmake ..
+# Configure build with GCC 16 and C++23 modules preset
+cmake .. --preset gcc16-ninja
 
 # Build (use multiple cores for speed)
 cmake --build . -j$(nproc)
@@ -70,34 +78,29 @@ cmake --build . -j$(nproc)
 sudo cmake --install .
 ```
 
-### Windows (Command Prompt)
+**Note on CMakePresets:** The project uses `CMakePresets.json` with a preset named `gcc16-ninja` that configures:
+- GCC 16 C++23 compiler
+- Ninja build generator
+- C++23 standard with modules support (`CMAKE_CXX_SCAN_FOR_MODULES=ON`)
+- vcpkg toolchain for dependency management
+
+### Windows
+
+> **Status:** Windows support requires MSVC 17+ with C++23 modules support. Currently, GCC 16+ on WSL2 or native Linux is the recommended build environment.
 
 ```batch
 # Create build directory
 mkdir build
 cd build
 
-# Configure for Visual Studio
-cmake .. -G "Visual Studio 17 2022"
+# Configure for Visual Studio (experimental C++23 modules support)
+cmake .. -G "Visual Studio 17 2022" -DCMAKE_CXX_STANDARD=23
 
 # Build
 cmake --build . --config Release -j %NUMBER_OF_PROCESSORS%
-
-# Optional: Install
-cmake --install . --config Release
 ```
 
-### Windows (PowerShell)
-
-```powershell
-# Create and enter build directory
-New-Item -ItemType Directory -Name build -Force
-cd build
-
-# Configure and build
-cmake .. -G "Visual Studio 17 2022"
-cmake --build . --config Release -j $env:NUMBER_OF_PROCESSORS
-```
+For best results on Windows, use **WSL2 with Ubuntu 24.04 LTS** and follow the Linux build instructions.
 
 ## Build Verification
 
@@ -305,14 +308,19 @@ sudo apt-get install nlohmann-json3-dev libspdlog-dev
 
 ### Compiler Errors
 
-**C++17 Not Supported**
+**C++23 Modules Not Supported**
 ```bash
-# Ensure C++17 compiler
-cmake -DCMAKE_CXX_STANDARD=17 ..
+# Ensure GCC 16+ is installed and used
+gcc --version  # Must be 16.0.0 or higher
 
-# Or upgrade compiler
-# Ubuntu: sudo apt-get install g++-11
-# macOS: brew install gcc
+# Set GCC 16 as default
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+
+# Reconfigure
+rm -rf build-cmake43
+mkdir build-cmake43 && cd build-cmake43
+cmake .. --preset gcc16-ninja
 ```
 
 **OpenSSL Not Found**
@@ -429,18 +437,64 @@ valgrind --leak-check=full ./quantclaw agent
 cmake -WITH_PERFTOOLS=ON ..
 ```
 
+## C++23 Modules Architecture
+
+QuantClaw uses C++23 modules (`.cppm` and `.ixx` files) for better compile-time isolation and faster incremental builds compared to traditional header files.
+
+### Module Structure
+
+- **`.cppm` files**: Module interface files (equivalent to header files in traditional C++)
+  - Example: `src/core/agent_loop.cppm`
+- **`.cpp` files**: Module implementation files (both traditional and module-implementing units)
+  - Example: `src/core/agent_loop.cpp`
+- **Global Module Fragment**: Non-modular `#include` directives must appear before the module declaration in each `.cpp` file:
+  ```cpp
+  module;
+  #include <cstdlib>
+  #include <spdlog/spdlog.h>
+  module quantclaw.core.agent_loop;
+  import std;  // C++23 standard library as a module
+  ```
+
+### Key Points for Development
+
+1. **Use `import std;` instead of `#include <cstddef>`, `#include <vector>`, etc.**
+   - The standard library is available as a module
+   - Bare C type names (e.g., `uint16_t`) require `std::` qualification or explicit `#include <cstdint>`
+
+2. **Third-party headers remain `#include`**
+   - Must be placed in the **global module fragment** (before `module` declaration)
+   - Examples: `<spdlog/spdlog.h>`, `<curl/curl.h>`
+   - Modular third-party libraries can use `import` (e.g., `import nlohmann.json;`)
+
+3. **Structured Bindings with `nlohmann::json`**
+   - When using `import nlohmann.json;`, structured bindings like `for (auto [k, v] : j.items())` may break
+   - Use explicit iterators instead: `for (auto it = j.begin(); it != j.end(); ++it) { auto k = it.key(); auto v = it.value(); }`
+
+4. **POSIX functions are not in `std::`**
+   - Functions like `setenv()`, `fork()`, `sigaction()` require their C headers in the global module fragment
+   - Include `<cstdlib>`, `<unistd.h>`, `<csignal>`, etc. explicitly
+
+### Rebuilding Module Caches
+
+GCC's module cache can occasionally become stale:
+
+```bash
+# Clear module caches and rebuild
+rm -rf build-cmake43/CMakeFiles
+cmake --build build-cmake43 --clean-first
+cmake --build build-cmake43 -j$(nproc)
+```
+
 ## Clean Build
 
 ```bash
-# Remove build artifacts
-rm -rf build
+# Remove build artifacts (recommended for module builds)
+rm -rf build-cmake43
 
-# Or with git
-git clean -xfd build/
-
-# Rebuild from scratch
-mkdir build && cd build
-cmake ..
+# Rebuild from scratch with modules preset
+mkdir build-cmake43 && cd build-cmake43
+cmake .. --preset gcc16-ninja
 cmake --build . -j$(nproc)
 ```
 
