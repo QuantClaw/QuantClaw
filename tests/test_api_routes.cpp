@@ -6,9 +6,10 @@
 #include <memory>
 #include <thread>
 
+#include <gtest/gtest.h>
 #include <httplib.h>
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
 
 import quantclaw.config;
 import quantclaw.core.agent_loop;
@@ -23,7 +24,6 @@ import quantclaw.web.api_routes;
 import quantclaw.web.web_server;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 // Mock LLM provider
 class ApiMockLLMProvider : public quantclaw::LLMProvider {

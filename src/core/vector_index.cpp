@@ -17,7 +17,7 @@ float VectorIndex::CosineSimilarity(const std::vector<float>& a,
     return 0.0f;
 
   float dot = 0.0f, norm_a = 0.0f, norm_b = 0.0f;
-  for (size_t i = 0; i < a.size(); ++i) {
+  for (std::size_t i = 0; i < a.size(); ++i) {
     dot += a[i] * b[i];
     norm_a += a[i] * a[i];
     norm_b += b[i] * b[i];

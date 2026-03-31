@@ -1,14 +1,13 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import std;
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+#include <gtest/gtest.h>
 
+import std;
 import quantclaw.providers.anthropic_provider;
 import quantclaw.providers.llm_provider;
-
-import <gtest/gtest.h>;
 
 // Mock AnthropicProvider for testing without actual API calls
 class MockAnthropicProvider : public quantclaw::AnthropicProvider {

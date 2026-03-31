@@ -1,12 +1,18 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.cli.onboard_commands;
+module;
+
+#include <spdlog/spdlog.h>
+
+module quantclaw.cli.onboard_commands;
 
 import std;
+import nlohmann.json;
 
 import quantclaw.builtin_skills;
 import quantclaw.config;
+import quantclaw.constants;
 import quantclaw.gateway.gateway_client;
 import quantclaw.platform.service;
 
@@ -765,7 +771,7 @@ bool OnboardCommands::CreateToolsFile() {
 }
 
 bool OnboardCommands::InstallDaemon(int port) {
-  platform::ServiceManager service(logger_);
+  quantclaw::platform::ServiceManager service(logger_);
   int ret = service.install(port);
   return ret == 0;
 }

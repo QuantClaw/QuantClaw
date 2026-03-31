@@ -8,15 +8,16 @@
 #include <mutex>
 #include <thread>
 
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
+#include <gtest/gtest.h>
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
 
 import quantclaw.gateway.gateway_client;
 import quantclaw.gateway.gateway_server;
 import quantclaw.gateway.protocol;
+import nlohmann.json;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 using namespace quantclaw::gateway;
 

@@ -3,13 +3,13 @@
 
 module;
 
-import std;
-
-import <httplib.h>;
-import nlohmann.json;
-import <spdlog/spdlog.h>;
+#include <httplib.h>
+#include <spdlog/spdlog.h>
 
 module quantclaw.tools.tool_registry;
+
+import std;
+import nlohmann.json;
 
 import quantclaw.core.subagent;
 import quantclaw.core.cron_scheduler;

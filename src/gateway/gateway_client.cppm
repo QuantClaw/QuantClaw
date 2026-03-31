@@ -1,13 +1,15 @@
-// Copyrighte,2025 QuantClaw Contributors
- of all build art
+// Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
+
+module;
+
+#include <ixwebsocket/IXWebSocket.h>
+#include <spdlog/spdlog.h>
 
 export module quantclaw.gateway.gateway_client;
 
 import std;
-import <ixwebsocket/IXWebSocket.h>;
 import nlohmann.json;
-import <spdlog/spdlog.h>;
 
 import quantclaw.gateway.protocol;
 

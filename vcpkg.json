@@ -7,9 +7,9 @@
     "nlohmann-json",
     "curl",
     "openssl",
-    "sqlite3",
+    "duckdb",
     "ixwebsocket",
-    "gtest",
+    "bext-ut",
     "cpp-httplib"
   ]
 }

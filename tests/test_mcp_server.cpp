@@ -3,12 +3,12 @@
 
 #include <memory>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import nlohmann.json;
 import quantclaw.mcp.mcp_server;
-
-#include <gtest/gtest.h>
 
 class TestMCPTool : public quantclaw::mcp::MCPTool {
  public:
@@ -71,31 +71,6 @@ TEST_F(MCPServerTest, CallTool) {
   EXPECT_EQ(response["id"], 3);
   auto content = response["result"]["content"];
   EXPECT_EQ(content[0]["text"], "Processed: hello");
-}
-
-TEST_F(MCPServerTest, ListTools) {
-  nlohmann::json request = {
-  {"jsonrpc", "2.0"}, {"id", 10}, {"method", "tools/list"}, {"params", {}}};
-
-  auto response = server_->HandleRequest(request);
-
-  EXPECT_EQ(response["id"], 10);
-  EXPECT_TRUE(response.contains("result"));
-  EXPECT_EQ(response["result"]["tools"].size(), 1u);
-}
-
-TEST_F(MCPServerTest, CallTool) {
-  nlohmann::json request = {
-      {"jsonrpc", "2.0"},
-      {"id", 11},
-  {"method", "tools/call"},
-      {"params",
-       {{"name", "test_tool"}, {"arguments", {{"input", "legacy"}}}}}};
-
-  auto response = server_->HandleRequest(request);
-
-  EXPECT_EQ(response["id"], 11);
-  EXPECT_EQ(response["result"]["content"][0]["text"], "Processed: legacy");
 }
 
 // --- Tool schema uses inputSchema per MCP spec ---

@@ -3,10 +3,18 @@
 
 #ifdef _WIN32
 
+module;
+
+// clang-format off
+import <windows.h>;  // must precede psapi.h
+#include <psapi.h>
+// clang-format on
+
+#include <spdlog/spdlog.h>
+
+module quantclaw.platform.service;
+
 import std;
-
-import quantclaw.platform.service;
-
 import quantclaw.platform.process;
 
 namespace quantclaw::platform {
@@ -37,7 +45,8 @@ int ServiceManager::install(int port) {
   std::string exe = executable_path();
   out << "{\n"
       << "  \"executable\": \"" << exe << "\",\n"
-      << "  \"args\": [\"gateway\", \"run\", \"--port\", \"" << port << "\"],\n"
+      << "  \"args\": [\"gateway\", \"run\", \"--port\", \""
+      << port << "\"],\n"
       << "  \"logFile\": \"" << log_file_ << "\"\n"
       << "}\n";
   out.close();

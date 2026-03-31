@@ -4,11 +4,11 @@
 #include <filesystem>
 #include <memory>
 
+#include <gtest/gtest.h>
 import quantclaw.platform.process;
 import quantclaw.security.sandbox;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 #ifdef __linux__
 #include <sys/resource.h>

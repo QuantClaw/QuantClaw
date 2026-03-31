@@ -1,10 +1,9 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.cli.cli_manager;
+module quantclaw.cli.cli_manager;
 
 import std;
-import <spdlog/spdlog.h>;
 
 import quantclaw.constants;
 
@@ -62,7 +61,7 @@ void CLIManager::ShowHelp() const {
     std::cout << "  " << cmd.name;
     if (!cmd.aliases.empty()) {
       std::cout << " (";
-      for (size_t i = 0; i < cmd.aliases.size(); ++i) {
+      for (std::size_t i = 0; i < cmd.aliases.size(); ++i) {
         if (i > 0)
           std::cout << ", ";
         std::cout << cmd.aliases[i];

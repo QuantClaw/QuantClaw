@@ -2,11 +2,12 @@
   "version": 8,
   "configurePresets": [
     {
-      "name": "gcc15-ninja",
-      "displayName": "GCC 15 + Ninja (C++23 modules)",
-      "description": "Configure QuantClaw with GCC 15 and Ninja for the module-based C++23 build.",
+      "name": "gcc16-ninja",
+      "displayName": "GCC 16 + Ninja (C++23 modules)",
+      "description": "Configure QuantClaw with GCC 16 and Ninja for the module-based C++23 build.",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build-cmake43",
+      "toolchainFile": "${sourceDir}/.vcpkg/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_TESTS": "ON",
@@ -19,8 +20,8 @@
   ],
   "buildPresets": [
     {
-      "name": "gcc15-ninja",
-      "configurePreset": "gcc15-ninja"
+      "name": "gcc16-ninja",
+      "configurePreset": "gcc16-ninja"
     }
   ]
 }

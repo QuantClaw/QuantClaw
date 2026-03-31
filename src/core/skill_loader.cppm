@@ -3,18 +3,15 @@
 
 module;
 
+#include <spdlog/spdlog.h>
+
 export module quantclaw.core.skill_loader;
 
 import std;
+import quantclaw.config;
 import nlohmann.json;
 
-namespace spdlog {
-class logger;
-}
-
 export namespace quantclaw {
-
-struct SkillsConfig;
 
 struct SkillInstallInfo {
   std::string method;

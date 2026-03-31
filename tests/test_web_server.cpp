@@ -1,15 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import std;
-import <httplib.h>;
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
+#include <httplib.h>
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+#include <gtest/gtest.h>
 
+import std;
 import quantclaw.web.web_server;
 
 import quantclaw.test.helpers;
-import <gtest/gtest.h>;
 
 class WebServerTest : public ::testing::Test {
  protected:

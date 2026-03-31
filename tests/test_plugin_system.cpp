@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -15,7 +16,6 @@ import quantclaw.plugins.plugin_registry;
 import quantclaw.plugins.plugin_system;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 // Windows SDK defines StartService/StopService as macros; undefine them
 // to allow calling quantclaw::PluginSystem::StartService/StopService.

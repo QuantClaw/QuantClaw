@@ -3,12 +3,13 @@
 
 module;
 
+#include <spdlog/spdlog.h>
+
 module quantclaw.core.memory_search;
 
 import std;
 
 import nlohmann.json;
-import <spdlog/spdlog.h>;
 import quantclaw.providers.embedding_provider;
 import quantclaw.core.mmr_reranker;
 import quantclaw.core.temporal_decay;

@@ -1,10 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.cli.agent_commands;
+module;
+
+#include <spdlog/spdlog.h>
+
+module quantclaw.cli.agent_commands;
 
 import std;
-
+import nlohmann.json;
+import quantclaw.gateway.gateway_client;
 
 namespace quantclaw::cli {
 

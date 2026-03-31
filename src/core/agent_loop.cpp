@@ -1,14 +1,19 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 module quantclaw.core.agent_loop;
 
 import std;
 
 import nlohmann.json;
-import <spdlog/spdlog.h>;
+import quantclaw.constants;
 import quantclaw.providers.failover_resolver;
 import quantclaw.core.context_engine;
+import quantclaw.core.content_block;
 import quantclaw.core.dag_runtime;
 import quantclaw.core.usage_accumulator;
 import quantclaw.providers.provider_error;

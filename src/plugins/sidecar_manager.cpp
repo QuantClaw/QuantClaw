@@ -1,9 +1,16 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 module quantclaw.plugins.sidecar_manager;
 
 import std;
+import nlohmann.json;
+import quantclaw.platform.ipc;
+import quantclaw.platform.process;
 
 namespace quantclaw {
 
@@ -135,7 +142,7 @@ SidecarResponse SidecarManager::Call(const std::string& method,
   std::string payload = req.to_json().dump() + "\n";
   int written = platform::ipc_write(ipc_handle_, payload.data(),
                                     static_cast<int>(payload.size()));
-  if (written < 0 || static_cast<size_t>(written) != payload.size()) {
+  if (written < 0 || static_cast<std::size_t>(written) != payload.size()) {
     platform::ipc_close(ipc_handle_);
     ipc_handle_ = platform::kInvalidIpc;
     SidecarResponse r;

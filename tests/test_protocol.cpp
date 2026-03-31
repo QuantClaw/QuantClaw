@@ -1,10 +1,13 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.gateway.protocol;
+#include <gtest/gtest.h>
 
 import std;
-import <gtest/gtest.h>;
+
+import nlohmann.json;
+
+import quantclaw.gateway.protocol;
 
 using namespace quantclaw::gateway;
 
@@ -289,7 +292,8 @@ TEST(ProtocolTest, EventConstants) {
   EXPECT_STREQ(events::kToolUse, "agent.tool_use");
   EXPECT_STREQ(events::kToolResult, "agent.tool_result");
   EXPECT_STREQ(events::kMessageEnd, "agent.message_end");
-  EXPECT_STREQ(events::kTick, "gateway.tick");
+  EXPECT_STREQ(events::kOcChat, "chat");
+  EXPECT_STREQ(events::kOcAgent, "agent");
 }
 
 // --- Roundtrip serialization ---

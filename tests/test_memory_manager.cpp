@@ -5,6 +5,7 @@
 #include <fstream>
 #include <memory>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -12,7 +13,6 @@ import quantclaw.core.memory_manager;
 import quantclaw.core.memory_search;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 class MemoryManagerTest : public ::testing::Test {
  protected:

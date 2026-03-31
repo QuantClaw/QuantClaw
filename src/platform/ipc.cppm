@@ -7,7 +7,7 @@ import std;
 
 export namespace quantclaw::platform {
 
-using IpcHandle = intptr_t;
+using IpcHandle = std::intptr_t;
 constexpr IpcHandle kInvalidIpc = -1;
 
 class IpcServer {

@@ -11,9 +11,12 @@
 
 #include <memory>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import std;
+import quantclaw.core.content_block;
 import quantclaw.config;
 import quantclaw.constants;
 import quantclaw.core.agent_loop;
@@ -26,7 +29,6 @@ import quantclaw.providers.provider_error;
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 using namespace quantclaw;
 

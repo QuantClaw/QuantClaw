@@ -1,12 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 module quantclaw.core.cron_scheduler;
 
 import std;
 
 import nlohmann.json;
-import <spdlog/spdlog.h>;
 
 namespace quantclaw {
 

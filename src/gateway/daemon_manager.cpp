@@ -1,7 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.gateway.daemon_manager;
+module;
+
+#include <spdlog/spdlog.h>
+
+module quantclaw.gateway.daemon_manager;
+
+import std;
+import quantclaw.platform.service;
 
 namespace quantclaw::gateway {
 

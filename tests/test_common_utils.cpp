@@ -1,11 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <gtest/gtest.h>
+
 import std;
-
 import quantclaw.common.defer;
-
-import <gtest/gtest.h>;
 
 // ── Defer ────────────────────────────────────────────────────────────────────
 

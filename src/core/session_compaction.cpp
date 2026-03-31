@@ -3,6 +3,8 @@
 
 module;
 
+#include <spdlog/spdlog.h>
+
 module quantclaw.core.session_compaction;
 
 import std;

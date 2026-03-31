@@ -1,10 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import std;
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+#include <gtest/gtest.h>
 
+import std;
 import quantclaw.config;
 import quantclaw.core.agent_loop;
 import quantclaw.core.memory_manager;
@@ -14,7 +15,6 @@ import quantclaw.providers.llm_provider;
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;
-import <gtest/gtest.h>;
 
 // Mock LLM provider that returns canned responses and captures requests
 class MockLLMProvider : public quantclaw::LLMProvider {

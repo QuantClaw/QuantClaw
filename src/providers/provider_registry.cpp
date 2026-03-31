@@ -1,12 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 module quantclaw.providers.provider_registry;
 
 import std;
 
 import nlohmann.json;
-import <spdlog/spdlog.h>;
 
 import quantclaw.providers.anthropic_provider;
 import quantclaw.providers.llm_provider;
@@ -63,7 +66,9 @@ void ProviderRegistry::LoadFromConfig(const nlohmann::json& providers_json) {
   if (!providers_json.is_object())
     return;
 
-  for (auto& [id, val] : providers_json.items()) {
+  for (auto it = providers_json.begin(); it != providers_json.end(); ++it) {
+    const std::string id = it.key();
+    const auto& val = it.value();
     ProviderEntry entry;
     entry.id = id;
     entry.display_name = val.value("displayName", id);
@@ -98,7 +103,9 @@ void ProviderRegistry::LoadAliases(const nlohmann::json& aliases_json) {
   if (!aliases_json.is_object())
     return;
 
-  for (auto& [model_ref, val] : aliases_json.items()) {
+  for (auto it = aliases_json.begin(); it != aliases_json.end(); ++it) {
+    const std::string model_ref = it.key();
+    const auto& val = it.value();
     if (val.is_object() && val.contains("alias")) {
       alias_map_[val["alias"].get<std::string>()] = model_ref;
     } else if (val.is_string()) {

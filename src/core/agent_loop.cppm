@@ -1,31 +1,31 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 export module quantclaw.core.agent_loop;
 
 import std;
+import quantclaw.constants;
 import nlohmann.json;
 import quantclaw.common.noncopyable;
 import quantclaw.config;
-
-namespace spdlog {
-class logger;
-}
-
 import quantclaw.core.dag_runtime;
-export namespace quantclaw {
+import quantclaw.core.context_engine;
+import quantclaw.core.memory_manager;
+import quantclaw.core.skill_loader;
+import quantclaw.core.subagent;
+import quantclaw.core.usage_accumulator;
+import quantclaw.providers.curl_raii;
+import quantclaw.providers.anthropic_provider;
+import quantclaw.providers.failover_resolver;
+import quantclaw.providers.llm_provider;
+import quantclaw.providers.provider_registry;
+import quantclaw.tools.tool_registry;
 
-class MemoryManager;
-class SkillLoader;
-class ToolRegistry;
-class ProviderRegistry;
-class SubagentManager;
-class FailoverResolver;
-class DagRuntime;
-class ContextEngine;
-class UsageAccumulator;
-class LLMProvider;
-struct Message;
+export namespace quantclaw {
 
 struct AgentEvent {
   std::string type;
@@ -117,18 +117,17 @@ class AgentLoop : public Noncopyable {
   std::shared_ptr<SkillLoader> skill_loader_;
   std::shared_ptr<ToolRegistry> tool_registry_;
   std::shared_ptr<LLMProvider> llm_provider_;
+  std::shared_ptr<spdlog::logger> logger_;
+  AgentConfig agent_config_;
+  int max_iterations_ = 0;
   ProviderRegistry* provider_registry_ = nullptr;
   SubagentManager* subagent_manager_ = nullptr;
   FailoverResolver* failover_resolver_ = nullptr;
-  std::shared_ptr<UsageAccumulator> usage_accumulator_;
-  std::shared_ptr<DagRuntime> dag_runtime_;
   std::shared_ptr<ContextEngine> context_engine_;
   std::string session_key_;
-  std::shared_ptr<spdlog::logger> logger_;
-  AgentConfig agent_config_;
-  std::atomic<bool> stop_requested_{false};
-  int max_iterations_ = 15;
-
+  std::shared_ptr<UsageAccumulator> usage_accumulator_;
+  std::shared_ptr<DagRuntime> dag_runtime_;
+  bool stop_requested_ = false;
   std::string last_provider_id_;
   std::string last_profile_id_;
 };

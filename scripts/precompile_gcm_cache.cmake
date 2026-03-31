@@ -27,6 +27,7 @@ set(_cxx_flags
 set(_project_includes
   -I${QC_SOURCE_DIR}/include
   -I${QC_SOURCE_DIR}/src
+  -I${QC_BINARY_DIR}/vcpkg_installed/x64-linux/include
   -I${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux/include
   -I${QC_SOURCE_DIR}/build-ninja/vcpkg_installed/x64-linux/include
 )
@@ -146,13 +147,7 @@ qc_run_compile("quantclaw.common.defer" FILE "${QC_SOURCE_DIR}/src/common/defer.
 
 # Third-party header units used throughout the project.
 qc_run_compile("nlohmann/json.hpp" FILE "${QC_SOURCE_DIR}/include/nlohmann/json.hpp" MODE header)
-qc_run_compile("spdlog/spdlog.h" FILE "${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux/include/spdlog/spdlog.h" MODE system-header)
-qc_run_compile("spdlog/sinks/null_sink.h" FILE "${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux/include/spdlog/sinks/null_sink.h" MODE system-header)
-qc_run_compile("httplib.h" FILE "${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux/include/httplib.h" MODE system-header)
-qc_run_compile("sqlite3.h" FILE "${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux/include/sqlite3.h" MODE system-header)
-qc_run_compile("ixwebsocket/IXHttp.h" FILE "${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux/include/ixwebsocket/IXHttp.h" MODE system-header)
-qc_run_compile("ixwebsocket/IXWebSocket.h" FILE "${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux/include/ixwebsocket/IXWebSocket.h" MODE system-header)
-qc_run_compile("ixwebsocket/IXWebSocketServer.h" FILE "${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux/include/ixwebsocket/IXWebSocketServer.h" MODE system-header)
+qc_run_compile("duckdb.h" FILE "${QC_BINARY_DIR}/vcpkg_installed/x64-linux/include/duckdb.h" MODE system-header)
 
 # The nlohmann.json named module exports the header unit above.
 qc_run_compile("nlohmann.json" FILE "${QC_SOURCE_DIR}/src/thirdparty/json.ixx" MODE module)

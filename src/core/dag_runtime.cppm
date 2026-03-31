@@ -1,15 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 export module quantclaw.core.dag_runtime;
 
 import std;
 import nlohmann.json;
 import quantclaw.common.noncopyable;
-
-namespace spdlog {
-class logger;
-}
 
 export namespace quantclaw {
 
@@ -75,6 +75,7 @@ class DagRuntime : public Noncopyable {
   std::shared_ptr<spdlog::logger> logger_;
   mutable std::mutex db_mu_;
   void* db_ = nullptr;
+  void* con_ = nullptr;
   bool enabled_ = false;
   std::unordered_map<std::string, std::string> latest_run_by_session_;
 };

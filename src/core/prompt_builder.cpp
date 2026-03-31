@@ -3,6 +3,8 @@
 
 module;
 
+#include <ctime>
+
 module quantclaw.core.prompt_builder;
 
 import std;

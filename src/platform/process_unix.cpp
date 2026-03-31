@@ -3,14 +3,21 @@
 
 #ifndef _WIN32
 
-import std;
-import <sys/resource.h>;
-import <sys/wait.h>;
-import <unistd.h>;
-import <poll.h>;
+module;
 
+#include <cerrno>
+
+#include <cstdlib>
+
+#include <poll.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+module quantclaw.platform.process;
+
+import std;
 import quantclaw.common.defer;
-import quantclaw.platform.process;
 
 namespace quantclaw::platform {
 

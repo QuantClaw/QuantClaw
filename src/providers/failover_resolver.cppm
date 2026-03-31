@@ -1,10 +1,13 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 export module quantclaw.providers.failover_resolver;
 
 import std;
-import <spdlog/spdlog.h>;
 
 import quantclaw.providers.cooldown_tracker;
 import quantclaw.providers.llm_provider;

@@ -3,26 +3,20 @@
 
 module;
 
+#include <spdlog/spdlog.h>
+
 export module quantclaw.tools.tool_registry;
 
 import std;
 import nlohmann.json;
-
-namespace spdlog {
-class logger;
-}
+import quantclaw.core.cron_scheduler;
+import quantclaw.core.subagent;
+import quantclaw.mcp.mcp_tool_manager;
+import quantclaw.security.exec_approval;
+import quantclaw.security.tool_permissions;
+import quantclaw.session.session_manager;
 
 export namespace quantclaw {
-
-class ToolPermissionChecker;
-class ExecApprovalManager;
-class SubagentManager;
-class CronScheduler;
-class SessionManager;
-
-namespace mcp {
-class MCPToolManager;
-}
 
 class ToolRegistry {
  public:

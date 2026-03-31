@@ -22,12 +22,11 @@ static constexpr socket_t kInvalidSocket = -1;
 #include <memory>
 #include <thread>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
 import quantclaw.mcp.mcp_client;
-
-#include <gtest/gtest.h>
 
 using namespace quantclaw::mcp;
 

@@ -1,15 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+#include <gtest/gtest.h>
+
 import std;
-
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
-
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;
-import <gtest/gtest.h>;
 
 class ToolRegistryTest : public ::testing::Test {
  protected:

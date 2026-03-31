@@ -3,11 +3,12 @@
 
 module;
 
-import std;
-import nlohmann.json;
-import <spdlog/spdlog.h>;
+#include <spdlog/spdlog.h>
 
 module quantclaw.core.subagent;
+
+import std;
+import nlohmann.json;
 
 namespace quantclaw {
 

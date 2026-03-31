@@ -1,13 +1,16 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.security.sandbox;
+module;
+
+#include <spdlog/spdlog.h>
+
+module quantclaw.security.sandbox;
 
 import std;
 
-import <spdlog/spdlog.h>;
 #ifdef __linux__
-import <sys/resource.h>;
+#include <sys/resource.h>
 #endif
 
 namespace quantclaw {

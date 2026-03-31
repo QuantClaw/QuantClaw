@@ -1,15 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 export module quantclaw.plugins.hook_manager;
 
 import std;
 import nlohmann.json;
 import quantclaw.plugins.sidecar_manager;
-
-namespace spdlog {
-class logger;
-}
 
 export namespace quantclaw {
 
@@ -67,7 +67,7 @@ class HookManager {
   bool UnregisterHook(const std::string& hook_name,
                       const std::string& plugin_id);
   void Clear();
-  size_t HandlerCount(const std::string& hook_name) const;
+  std::size_t HandlerCount(const std::string& hook_name) const;
 
  private:
   nlohmann::json FireVoid(const std::string& hook_name,

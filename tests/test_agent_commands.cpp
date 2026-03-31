@@ -13,8 +13,9 @@
 #include <sstream>
 #include <thread>
 
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
+#include <gtest/gtest.h>
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
 
 import quantclaw.cli.agent_commands;
 import quantclaw.config;
@@ -30,7 +31,6 @@ import quantclaw.session.session_manager;
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 // Forward declare register_rpc_handlers
 namespace quantclaw {

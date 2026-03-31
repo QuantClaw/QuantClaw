@@ -3,21 +3,18 @@
 
 module;
 
+#include <spdlog/spdlog.h>
+
 export module quantclaw.core.memory_search;
 
 import std;
 import nlohmann.json;
-
-namespace spdlog {
-class logger;
-}
+import quantclaw.providers.embedding_provider;
 import quantclaw.core.mmr_reranker;
 import quantclaw.core.temporal_decay;
 import quantclaw.core.vector_index;
 
 export namespace quantclaw {
-
-class EmbeddingProvider;
 
 struct MemorySearchResult {
   std::string source;

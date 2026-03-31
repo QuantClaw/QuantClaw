@@ -5,6 +5,7 @@
 #include <fstream>
 #include <memory>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -14,7 +15,6 @@ import quantclaw.core.prompt_builder;
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 class PromptBuilderTest : public ::testing::Test {
  protected:

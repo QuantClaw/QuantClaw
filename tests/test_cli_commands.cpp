@@ -9,14 +9,13 @@
 
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
+#include <gtest/gtest.h>
 
 import quantclaw.cli.agent_commands;
 import quantclaw.cli.cli_manager;
 import quantclaw.cli.gateway_commands;
 import quantclaw.cli.onboard_commands;
 import quantclaw.cli.session_commands;
-
-#include <gtest/gtest.h>
 
 using namespace quantclaw::cli;
 

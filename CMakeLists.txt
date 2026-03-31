@@ -96,6 +96,7 @@ endif()
 
 # Required dependencies
 include(FetchContent)
+find_package(ut CONFIG REQUIRED)
 find_package(spdlog CONFIG QUIET)
 find_package(CURL CONFIG QUIET)
 if(NOT CURL_FOUND)
@@ -112,12 +113,20 @@ if(NOT CURL_FOUND)
     FetchContent_MakeAvailable(curl)
 endif()
 find_package(OpenSSL REQUIRED)
-find_package(SQLite3 QUIET)
-if(TARGET SQLite3::SQLite3)
-    set(QC_SQLITE_TARGET SQLite3::SQLite3)
+find_package(DuckDB CONFIG QUIET)
+if(NOT DuckDB_FOUND)
+    find_package(duckdb CONFIG QUIET)
+endif()
+if(TARGET DuckDB::DuckDB)
+    set(QC_DUCKDB_TARGET DuckDB::DuckDB)
+elseif(TARGET duckdb::duckdb)
+    set(QC_DUCKDB_TARGET duckdb::duckdb)
+elseif(TARGET duckdb)
+    set(QC_DUCKDB_TARGET duckdb)
+elseif(TARGET duckdb_static)
+    set(QC_DUCKDB_TARGET duckdb_static)
 else()
-    find_package(unofficial-sqlite3 CONFIG REQUIRED)
-    set(QC_SQLITE_TARGET unofficial::sqlite3::sqlite3)
+    message(FATAL_ERROR "DuckDB CMake target not found after package discovery")
 endif()
 find_package(nlohmann_json CONFIG QUIET)
 
@@ -192,8 +201,76 @@ if(NOT httplib_FOUND)
     FetchContent_MakeAvailable(httplib)
 endif()
 
-# Source files - explicitly listed
+# Source files - .cpp implementation units only
+# Module interface units (.cppm/.ixx) are in QUANTCLAW_CORE_MODULE_SOURCES below.
 set(QUANTCLAW_CORE_SOURCES
+    # Providers
+    src/providers/provider_registry.cpp
+    # Core
+    src/core/agent_loop.cpp
+    src/core/cron_scheduler.cpp
+    src/core/dag_runtime.cpp
+    src/core/mmr_reranker.cpp
+    src/core/default_context_engine.cpp
+    src/core/message_commands.cpp
+    src/core/context_pruner.cpp
+    src/core/memory_manager.cpp
+    src/core/memory_search.cpp
+    src/core/multi_stage_compaction.cpp
+    src/core/prompt_builder.cpp
+    src/core/session_compaction.cpp
+    src/core/signal_handler.cpp
+    src/core/skill_loader.cpp
+    src/core/temporal_decay.cpp
+    src/core/usage_accumulator.cpp
+    src/core/vector_index.cpp
+    src/core/subagent.cpp
+    # CLI
+    src/cli/cli_manager.cpp
+    src/cli/agent_commands.cpp
+    src/cli/gateway_commands.cpp
+    src/cli/onboard_commands.cpp
+    src/cli/session_commands.cpp
+    # Gateway
+    src/gateway/gateway_server.cpp
+    src/gateway/gateway_client.cpp
+    src/gateway/rpc_handlers.cpp
+    src/gateway/daemon_manager.cpp
+    src/gateway/command_queue.cpp
+    # Session
+    src/session/session_manager.cpp
+    src/session/session_maintenance.cpp
+    # Tools
+    src/tools/tool_registry.cpp
+    src/tools/tool_chain.cpp
+    src/tools/browser_tool.cpp
+    # MCP
+    src/mcp/mcp_server.cpp
+    src/mcp/mcp_client.cpp
+    src/mcp/mcp_tool_manager.cpp
+    # Channels
+    src/channels/adapter_manager.cpp
+    src/channels/channel_policy.cpp
+    # Plugins
+    src/plugins/plugin_manifest.cpp
+    src/plugins/plugin_registry.cpp
+    src/plugins/sidecar_manager.cpp
+    src/plugins/hook_manager.cpp
+    src/plugins/plugin_system.cpp
+    # Security
+    src/security/sandbox.cpp
+    src/security/tool_permissions.cpp
+    src/security/exec_approval.cpp
+    src/security/rbac.cpp
+    src/security/rate_limiter.cpp
+    # Web
+    src/web/web_server.cpp
+    src/web/api_routes.cpp
+    # IPC - single TCP implementation for all platforms
+    src/platform/ipc_tcp.cpp
+)
+
+set(QUANTCLAW_CORE_MODULE_SOURCES
     src/constants.cppm
     src/config.cppm
     src/common/defer.cppm
@@ -201,10 +278,30 @@ set(QUANTCLAW_CORE_SOURCES
     src/providers/embedding_provider.cppm
     src/providers/curl_raii.cppm
     src/providers/anthropic_provider.cppm
-    src/providers/provider_registry.cpp
+    src/providers/provider_registry.cppm
     src/providers/provider_error.cppm
     src/providers/cooldown_tracker.cppm
     src/providers/failover_resolver.cppm
+    src/core/content_block.cppm
+    src/core/agent_loop.cppm
+    src/core/cron_scheduler.cppm
+    src/core/dag_runtime.cppm
+    src/core/mmr_reranker.cppm
+    src/core/context_engine.cppm
+    src/core/default_context_engine.cppm
+    src/core/message_commands.cppm
+    src/core/context_pruner.cppm
+    src/core/memory_manager.cppm
+    src/core/memory_search.cppm
+    src/core/multi_stage_compaction.cppm
+    src/core/prompt_builder.cppm
+    src/core/session_compaction.cppm
+    src/core/signal_handler.cppm
+    src/core/skill_loader.cppm
+    src/core/temporal_decay.cppm
+    src/core/usage_accumulator.cppm
+    src/core/vector_index.cppm
+    src/core/subagent.cppm
     src/session/session_manager.cppm
     src/security/rbac.cppm
     src/platform/process.cppm
@@ -217,6 +314,9 @@ set(QUANTCLAW_CORE_SOURCES
     src/cli/session_commands.cppm
     src/gateway/daemon_manager.cppm
     src/gateway/protocol.cppm
+    src/gateway/gateway_server.cppm
+    src/gateway/gateway_client.cppm
+    src/gateway/command_queue.cppm
     src/channels/channel_policy.cppm
     src/plugins/plugin_manifest.cppm
     src/plugins/plugin_registry.cppm
@@ -227,66 +327,22 @@ set(QUANTCLAW_CORE_SOURCES
     src/common/parse_util.cppm
     src/common/string_util.cppm
     src/builtin_skills.cppm
-    # Third-party module wrapper
     src/thirdparty/json.ixx
-    # CLI
-    src/cli/cli_manager.cpp
-    src/cli/agent_commands.cpp
-    src/cli/gateway_commands.cpp
-    src/cli/onboard_commands.cpp
-    src/cli/session_commands.cpp
-    # Gateway
-    src/gateway/gateway_server.cppm
-    src/gateway/gateway_server.cpp
-    src/gateway/gateway_client.cppm
-    src/gateway/gateway_client.cpp
-    src/gateway/rpc_handlers.cpp
-    src/gateway/daemon_manager.cpp
-    src/gateway/command_queue.cppm
-    src/gateway/command_queue.cpp
-    # Session
-    src/session/session_manager.cpp
+    src/tools/tool_registry.cppm
     src/session/session_maintenance.cppm
-    src/session/session_maintenance.cpp
-    # Tools
-    src/tools/tool_registry.cpp
     src/tools/tool_chain.cppm
-    src/tools/tool_chain.cpp
-    src/tools/browser_tool.cpp
-    # MCP
     src/mcp/mcp_server.cppm
     src/mcp/mcp_client.cppm
-    src/mcp/mcp_server.cpp
-    src/mcp/mcp_client.cpp
-    src/mcp/mcp_tool_manager.cpp
-    # Channels
+    src/mcp/mcp_tool_manager.cppm
+    src/mcp/quantclaw_mcp_tools.cppm
     src/channels/adapter_manager.cppm
-    src/channels/adapter_manager.cpp
-    src/channels/channel_policy.cpp
-    # Plugins
-    src/plugins/plugin_manifest.cpp
-    src/plugins/plugin_registry.cpp
-    src/plugins/sidecar_manager.cpp
-    src/plugins/hook_manager.cpp
-    src/plugins/plugin_system.cpp
-    # Security
     src/security/rate_limiter.cppm
     src/security/tool_permissions.cppm
     src/security/exec_approval.cppm
     src/tools/browser_tool.cppm
     src/security/sandbox.cppm
-    src/security/sandbox.cpp
-    src/security/tool_permissions.cpp
-    src/security/exec_approval.cpp
-    src/security/rbac.cpp
-    src/security/rate_limiter.cpp
-    # Web
     src/web/web_server.cppm
     src/web/api_routes.cppm
-    src/web/web_server.cpp
-    src/web/api_routes.cpp
-    # IPC - single TCP implementation for all platforms
-    src/platform/ipc_tcp.cpp
 )
 
 # Platform-specific sources (process + service abstractions)
@@ -318,6 +374,13 @@ string(TIMESTAMP QC_BUILD_DATE "%Y-%m-%d")
 
 add_library(quantclaw_core STATIC ${QUANTCLAW_CORE_SOURCES})
 set_property(TARGET quantclaw_core PROPERTY CXX_SCAN_FOR_MODULES ON)
+
+target_sources(quantclaw_core
+    PUBLIC
+        FILE_SET CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
+        FILES ${QUANTCLAW_CORE_MODULE_SOURCES}
+)
 
 execute_process(
     COMMAND ${CMAKE_COMMAND}
@@ -363,7 +426,7 @@ target_link_libraries(quantclaw_core
         CURL::libcurl
         OpenSSL::SSL
         OpenSSL::Crypto
-        ${QC_SQLITE_TARGET}
+        ${QC_DUCKDB_TARGET}
 )
 
 # WinSock2 and BCrypt (needed by mbedtls) required on Windows
@@ -463,23 +526,10 @@ install(TARGETS quantclaw DESTINATION bin)
 
 # --- Tests ---
 if(BUILD_TESTS)
-    # googletest: try vcpkg/system first, fallback to FetchContent
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    find_package(GTest CONFIG QUIET)
-    if(NOT GTest_FOUND)
-        include(FetchContent)
-        FetchContent_Declare(
-            googletest
-            GIT_REPOSITORY https://github.com/google/googletest.git
-            GIT_TAG        v1.15.2
-            GIT_SHALLOW    TRUE
-        )
-        FetchContent_MakeAvailable(googletest)
-    endif()
-
     enable_testing()
 
     set(TEST_SOURCES
+        tests/test_main.cpp
         tests/test_helpers.cppm
         tests/test_config.cpp
         tests/test_protocol.cpp
@@ -542,7 +592,7 @@ if(BUILD_TESTS)
     )
     target_link_libraries(quantclaw_tests PRIVATE
         quantclaw_core
-        GTest::gtest_main
+        Boost::ut
     )
     set_property(TARGET quantclaw_tests PROPERTY CXX_SCAN_FOR_MODULES ON)
     target_compile_options(quantclaw_tests PRIVATE -Wall -Wextra -Wpedantic -O2)
@@ -551,23 +601,7 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
 
-    include(GoogleTest)
-    if(WIN32)
-        # On Windows, vcpkg DLLs are in vcpkg_installed/<triplet>/bin; add them
-        # to PATH so gtest_discover_tests can run the binary to list tests, and
-        # so ctest can run the tests themselves.
-        set(VCPKG_DLL_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/bin")
-        # ENVIRONMENT entries are a CMake semicolon-separated list, so the
-        # PATH value must have its semicolons escaped as \; to avoid being
-        # split into separate list items.
-        string(REPLACE ";" "\\;" _escaped_system_path "$ENV{PATH}")
-        gtest_discover_tests(quantclaw_tests
-            DISCOVERY_MODE PRE_TEST
-            PROPERTIES ENVIRONMENT "PATH=${VCPKG_DLL_DIR}\;${_escaped_system_path}"
-        )
-    else()
-        gtest_discover_tests(quantclaw_tests)
-    endif()
+    add_test(NAME quantclaw_tests COMMAND quantclaw_tests)
 
     if(TARGET qc_stdlib_modules)
         add_dependencies(quantclaw_tests qc_stdlib_modules)

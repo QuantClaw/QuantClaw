@@ -4,13 +4,13 @@
 #include <filesystem>
 #include <fstream>
 
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
+#include <gtest/gtest.h>
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
 
 import quantclaw.session.session_maintenance;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 namespace quantclaw {
 

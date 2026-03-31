@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -13,8 +14,6 @@ import quantclaw.core.temporal_decay;
 import quantclaw.core.vector_index;
 import quantclaw.core.memory_search;
 import quantclaw.providers.embedding_provider;
-
-#include <gtest/gtest.h>
 
 namespace quantclaw {
 

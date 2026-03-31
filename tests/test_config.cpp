@@ -1,7 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <gtest/gtest.h>
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 import std;
+import nlohmann.json;
 
 #ifdef _WIN32
 #define test_setenv(name, value) _putenv_s(name, value)
@@ -10,9 +15,6 @@ import std;
 #define test_setenv(name, value) setenv(name, value, 1)
 #define test_unsetenv(name) unsetenv(name)
 #endif
-
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
 
 import quantclaw.config;
 import quantclaw.core.agent_loop;
@@ -23,7 +25,6 @@ import quantclaw.providers.provider_registry;
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;
-import <gtest/gtest.h>;
 
 class ConfigTest : public ::testing::Test {
  protected:

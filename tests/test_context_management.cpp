@@ -9,16 +9,15 @@
 #include <process.h>
 #endif
 
-import nlohmann.json;
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+import nlohmann.json;
 import quantclaw.config;
 import quantclaw.core.context_pruner;
 import quantclaw.core.memory_search;
 import quantclaw.gateway.command_queue;
-
-#include <gtest/gtest.h>
 
 namespace quantclaw {
 

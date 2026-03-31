@@ -1,6 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <cstddef>
+#include <curl/curl.h>
+#include <spdlog/spdlog.h>
+
 module quantclaw.mcp.mcp_client;
 
 import std;
@@ -8,7 +14,8 @@ import std;
 
 namespace quantclaw::mcp {
 
-static size_t WriteCallback(void* contents, size_t size, size_t nmemb,
+static std::size_t WriteCallback(void* contents, std::size_t size,
+                                 std::size_t nmemb,
                             std::string* userp) {
   userp->append((char*)contents, size * nmemb);
   return size * nmemb;

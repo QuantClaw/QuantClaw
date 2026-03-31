@@ -3,12 +3,15 @@
 
 module;
 
+#include <spdlog/spdlog.h>
+
 import std;
 
 module quantclaw.mcp.mcp_tool_manager;
 
 import quantclaw.mcp.mcp_client;
-import quantclaw.tools.tool_registry;
+import quantclaw.config;
+import nlohmann.json;
 
 namespace quantclaw::mcp {
 
@@ -57,26 +60,6 @@ void MCPToolManager::DiscoverTools(const MCPConfig& config) {
   }
 
   logger_->info("Total MCP tools discovered: {}", tool_to_server_.size());
-}
-
-void MCPToolManager::RegisterInto(ToolRegistry& registry) {
-  for (const auto& [qualified_name, meta] : tool_meta_) {
-    auto schema = nlohmann::json::parse(meta.parameters_json, nullptr, false);
-    if (schema.is_discarded()) {
-      schema = nlohmann::json::object();
-    }
-    auto self =
-        this;  // capture raw pointer; MCPToolManager outlives the lambda
-    const auto& name = qualified_name;  // C++17: structured bindings cannot be
-                                        // captured in lambdas
-    registry.RegisterExternalTool(
-        qualified_name, meta.description, schema,
-        [self, name](const nlohmann::json& args) -> std::string {
-          return self->ExecuteTool(name, args.dump());
-        });
-  }
-
-  logger_->info("Registered {} MCP tools into ToolRegistry", tool_meta_.size());
 }
 
 std::string MCPToolManager::ExecuteTool(const std::string& qualified_name,

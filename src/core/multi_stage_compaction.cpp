@@ -3,6 +3,8 @@
 
 module;
 
+#include <spdlog/spdlog.h>
+
 module quantclaw.core.multi_stage_compaction;
 
 import std;

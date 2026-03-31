@@ -3,14 +3,12 @@
 
 module;
 
+#include <spdlog/spdlog.h>
+
 export module quantclaw.tools.tool_chain;
 
 import std;
 import nlohmann.json;
-
-namespace spdlog {
-class logger;
-}
 
 export namespace quantclaw {
 

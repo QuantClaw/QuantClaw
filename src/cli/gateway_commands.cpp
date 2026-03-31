@@ -1,14 +1,21 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.cli.gateway_commands;
+module;
+
+#include <httplib.h>
+#include <spdlog/spdlog.h>
+
+module quantclaw.cli.gateway_commands;
 
 import std;
+import nlohmann.json;
 
 import quantclaw.channels.adapter_manager;
 import quantclaw.config;
 import quantclaw.constants;
 import quantclaw.core.agent_loop;
+import quantclaw.providers.llm_provider;
 import quantclaw.core.prompt_builder;
 import quantclaw.core.subagent;
 import quantclaw.core.dag_runtime;
@@ -146,7 +153,6 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       std::make_shared<quantclaw::mcp::MCPToolManager>(logger_);
   if (!config.mcp.servers.empty()) {
     mcp_tool_manager->DiscoverTools(config.mcp);
-    mcp_tool_manager->RegisterInto(*tool_registry);
   }
 
   // Set up tool permissions
@@ -198,7 +204,7 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   agent_loop->SetProviderRegistry(provider_registry.get());
 
     auto dag_runtime = std::make_shared<quantclaw::DagRuntime>(
-      (sessions_dir / "dag.sqlite3").string(), logger_);
+      (sessions_dir / "dag.duckdb").string(), logger_);
     agent_loop->SetDagRuntime(dag_runtime);
 
   auto session_manager =
@@ -260,7 +266,6 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       // Re-discover MCP tools if server list changed
       if (!config.mcp.servers.empty()) {
         mcp_tool_manager->DiscoverTools(config.mcp);
-        mcp_tool_manager->RegisterInto(*tool_registry);
       }
 
       // Reload workspace files

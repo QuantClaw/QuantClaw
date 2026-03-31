@@ -1,15 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 export module quantclaw.core.session_compaction;
 
 import std;
 import nlohmann.json;
 import quantclaw.providers.llm_provider;
-
-namespace spdlog {
-class logger;
-}
 
 export namespace quantclaw {
 

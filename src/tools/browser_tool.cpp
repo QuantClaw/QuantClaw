@@ -1,13 +1,19 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.tools.browser_tool;
+module;
+
+#include <ixwebsocket/IXWebSocket.h>
+#include <httplib.h>
+#include <spdlog/spdlog.h>
+
+module quantclaw.tools.browser_tool;
 
 import std;
 
-import <httplib.h>;
-
+import nlohmann.json;
 import quantclaw.common.parse_util;
+import quantclaw.platform.process;
 
 namespace quantclaw {
 

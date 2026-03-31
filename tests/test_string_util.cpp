@@ -1,10 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.common.string_util;
+#include <gtest/gtest.h>
 
 import std;
-import <gtest/gtest.h>;
+
+import quantclaw.common.string_util;
 
 using namespace quantclaw;
 

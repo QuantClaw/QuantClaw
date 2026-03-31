@@ -5,13 +5,17 @@
 #include <fstream>
 #include <memory>
 
-import <spdlog/sinks/null_sink.h>;
-import <spdlog/spdlog.h>;
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
 
-import quantclaw.session.session_manager;
-
-import quantclaw.test.helpers;
 #include <gtest/gtest.h>
+
+import std;
+import nlohmann.json;
+
+import quantclaw.core.content_block;
+import quantclaw.session.session_manager;
+import quantclaw.test.helpers;
 
 class SessionManagerTest : public ::testing::Test {
  protected:

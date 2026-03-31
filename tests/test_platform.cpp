@@ -4,11 +4,12 @@
 #include <filesystem>
 #include <thread>
 
+#include <gtest/gtest.h>
+#include <spdlog/spdlog.h>
+
 import quantclaw.platform.ipc;
 import quantclaw.platform.process;
 import quantclaw.platform.service;
-
-#include <gtest/gtest.h>
 
 using namespace quantclaw::platform;
 

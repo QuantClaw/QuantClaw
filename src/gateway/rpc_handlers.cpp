@@ -1,7 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <spdlog/spdlog.h>
+
 import std;
+import nlohmann.json;
 
 import quantclaw.config;
 import quantclaw.constants;
@@ -10,6 +13,7 @@ import quantclaw.core.message_commands;
 import quantclaw.gateway.command_queue;
 import quantclaw.gateway.gateway_server;
 import quantclaw.gateway.protocol;
+import quantclaw.providers.llm_provider;
 import quantclaw.plugins.plugin_system;
 import quantclaw.providers.provider_registry;
 import quantclaw.security.exec_approval;
@@ -1180,8 +1184,8 @@ void register_rpc_handlers(
           // Flatten nested patch object if present
           nlohmann::json flat = params;
           if (params.contains("patch") && params["patch"].is_object()) {
-            for (auto& [k, v] : params["patch"].items()) {
-              flat[k] = v;
+            for (const auto& item : params["patch"].items()) {
+              flat[item.key()] = item.value();
             }
           }
 

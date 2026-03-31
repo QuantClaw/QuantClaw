@@ -1,11 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.security.rate_limiter;
+#include <gtest/gtest.h>
 
 import std;
 
-import <gtest/gtest.h>;
+import quantclaw.security.rate_limiter;
 
 using namespace quantclaw;
 

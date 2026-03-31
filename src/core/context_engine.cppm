@@ -4,10 +4,9 @@
 export module quantclaw.core.context_engine;
 
 import std;
+import quantclaw.providers.llm_provider;
 
 export namespace quantclaw {
-
-struct Message;
 
 struct AssembleResult {
   std::vector<Message> messages;

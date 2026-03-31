@@ -1,10 +1,11 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.core.message_commands;
+#include <gtest/gtest.h>
 
 import std;
-import <gtest/gtest.h>;
+
+import quantclaw.core.message_commands;
 
 using namespace quantclaw;
 

@@ -3,14 +3,21 @@
 
 #ifndef _WIN32
 
+module;
+
+#include <cerrno>
+#include <csignal>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <spdlog/spdlog.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+module quantclaw.platform.service;
+
 import std;
-import <csignal>;
-import <cstdlib>;
-import <filesystem>;
-import <fstream>;
-
-import quantclaw.platform.service;
-
 import quantclaw.platform.process;
 
 namespace quantclaw::platform {
@@ -60,8 +67,6 @@ int ServiceManager::install(int port) {
   if (r != 0)
     logger_->warn("systemctl daemon-reload returned {}", r);
 
-  // Execute enable command (return value ignored; redirection suppresses
-  // output)
   (void)std::system(
       ("systemctl --user enable " + std::string(kServiceName) + " 2>/dev/null")
           .c_str());
@@ -76,13 +81,10 @@ int ServiceManager::uninstall() {
     logger_->info("Service not installed");
     return 0;
   }
-  // Execute disable command (return value ignored; redirection suppresses
-  // output)
   (void)std::system(
       ("systemctl --user disable " + std::string(kServiceName) + " 2>/dev/null")
           .c_str());
   std::filesystem::remove(svc);
-  // Execute daemon-reload (return value ignored; redirection suppresses output)
   (void)std::system("systemctl --user daemon-reload 2>/dev/null");
   logger_->info("Service uninstalled");
   return 0;

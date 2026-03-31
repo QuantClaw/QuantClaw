@@ -8,6 +8,7 @@
 #include <memory>
 #include <thread>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -25,7 +26,6 @@ import quantclaw.tools.tool_chain;
 import quantclaw.tools.tool_registry;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 // Forward declare
 namespace quantclaw {

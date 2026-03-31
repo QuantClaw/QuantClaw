@@ -1,31 +1,32 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+#include <duckdb.h>
+
 module quantclaw.core.dag_runtime;
 
 import std;
-
 import nlohmann.json;
-import <spdlog/spdlog.h>;
-
-import <sqlite3.h>;
+import quantclaw.common.noncopyable;
 
 namespace quantclaw {
 
 namespace {
 
-bool exec_sql(sqlite3* db, const char* sql, std::string* error_out) {
-  char* err = nullptr;
-  int rc = sqlite3_exec(db, sql, nullptr, nullptr, &err);
-  if (rc != SQLITE_OK) {
+bool exec_sql(duckdb_connection con, const char* sql, std::string* error_out) {
+  duckdb_result result;
+  if (duckdb_query(con, sql, &result) == DuckDBError) {
     if (error_out) {
-      *error_out = err ? err : "sqlite error";
+      const char* err = duckdb_result_error(&result);
+      *error_out = err ? err : "duckdb error";
     }
-    if (err) {
-      sqlite3_free(err);
-    }
+    duckdb_destroy_result(&result);
     return false;
   }
+  duckdb_destroy_result(&result);
   return true;
 }
 
@@ -66,33 +67,47 @@ std::string DagNodeTypeToString(DagNodeType type) {
 DagRuntime::DagRuntime(const std::string& db_path,
                        std::shared_ptr<spdlog::logger> logger)
     : logger_(std::move(logger)) {
-  sqlite3* db = nullptr;
-  int rc = sqlite3_open_v2(db_path.c_str(), &db,
-                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
-                               SQLITE_OPEN_FULLMUTEX,
-                           nullptr);
-  if (rc != SQLITE_OK) {
+  duckdb_database db = nullptr;
+  if (duckdb_open(db_path.c_str(), &db) == DuckDBError) {
     if (logger_) {
-      logger_->error("Failed to open DAG sqlite db '{}': {}", db_path,
-                     sqlite3_errmsg(db));
+      logger_->error("Failed to open DAG DuckDB db '{}': {}", db_path,
+                     "open failed");
     }
     if (db) {
-      sqlite3_close(db);
+      duckdb_close(&db);
     }
     return;
   }
+
+  duckdb_connection con = nullptr;
+  if (duckdb_connect(db, &con) == DuckDBError) {
+    if (logger_) {
+      logger_->error("Failed to connect to DAG DuckDB db '{}': {}", db_path,
+                     "connect failed");
+    }
+    duckdb_close(&db);
+    return;
+  }
+
   db_ = db;
+  con_ = con;
   init_schema();
-  enabled_ = db_ != nullptr;
+  enabled_ = db_ != nullptr && con_ != nullptr;
   if (enabled_ && logger_) {
-    logger_->info("DAG runtime enabled with sqlite db: {}", db_path);
+    logger_->info("DAG runtime enabled with DuckDB db: {}", db_path);
   }
 }
 
 DagRuntime::~DagRuntime() {
   std::lock_guard<std::mutex> lock(db_mu_);
+  if (con_) {
+    auto con = static_cast<duckdb_connection>(con_);
+    duckdb_disconnect(&con);
+    con_ = nullptr;
+  }
   if (db_) {
-    sqlite3_close(static_cast<sqlite3*>(db_));
+    auto db = static_cast<duckdb_database>(db_);
+    duckdb_close(&db);
     db_ = nullptr;
   }
 }
@@ -155,16 +170,15 @@ std::string DagRuntime::LatestRunIdForSession(
 
 void DagRuntime::init_schema() {
   std::lock_guard<std::mutex> lock(db_mu_);
-  auto* db = static_cast<sqlite3*>(db_);
-  if (!db) {
+  auto con = static_cast<duckdb_connection>(con_);
+  auto db = static_cast<duckdb_database>(db_);
+  if (!db || !con) {
     return;
   }
 
   std::string error;
-  const char* kSchemaSql = R"SQL(
-PRAGMA journal_mode=WAL;
-PRAGMA synchronous=NORMAL;
-
+  const char* kSchemaSql[] = {
+      R"SQL(
 CREATE TABLE IF NOT EXISTS dag_runs (
   run_id TEXT PRIMARY KEY,
   session_key TEXT NOT NULL,
@@ -174,35 +188,48 @@ CREATE TABLE IF NOT EXISTS dag_runs (
   finished_at TEXT,
   error TEXT
 );
-
+)SQL",
+      R"SQL(
 CREATE TABLE IF NOT EXISTS dag_nodes (
   node_id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL,
   node_type TEXT NOT NULL,
   payload_json TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  FOREIGN KEY(run_id) REFERENCES dag_runs(run_id)
+  created_at TEXT NOT NULL
 );
-
+)SQL",
+      R"SQL(
 CREATE TABLE IF NOT EXISTS dag_edges (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
   run_id TEXT NOT NULL,
   from_node_id TEXT NOT NULL,
   to_node_id TEXT NOT NULL,
   edge_type TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  FOREIGN KEY(run_id) REFERENCES dag_runs(run_id)
+  created_at TEXT NOT NULL
 );
-
+)SQL",
+      R"SQL(
 CREATE INDEX IF NOT EXISTS idx_dag_nodes_run_id ON dag_nodes(run_id);
+)SQL",
+      R"SQL(
 CREATE INDEX IF NOT EXISTS idx_dag_edges_run_id ON dag_edges(run_id);
-)SQL";
+)SQL",
+  };
 
-  if (!exec_sql(db, kSchemaSql, &error)) {
+  for (const auto* stmt : kSchemaSql) {
+    if (!exec_sql(con, stmt, &error)) {
+      break;
+    }
+  }
+
+  if (!error.empty()) {
     if (logger_) {
       logger_->error("Failed to initialize DAG schema: {}", error);
     }
-    sqlite3_close(db);
+    auto con_handle = con;
+    auto db_handle = db;
+    duckdb_disconnect(&con_handle);
+    duckdb_close(&db_handle);
+    con_ = nullptr;
     db_ = nullptr;
   }
 }
@@ -236,52 +263,59 @@ void DagRuntime::insert_run(const std::string& run_id,
                             const std::string& session_key,
                             const std::string& user_message) {
   std::lock_guard<std::mutex> lock(db_mu_);
-  auto* db = static_cast<sqlite3*>(db_);
-  if (!db) {
+  auto con = static_cast<duckdb_connection>(con_);
+  if (!con) {
     return;
   }
 
   const char* sql =
       "INSERT INTO dag_runs(run_id, session_key, status, user_message, "
       "created_at) VALUES(?, ?, ?, ?, ?);";
-  sqlite3_stmt* stmt = nullptr;
-  if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+  duckdb_prepared_statement stmt;
+  if (duckdb_prepare(con, sql, &stmt) == DuckDBError) {
     if (logger_) {
-      logger_->error("DAG insert_run prepare failed: {}", sqlite3_errmsg(db));
+      logger_->error("DAG insert_run prepare failed: {}",
+                     duckdb_prepare_error(stmt));
     }
+    duckdb_destroy_prepare(&stmt);
     return;
   }
 
-  sqlite3_bind_text(stmt, 1, run_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 2, session_key.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 3, "running", -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 4, user_message.c_str(), -1, SQLITE_TRANSIENT);
+  duckdb_bind_varchar(stmt, 1, run_id.c_str());
+  duckdb_bind_varchar(stmt, 2, session_key.c_str());
+  duckdb_bind_varchar(stmt, 3, "running");
+  duckdb_bind_varchar(stmt, 4, user_message.c_str());
   auto now = now_iso8601();
-  sqlite3_bind_text(stmt, 5, now.c_str(), -1, SQLITE_TRANSIENT);
+  duckdb_bind_varchar(stmt, 5, now.c_str());
 
-  if (sqlite3_step(stmt) != SQLITE_DONE && logger_) {
-    logger_->error("DAG insert_run step failed: {}", sqlite3_errmsg(db));
+  duckdb_result result;
+  if (duckdb_execute_prepared(stmt, &result) == DuckDBError && logger_) {
+    logger_->error("DAG insert_run step failed: {}",
+                   duckdb_result_error(&result));
   }
-  sqlite3_finalize(stmt);
+  duckdb_destroy_result(&result);
+  duckdb_destroy_prepare(&stmt);
 }
 
 void DagRuntime::insert_node(const std::string& node_id,
                              const std::string& run_id, DagNodeType type,
                              const nlohmann::json& payload) {
   std::lock_guard<std::mutex> lock(db_mu_);
-  auto* db = static_cast<sqlite3*>(db_);
-  if (!db) {
+  auto con = static_cast<duckdb_connection>(con_);
+  if (!con) {
     return;
   }
 
   const char* sql =
       "INSERT INTO dag_nodes(node_id, run_id, node_type, payload_json, "
       "created_at) VALUES(?, ?, ?, ?, ?);";
-  sqlite3_stmt* stmt = nullptr;
-  if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+  duckdb_prepared_statement stmt;
+  if (duckdb_prepare(con, sql, &stmt) == DuckDBError) {
     if (logger_) {
-      logger_->error("DAG insert_node prepare failed: {}", sqlite3_errmsg(db));
+      logger_->error("DAG insert_node prepare failed: {}",
+                     duckdb_prepare_error(stmt));
     }
+    duckdb_destroy_prepare(&stmt);
     return;
   }
 
@@ -289,16 +323,19 @@ void DagRuntime::insert_node(const std::string& node_id,
   auto now = now_iso8601();
   auto type_text = DagNodeTypeToString(type);
 
-  sqlite3_bind_text(stmt, 1, node_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 2, run_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 3, type_text.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 4, payload_text.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 5, now.c_str(), -1, SQLITE_TRANSIENT);
+  duckdb_bind_varchar(stmt, 1, node_id.c_str());
+  duckdb_bind_varchar(stmt, 2, run_id.c_str());
+  duckdb_bind_varchar(stmt, 3, type_text.c_str());
+  duckdb_bind_varchar(stmt, 4, payload_text.c_str());
+  duckdb_bind_varchar(stmt, 5, now.c_str());
 
-  if (sqlite3_step(stmt) != SQLITE_DONE && logger_) {
-    logger_->error("DAG insert_node step failed: {}", sqlite3_errmsg(db));
+  duckdb_result result;
+  if (duckdb_execute_prepared(stmt, &result) == DuckDBError && logger_) {
+    logger_->error("DAG insert_node step failed: {}",
+                   duckdb_result_error(&result));
   }
-  sqlite3_finalize(stmt);
+  duckdb_destroy_result(&result);
+  duckdb_destroy_prepare(&stmt);
 }
 
 void DagRuntime::insert_edge(const std::string& run_id,
@@ -306,64 +343,74 @@ void DagRuntime::insert_edge(const std::string& run_id,
                              const std::string& to_node_id,
                              const std::string& edge_type) {
   std::lock_guard<std::mutex> lock(db_mu_);
-  auto* db = static_cast<sqlite3*>(db_);
-  if (!db) {
+  auto con = static_cast<duckdb_connection>(con_);
+  if (!con) {
     return;
   }
 
   const char* sql =
       "INSERT INTO dag_edges(run_id, from_node_id, to_node_id, edge_type, "
       "created_at) VALUES(?, ?, ?, ?, ?);";
-  sqlite3_stmt* stmt = nullptr;
-  if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+  duckdb_prepared_statement stmt;
+  if (duckdb_prepare(con, sql, &stmt) == DuckDBError) {
     if (logger_) {
-      logger_->error("DAG insert_edge prepare failed: {}", sqlite3_errmsg(db));
+      logger_->error("DAG insert_edge prepare failed: {}",
+                     duckdb_prepare_error(stmt));
     }
+    duckdb_destroy_prepare(&stmt);
     return;
   }
 
   auto now = now_iso8601();
-  sqlite3_bind_text(stmt, 1, run_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 2, from_node_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 3, to_node_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 4, edge_type.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 5, now.c_str(), -1, SQLITE_TRANSIENT);
+  duckdb_bind_varchar(stmt, 1, run_id.c_str());
+  duckdb_bind_varchar(stmt, 2, from_node_id.c_str());
+  duckdb_bind_varchar(stmt, 3, to_node_id.c_str());
+  duckdb_bind_varchar(stmt, 4, edge_type.c_str());
+  duckdb_bind_varchar(stmt, 5, now.c_str());
 
-  if (sqlite3_step(stmt) != SQLITE_DONE && logger_) {
-    logger_->error("DAG insert_edge step failed: {}", sqlite3_errmsg(db));
+  duckdb_result result;
+  if (duckdb_execute_prepared(stmt, &result) == DuckDBError && logger_) {
+    logger_->error("DAG insert_edge step failed: {}",
+                   duckdb_result_error(&result));
   }
-  sqlite3_finalize(stmt);
+  duckdb_destroy_result(&result);
+  duckdb_destroy_prepare(&stmt);
 }
 
 void DagRuntime::finalize_run(const std::string& run_id,
                               const std::string& status,
                               const std::string& error) {
   std::lock_guard<std::mutex> lock(db_mu_);
-  auto* db = static_cast<sqlite3*>(db_);
-  if (!db) {
+  auto con = static_cast<duckdb_connection>(con_);
+  if (!con) {
     return;
   }
 
   const char* sql =
       "UPDATE dag_runs SET status=?, finished_at=?, error=? WHERE run_id=?;";
-  sqlite3_stmt* stmt = nullptr;
-  if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+  duckdb_prepared_statement stmt;
+  if (duckdb_prepare(con, sql, &stmt) == DuckDBError) {
     if (logger_) {
-      logger_->error("DAG finalize_run prepare failed: {}", sqlite3_errmsg(db));
+      logger_->error("DAG finalize_run prepare failed: {}",
+                     duckdb_prepare_error(stmt));
     }
+    duckdb_destroy_prepare(&stmt);
     return;
   }
 
   auto now = now_iso8601();
-  sqlite3_bind_text(stmt, 1, status.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 2, now.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 3, error.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 4, run_id.c_str(), -1, SQLITE_TRANSIENT);
+  duckdb_bind_varchar(stmt, 1, status.c_str());
+  duckdb_bind_varchar(stmt, 2, now.c_str());
+  duckdb_bind_varchar(stmt, 3, error.c_str());
+  duckdb_bind_varchar(stmt, 4, run_id.c_str());
 
-  if (sqlite3_step(stmt) != SQLITE_DONE && logger_) {
-    logger_->error("DAG finalize_run step failed: {}", sqlite3_errmsg(db));
+  duckdb_result result;
+  if (duckdb_execute_prepared(stmt, &result) == DuckDBError && logger_) {
+    logger_->error("DAG finalize_run step failed: {}",
+                   duckdb_result_error(&result));
   }
-  sqlite3_finalize(stmt);
+  duckdb_destroy_result(&result);
+  duckdb_destroy_prepare(&stmt);
 }
 
 }  // namespace quantclaw

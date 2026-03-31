@@ -1,21 +1,18 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 export module quantclaw.mcp.mcp_tool_manager;
 
-export import quantclaw.tools.tool_registry;
-
 import quantclaw.mcp.mcp_client;
+import quantclaw.config;
 
 import std;
 
-namespace spdlog {
-class logger;
-}
-
 export namespace quantclaw {
-
-struct MCPConfig;
 
 namespace mcp {
 
@@ -25,9 +22,6 @@ class MCPToolManager {
 
   // Connect to all configured MCP servers and discover their tools
   void DiscoverTools(const MCPConfig& config);
-
-  // Register discovered tools into a ToolRegistry
-  void RegisterInto(ToolRegistry& registry);
 
   // Execute an external tool by its qualified name
   std::string ExecuteTool(const std::string& qualified_name,
@@ -39,7 +33,7 @@ class MCPToolManager {
   std::string GetOriginalToolName(const std::string& qualified_name) const;
 
   // Get count of discovered tools
-  size_t ToolCount() const {
+  std::size_t ToolCount() const {
     return tool_to_server_.size();
   }
 

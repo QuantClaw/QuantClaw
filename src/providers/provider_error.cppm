@@ -65,4 +65,75 @@ class ProviderError : public std::runtime_error {
 ProviderErrorKind ClassifyHttpError(int http_status,
                                     const std::string& response_body = "");
 
+inline ProviderError::ProviderError(ProviderErrorKind kind, int http_status,
+                                    const std::string& message,
+                                    const std::string& provider_id,
+                                    const std::string& profile_id)
+    : std::runtime_error(message),
+      kind_(kind),
+      http_status_(http_status),
+      provider_id_(provider_id),
+      profile_id_(profile_id) {}
+
+inline std::string ProviderErrorKindToString(ProviderErrorKind kind) {
+  switch (kind) {
+    case ProviderErrorKind::kRateLimit:
+      return "rate_limit";
+    case ProviderErrorKind::kAuthError:
+      return "auth_error";
+    case ProviderErrorKind::kBillingError:
+      return "billing_error";
+    case ProviderErrorKind::kTransient:
+      return "transient";
+    case ProviderErrorKind::kModelNotFound:
+      return "model_not_found";
+    case ProviderErrorKind::kTimeout:
+      return "timeout";
+    case ProviderErrorKind::kContextOverflow:
+      return "context_overflow";
+    case ProviderErrorKind::kUnknown:
+    default:
+      return "unknown";
+  }
+}
+
+inline ProviderErrorKind ClassifyHttpError(int http_status,
+                                           const std::string& response_body) {
+  if (http_status == 429)
+    return ProviderErrorKind::kRateLimit;
+  if (http_status == 401 || http_status == 403)
+    return ProviderErrorKind::kAuthError;
+  if (http_status == 402)
+    return ProviderErrorKind::kBillingError;
+  if (http_status == 404)
+    return ProviderErrorKind::kModelNotFound;
+  if (http_status == 408)
+    return ProviderErrorKind::kTimeout;
+  if (http_status == 500 || http_status == 502 || http_status == 503 ||
+      http_status == 504)
+    return ProviderErrorKind::kTransient;
+
+  auto body_lower = response_body;
+  for (char& c : body_lower) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+
+  if (body_lower.find("insufficient_credits") != std::string::npos ||
+      body_lower.find("insufficient_quota") != std::string::npos ||
+      body_lower.find("billing") != std::string::npos) {
+    return ProviderErrorKind::kBillingError;
+  }
+  if (body_lower.find("context_length") != std::string::npos ||
+      body_lower.find("context window") != std::string::npos ||
+      body_lower.find("context_length_exceeded") != std::string::npos) {
+    return ProviderErrorKind::kContextOverflow;
+  }
+  if (body_lower.find("rate limit") != std::string::npos ||
+      body_lower.find("too many requests") != std::string::npos) {
+    return ProviderErrorKind::kRateLimit;
+  }
+
+  return ProviderErrorKind::kUnknown;
+}
+
 }  // namespace quantclaw

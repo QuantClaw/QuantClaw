@@ -1,11 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import std;
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/daily_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
-import <spdlog/spdlog.h>;
-import <spdlog/sinks/daily_file_sink.h>;
-import <spdlog/sinks/stdout_color_sinks.h>;
+import std;
+import nlohmann.json;
 
 import quantclaw.core.skill_loader;
 import quantclaw.core.memory_search;
@@ -16,8 +17,12 @@ import quantclaw.cli.onboard_commands;
 import quantclaw.cli.session_commands;
 import quantclaw.common.parse_util;
 import quantclaw.config;
+import quantclaw.constants;
 import quantclaw.gateway.gateway_client;
 import quantclaw.platform.process;
+
+using Json = decltype(std::declval<quantclaw::gateway::GatewayClient>().Call(
+  std::declval<const std::string&>(), {}));
 
 // Bring port/URL constants into scope (avoids quantclaw:: prefix for literals)
 using quantclaw::kDefaultGatewayPort;
@@ -427,7 +432,7 @@ int main(int argc, char* argv[]) {
                return 0;
              }
 
-             nlohmann::json params;
+             Json params = Json::object();
              if (!path.empty())
                params["path"] = path;
              auto result = client->Call("config.get", params);
@@ -459,10 +464,10 @@ int main(int argc, char* argv[]) {
            std::string raw_value = args[2];
 
            // Parse value: try JSON first, then treat as string
-           nlohmann::json value;
+           Json value = Json::object();
            try {
-             value = nlohmann::json::parse(raw_value);
-           } catch (const nlohmann::json::exception&) {
+             value = Json::parse(raw_value);
+           } catch (const std::exception&) {
              value = raw_value;
            }
 
@@ -724,7 +729,7 @@ int main(int argc, char* argv[]) {
                auto result = client->Call("cron.list", {});
                client->Disconnect();
                // RPC returns {jobs:[...], total, ...}; extract array
-               nlohmann::json jobs_arr = nlohmann::json::array();
+               Json jobs_arr = Json::array();
                if (result.is_object() && result.contains("jobs")) {
                  jobs_arr = result["jobs"];
                } else if (result.is_array()) {
@@ -999,7 +1004,7 @@ int main(int argc, char* argv[]) {
              auto client = make_client();
              if (!client)
                return 1;
-             nlohmann::json params;
+             Json params = Json::object();
              if (!channel_id.empty())
                params["id"] = channel_id;
              auto result = client->Call("channels.status", params);
@@ -1030,7 +1035,7 @@ int main(int argc, char* argv[]) {
            try {
              // Write to config file
              auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
-             nlohmann::json channel_json;
+             Json channel_json = Json::object();
              channel_json["enabled"] = true;
              channel_json["token"] = token;
              quantclaw::QuantClawConfig::SetValue(config_file, "channels." + id,
@@ -1226,9 +1231,9 @@ int main(int argc, char* argv[]) {
                    result["aliases"].is_object() &&
                    !result["aliases"].empty()) {
                  std::cout << "\nAliases:" << std::endl;
-                 for (auto& [alias, target] : result["aliases"].items()) {
-                   std::cout << "  " << alias << " -> "
-                             << target.get<std::string>() << std::endl;
+                 for (const auto& item : result["aliases"].items()) {
+                   std::cout << "  " << item.key() << " -> "
+                             << item.value().get<std::string>() << std::endl;
                  }
                }
              }
@@ -1277,9 +1282,9 @@ int main(int argc, char* argv[]) {
              auto result = client->Call("models.list", {});
              client->Disconnect();
              if (result.contains("aliases") && result["aliases"].is_object()) {
-               for (auto& [alias, target] : result["aliases"].items()) {
-                 std::cout << "  " << alias << " -> "
-                           << target.get<std::string>() << std::endl;
+               for (const auto& item : result["aliases"].items()) {
+                 std::cout << "  " << item.key() << " -> "
+                           << item.value().get<std::string>() << std::endl;
                }
              } else {
                std::cout << "No model aliases configured" << std::endl;
@@ -1448,7 +1453,7 @@ int main(int argc, char* argv[]) {
              auto arr = result.is_array() ? result
                                           : (result.contains("plugins")
                                                  ? result["plugins"]
-                                                 : nlohmann::json::array());
+                                                 : Json::array());
              if (arr.empty()) {
                std::cout << "No plugins loaded" << std::endl;
              } else {
@@ -1487,7 +1492,7 @@ int main(int argc, char* argv[]) {
              auto arr = result.is_array() ? result
                                           : (result.contains("plugins")
                                                  ? result["plugins"]
-                                                 : nlohmann::json::array());
+                                                 : Json::array());
              bool found = false;
              for (const auto& p : arr) {
                if (!plugin_id.empty() && p.value("id", "") != plugin_id)
@@ -1588,7 +1593,7 @@ int main(int argc, char* argv[]) {
 
            try {
              auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
-             nlohmann::json install_entry;
+             Json install_entry = Json::object();
              install_entry["installPath"] =
                  std::filesystem::canonical(plugin_path).string();
              quantclaw::QuantClawConfig::SetValue(

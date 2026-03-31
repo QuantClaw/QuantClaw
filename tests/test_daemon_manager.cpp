@@ -18,13 +18,13 @@
 #define test_unsetenv(name) unsetenv(name)
 #endif
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
 import quantclaw.gateway.daemon_manager;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 using namespace quantclaw::gateway;
 

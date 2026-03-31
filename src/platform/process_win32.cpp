@@ -3,15 +3,17 @@
 
 #ifdef _WIN32
 
-import std;
-
-import quantclaw.common.defer;
-import quantclaw.platform.process;
+module;
 
 // clang-format off
 import <windows.h>;  // must precede psapi.h
 import <psapi.h>;
 // clang-format on
+
+module quantclaw.platform.process;
+
+import std;
+import quantclaw.common.defer;
 
 namespace quantclaw::platform {
 

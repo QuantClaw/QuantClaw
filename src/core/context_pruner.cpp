@@ -4,6 +4,7 @@
 module quantclaw.core.context_pruner;
 
 import std;
+import quantclaw.core.content_block;
 
 namespace quantclaw {
 

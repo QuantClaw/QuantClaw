@@ -1,26 +1,23 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 export module quantclaw.web.api_routes;
 
 import std;
-import <spdlog/spdlog.h>;
-
-namespace quantclaw {
-class SessionManager;
-class AgentLoop;
-class PromptBuilder;
-class ToolRegistry;
-struct QuantClawConfig;
-}  // namespace quantclaw
-
-namespace quantclaw::gateway {
-class GatewayServer;
-}
+import quantclaw.config;
+import quantclaw.core.agent_loop;
+import quantclaw.core.prompt_builder;
+import quantclaw.gateway.gateway_server;
+import quantclaw.plugins.plugin_system;
+import quantclaw.session.session_manager;
+import quantclaw.tools.tool_registry;
+import quantclaw.web.web_server;
 
 namespace quantclaw::web {
-
-class WebServer;
 
 export void register_api_routes(
     WebServer& server,

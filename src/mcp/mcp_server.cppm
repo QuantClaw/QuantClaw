@@ -3,14 +3,12 @@
 
 module;
 
+#include <spdlog/spdlog.h>
+
 export module quantclaw.mcp.mcp_server;
 
 import std;
 import nlohmann.json;
-
-namespace spdlog {
-class logger;
-}
 
 export namespace quantclaw::mcp {
 

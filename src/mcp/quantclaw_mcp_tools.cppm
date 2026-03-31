@@ -3,18 +3,15 @@
 
 module;
 
-export module quantclaw.mcp.quantclaw_mcp_tools;
+#include <spdlog/spdlog.h>
 
-import quantclaw.mcp.mcp_server;
-import quantclaw.tools.tool_registry;
+export module quantclaw.mcp.quantclaw_mcp_tools;
 
 import std;
 import nlohmann.json;
 
-namespace spdlog {
-class logger;
-}
-
+import quantclaw.mcp.mcp_server;
+import quantclaw.tools.tool_registry;
 import quantclaw.core.memory_manager;
 
 export namespace quantclaw::mcp {

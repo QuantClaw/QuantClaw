@@ -1,6 +1,10 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+module;
+
+#include <spdlog/spdlog.h>
+
 module quantclaw.tools.tool_chain;
 
 import std;
@@ -16,7 +20,7 @@ std::string ChainTemplateEngine::resolve_string(
 
   // Replace {{prev.result}} with the last step's result
   const std::string prev_token = "{{prev.result}}";
-  size_t pos = result.find(prev_token);
+  std::size_t pos = result.find(prev_token);
   while (pos != std::string::npos) {
     std::string replacement;
     if (!previous_results.empty()) {
@@ -52,8 +56,8 @@ nlohmann::json ChainTemplateEngine::resolve(
   }
   if (value.is_object()) {
     nlohmann::json resolved = nlohmann::json::object();
-    for (auto& [key, val] : value.items()) {
-      resolved[key] = resolve(val, previous_results);
+    for (auto it = value.begin(); it != value.end(); ++it) {
+      resolved[it.key()] = resolve(it.value(), previous_results);
     }
     return resolved;
   }

@@ -32,6 +32,73 @@ inline FrameType FrameTypeFromString(const std::string& str) {
   throw std::runtime_error("Unknown frame type: " + str);
 }
 
+inline FrameType ParseFrameType(const nlohmann::json& j) {
+  return FrameTypeFromString(j.value("type", ""));
+}
+
+namespace methods {
+inline constexpr const char* kGatewayHealth = "gateway.health";
+inline constexpr const char* kGatewayStatus = "gateway.status";
+inline constexpr const char* kConfigGet = "config.get";
+inline constexpr const char* kConfigSet = "config.set";
+inline constexpr const char* kConfigReload = "config.reload";
+inline constexpr const char* kAgentRequest = "agent.request";
+inline constexpr const char* kAgentStop = "agent.stop";
+inline constexpr const char* kSessionsList = "sessions.list";
+inline constexpr const char* kSessionsHistory = "sessions.history";
+inline constexpr const char* kSessionsDelete = "sessions.delete";
+inline constexpr const char* kSessionsReset = "sessions.reset";
+inline constexpr const char* kSessionsPatch = "sessions.patch";
+inline constexpr const char* kSessionsCompact = "sessions.compact";
+inline constexpr const char* kOcConnect = "connect";
+inline constexpr const char* kConnectHello = "connect.hello";
+inline constexpr const char* kChannelsList = "channels.list";
+inline constexpr const char* kChannelsStatus = "channels.status";
+inline constexpr const char* kChainExecute = "chain.execute";
+inline constexpr const char* kOcChatSend = "chat.send";
+inline constexpr const char* kOcChatHistory = "chat.history";
+inline constexpr const char* kOcChatAbort = "chat.abort";
+inline constexpr const char* kOcHealth = "health";
+inline constexpr const char* kOcStatus = "status";
+inline constexpr const char* kOcModelsList = "models.list";
+inline constexpr const char* kOcToolsCatalog = "tools.catalog";
+inline constexpr const char* kOcSessionsPreview = "sessions.preview";
+inline constexpr const char* kSkillsStatus = "skills.status";
+inline constexpr const char* kSkillsInstall = "skills.install";
+inline constexpr const char* kCronList = "cron.list";
+inline constexpr const char* kCronAdd = "cron.add";
+inline constexpr const char* kCronRemove = "cron.remove";
+inline constexpr const char* kCronUpdate = "cron.update";
+inline constexpr const char* kCronRun = "cron.run";
+inline constexpr const char* kCronRuns = "cron.runs";
+inline constexpr const char* kExecApprovalReq = "exec.approval.request";
+inline constexpr const char* kExecApprovals = "exec.approvals";
+inline constexpr const char* kModelsSet = "models.set";
+inline constexpr const char* kPluginsList = "plugins.list";
+inline constexpr const char* kPluginsTools = "plugins.tools";
+inline constexpr const char* kPluginsCallTool = "plugins.callTool";
+inline constexpr const char* kPluginsServices = "plugins.services";
+inline constexpr const char* kPluginsProviders = "plugins.providers";
+inline constexpr const char* kPluginsCommands = "plugins.commands";
+inline constexpr const char* kPluginsGateway = "plugins.gateway";
+inline constexpr const char* kQueueStatus = "queue.status";
+inline constexpr const char* kQueueConfigure = "queue.configure";
+inline constexpr const char* kQueueCancel = "queue.cancel";
+inline constexpr const char* kQueueAbort = "queue.abort";
+inline constexpr const char* kMemoryStatus = "memory.status";
+inline constexpr const char* kMemorySearch = "memory.search";
+}
+
+namespace events {
+inline constexpr const char* kConnectChallenge = "connect.challenge";
+inline constexpr const char* kTextDelta = "text.delta";
+inline constexpr const char* kToolUse = "tool.use";
+inline constexpr const char* kToolResult = "tool.result";
+inline constexpr const char* kMessageEnd = "message.end";
+inline constexpr const char* kOcChat = "chat";
+inline constexpr const char* kOcAgent = "agent";
+}
+
 struct RpcRequest {
   std::string id;
   std::string method;

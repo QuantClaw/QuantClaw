@@ -1,13 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
 import quantclaw.mcp.mcp_tool_manager;
 import quantclaw.tools.tool_registry;
-
-#include <gtest/gtest.h>
 
 class MCPToolManagerTest : public ::testing::Test {
  protected:

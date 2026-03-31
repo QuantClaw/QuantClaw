@@ -1,7 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.gateway.command_queue;
+module;
+
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
+
+module quantclaw.gateway.command_queue;
 
 import std;
 

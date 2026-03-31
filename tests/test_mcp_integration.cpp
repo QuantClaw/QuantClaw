@@ -5,14 +5,16 @@
 #include <fstream>
 #include <memory>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
 import quantclaw.mcp.mcp_server;
 import quantclaw.tools.tool_registry;
 
+import nlohmann.json;
+
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 // Simple MCP tool backed by ToolRegistry
 class RegistryBackedTool : public quantclaw::mcp::MCPTool {

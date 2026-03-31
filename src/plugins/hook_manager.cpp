@@ -1,10 +1,15 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.plugins.hook_manager;
+module;
+
+#include <spdlog/spdlog.h>
+
+module quantclaw.plugins.hook_manager;
 
 import std;
 
+import nlohmann.json;
 import quantclaw.plugins.sidecar_manager;
 
 namespace quantclaw {
@@ -264,7 +269,7 @@ std::vector<std::string> HookManager::RegisteredHooks() const {
   return names;
 }
 
-size_t HookManager::HandlerCount(const std::string& hook_name) const {
+std::size_t HookManager::HandlerCount(const std::string& hook_name) const {
   std::lock_guard<std::mutex> lock(mu_);
   auto it = hooks_.find(hook_name);
   if (it == hooks_.end())

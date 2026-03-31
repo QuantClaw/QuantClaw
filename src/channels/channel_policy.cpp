@@ -1,9 +1,14 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.channels.channel_policy;
+module;
+
+#include <spdlog/spdlog.h>
+
+module quantclaw.channels.channel_policy;
 
 import std;
+import nlohmann.json;
 
 namespace quantclaw {
 

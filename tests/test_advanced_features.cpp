@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include <gtest/gtest.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -12,7 +13,6 @@ import quantclaw.core.session_compaction;
 import quantclaw.core.cron_scheduler;
 
 import quantclaw.test.helpers;
-#include <gtest/gtest.h>
 
 // Windows SDK defines AddJob as AddJobA (print spooler API); undefine to
 // allow calling quantclaw::CronScheduler::AddJob.
@@ -104,7 +104,8 @@ TEST_F(CompactionTest, CompactFallsBackToTruncate) {
   opts.keep_recent = 10;
 
   auto result =
-      compaction_->Compact(msgs, opts, [](const std::vector<nlohmann::json>&) {
+      compaction_->Compact(msgs, opts, [](const std::vector<nlohmann::json>& old_msgs) {
+        (void)old_msgs;
         return "";  // empty summary → fallback
       });
 

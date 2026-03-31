@@ -8,9 +8,13 @@
 // the port to the sidecar child via QUANTCLAW_PORT.  The sidecar connects
 // back with net.createConnection(port, '127.0.0.1').
 
-import std;
+module;
 
-import quantclaw.platform.ipc;
+#include <spdlog/spdlog.h>
+
+module quantclaw.platform.ipc;
+
+import std;
 
 #ifdef _WIN32
 // ---- Windows WinSock2 ----
@@ -43,11 +47,11 @@ inline void close_fd(socket_t s) {
 
 #else
 // ---- POSIX ----
-import <arpa/inet.h>;
-import <netinet/in.h>;
-import <sys/select.h>;
-import <sys/socket.h>;
-import <unistd.h>;
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 using socket_t = int;
 #define INVALID_SOCK (-1)

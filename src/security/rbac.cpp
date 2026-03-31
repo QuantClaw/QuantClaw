@@ -1,10 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import quantclaw.security.rbac;
+module;
 
-import quantclaw.gateway.protocol;
+module quantclaw.security.rbac;
+
 import std;
+import quantclaw.gateway.protocol;
 
 namespace quantclaw {
 
