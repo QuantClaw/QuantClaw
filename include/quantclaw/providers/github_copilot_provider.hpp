@@ -25,6 +25,7 @@ class GitHubCopilotProvider : public OpenAIProvider {
   std::string ResolveApiKey() const override;
   std::string ResolveBaseUrl() const override;
   std::string ProviderId() const override;
+  CurlSlist CreateHeaders() const override;
 
  private:
   std::shared_ptr<auth::GitHubCopilotRuntimeResolverInterface> resolver_;

@@ -47,6 +47,7 @@ std::string post_form(const std::string& url, const std::string& body) {
   CurlSlist headers;
   headers.append("Accept: application/json");
   headers.append("Content-Type: application/x-www-form-urlencoded");
+  headers.append("User-Agent: QuantClaw/0.3.0");
 
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -76,6 +77,7 @@ std::string get_json(const std::string& url, const std::string& bearer_token) {
   CurlHandle curl;
   CurlSlist headers;
   headers.append("Accept: application/json");
+  headers.append("User-Agent: QuantClaw/0.3.0");
   headers.append(("Authorization: Bearer " + bearer_token).c_str());
 
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -281,13 +283,18 @@ bool GitHubCopilotTokenCache::Clear() const {
 }
 
 GitHubCopilotTokenClient::GitHubCopilotTokenClient(
-    std::shared_ptr<spdlog::logger> logger)
-    : logger_(std::move(logger)) {}
+    std::shared_ptr<spdlog::logger> logger, std::string copilot_token_url)
+    : logger_(std::move(logger)),
+      copilot_token_url_(std::move(copilot_token_url)) {}
+
+std::string GitHubCopilotTokenClient::DefaultCopilotTokenUrl() {
+  return kCopilotTokenUrl;
+}
 
 GitHubCopilotRuntimeCredential
 GitHubCopilotTokenClient::ExchangeForApiToken(const std::string& github_token) {
   const auto json =
-      nlohmann::json::parse(get_json(kCopilotTokenUrl, github_token));
+      nlohmann::json::parse(get_json(copilot_token_url_, github_token));
   GitHubCopilotRuntimeCredential credential;
   credential.api_token = json.value("token", "");
   const auto expires_at = json["expires_at"];

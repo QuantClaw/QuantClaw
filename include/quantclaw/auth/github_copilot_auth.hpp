@@ -82,16 +82,20 @@ class GitHubCopilotTokenCache {
 
 class GitHubCopilotTokenClient {
  public:
-  explicit GitHubCopilotTokenClient(std::shared_ptr<spdlog::logger> logger);
+  explicit GitHubCopilotTokenClient(
+      std::shared_ptr<spdlog::logger> logger,
+      std::string copilot_token_url = DefaultCopilotTokenUrl());
   virtual ~GitHubCopilotTokenClient() = default;
 
   virtual GitHubCopilotRuntimeCredential
   ExchangeForApiToken(const std::string& github_token);
 
+  static std::string DefaultCopilotTokenUrl();
   static std::string DeriveBaseUrlFromApiToken(const std::string& api_token);
 
  private:
   std::shared_ptr<spdlog::logger> logger_;
+  std::string copilot_token_url_;
 };
 
 class GitHubCopilotRuntimeResolver

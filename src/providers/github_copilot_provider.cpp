@@ -4,6 +4,13 @@
 #include "quantclaw/providers/github_copilot_provider.hpp"
 
 namespace quantclaw {
+namespace {
+
+constexpr char kCopilotUserAgent[] = "GithubCopilot/1.155.0";
+constexpr char kCopilotEditorVersion[] = "vscode/1.85.1";
+constexpr char kCopilotEditorPluginVersion[] = "copilot/1.155.0";
+
+}  // namespace
 
 GitHubCopilotProvider::GitHubCopilotProvider(
     int timeout, std::shared_ptr<spdlog::logger> logger,
@@ -32,6 +39,18 @@ std::string GitHubCopilotProvider::ResolveBaseUrl() const {
 
 std::string GitHubCopilotProvider::ProviderId() const {
   return "github-copilot";
+}
+
+CurlSlist GitHubCopilotProvider::CreateHeaders() const {
+  auto headers = OpenAIProvider::CreateHeaders();
+  headers.append(("User-Agent: " + std::string(kCopilotUserAgent)).c_str());
+  headers.append(("Editor-Version: " + std::string(kCopilotEditorVersion))
+                     .c_str());
+  headers.append(
+      ("Editor-Plugin-Version: " +
+       std::string(kCopilotEditorPluginVersion))
+          .c_str());
+  return headers;
 }
 
 }  // namespace quantclaw

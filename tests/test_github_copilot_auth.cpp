@@ -3,6 +3,8 @@
 
 #include <filesystem>
 #include <memory>
+#include <string>
+#include <thread>
 
 #ifdef _WIN32
 #define test_setenv(name, value) _putenv_s(name, value)
@@ -12,6 +14,7 @@
 #define test_unsetenv(name) unsetenv(name)
 #endif
 
+#include <httplib.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -125,6 +128,59 @@ TEST(GitHubCopilotAuthTest, RuntimeResolverPrefersEnvironmentTokens) {
   test_unsetenv("COPILOT_GITHUB_TOKEN");
   test_unsetenv("GH_TOKEN");
   test_unsetenv("GITHUB_TOKEN");
+}
+
+TEST(GitHubCopilotAuthTest, TokenExchangeSendsUserAgentHeader) {
+  const int port = test::FindFreePort();
+  ASSERT_GT(port, 0);
+
+  httplib::Server server;
+  std::string seen_auth;
+  std::string seen_user_agent;
+
+  server.Get("/copilot_internal/v2/token",
+             [&](const httplib::Request& req, httplib::Response& res) {
+               seen_auth = req.get_header_value("Authorization");
+               seen_user_agent = req.get_header_value("User-Agent");
+               res.set_content(
+                   R"({"token":"copilot-api-token","expires_at":4102444800})",
+                   "application/json");
+             });
+
+  std::thread thread([&]() {
+    test::ReleaseHeldPort(port);
+    server.listen("127.0.0.1", port);
+  });
+  const auto stop_server = [&]() {
+    server.stop();
+    if (thread.joinable()) {
+      thread.join();
+    }
+  };
+
+  if (!test::WaitForServerReady(port)) {
+    stop_server();
+    FAIL() << "Timed out waiting for mock Copilot server";
+  }
+
+  auto logger = make_logger("github-copilot-token-user-agent");
+  GitHubCopilotTokenClient client(
+      logger, "http://127.0.0.1:" + std::to_string(port) +
+                  "/copilot_internal/v2/token");
+
+  GitHubCopilotRuntimeCredential credential;
+  try {
+    credential = client.ExchangeForApiToken("github-access");
+  } catch (const std::exception& ex) {
+    stop_server();
+    FAIL() << "ExchangeForApiToken threw: " << ex.what();
+  }
+
+  stop_server();
+
+  EXPECT_EQ(credential.api_token, "copilot-api-token");
+  EXPECT_EQ(seen_auth, "Bearer github-access");
+  EXPECT_FALSE(seen_user_agent.empty());
 }
 
 }  // namespace quantclaw::auth

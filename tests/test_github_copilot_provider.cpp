@@ -42,10 +42,17 @@ TEST(GitHubCopilotProviderTest, ChatCompletionUsesResolvedTokenAndBaseUrl) {
 
   httplib::Server server;
   std::string seen_auth;
+  std::string seen_user_agent;
+  std::string seen_editor_version;
+  std::string seen_editor_plugin_version;
 
   server.Post("/chat/completions", [&](const httplib::Request& req,
                                        httplib::Response& res) {
     seen_auth = req.get_header_value("Authorization");
+    seen_user_agent = req.get_header_value("User-Agent");
+    seen_editor_version = req.get_header_value("Editor-Version");
+    seen_editor_plugin_version =
+        req.get_header_value("Editor-Plugin-Version");
     res.set_content(
         R"({"choices":[{"message":{"content":"copilot ok"},"finish_reason":"stop"}]})",
         "application/json");
@@ -89,6 +96,9 @@ TEST(GitHubCopilotProviderTest, ChatCompletionUsesResolvedTokenAndBaseUrl) {
 
   EXPECT_EQ(response.content, "copilot ok");
   EXPECT_EQ(seen_auth, "Bearer copilot-runtime-token");
+  EXPECT_EQ(seen_user_agent, "GithubCopilot/1.155.0");
+  EXPECT_EQ(seen_editor_version, "vscode/1.85.1");
+  EXPECT_EQ(seen_editor_plugin_version, "copilot/1.155.0");
   EXPECT_EQ(resolver->resolve_calls, 2);
 }
 

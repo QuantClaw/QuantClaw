@@ -32,7 +32,7 @@ class OpenAIProvider : public LLMProvider {
   virtual std::string ResolveBaseUrl() const;
   virtual std::string ProviderId() const;
   std::string MakeApiRequest(const std::string& json_payload) const;
-  CurlSlist CreateHeaders() const;
+  virtual CurlSlist CreateHeaders() const;
 
  private:
   std::string api_key_;
