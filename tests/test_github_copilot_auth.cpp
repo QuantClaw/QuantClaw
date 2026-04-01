@@ -138,14 +138,13 @@ TEST(GitHubCopilotAuthTest, TokenExchangeSendsUserAgentHeader) {
   std::string seen_auth;
   std::string seen_user_agent;
 
-  server.Get("/copilot_internal/v2/token",
-             [&](const httplib::Request& req, httplib::Response& res) {
-               seen_auth = req.get_header_value("Authorization");
-               seen_user_agent = req.get_header_value("User-Agent");
-               res.set_content(
-                   R"({"token":"copilot-api-token","expires_at":4102444800})",
-                   "application/json");
-             });
+  server.Get("/copilot_internal/v2/token", [&](const httplib::Request& req,
+                                               httplib::Response& res) {
+    seen_auth = req.get_header_value("Authorization");
+    seen_user_agent = req.get_header_value("User-Agent");
+    res.set_content(R"({"token":"copilot-api-token","expires_at":4102444800})",
+                    "application/json");
+  });
 
   std::thread thread([&]() {
     test::ReleaseHeldPort(port);
@@ -164,9 +163,9 @@ TEST(GitHubCopilotAuthTest, TokenExchangeSendsUserAgentHeader) {
   }
 
   auto logger = make_logger("github-copilot-token-user-agent");
-  GitHubCopilotTokenClient client(
-      logger, "http://127.0.0.1:" + std::to_string(port) +
-                  "/copilot_internal/v2/token");
+  GitHubCopilotTokenClient client(logger,
+                                  "http://127.0.0.1:" + std::to_string(port) +
+                                      "/copilot_internal/v2/token");
 
   GitHubCopilotRuntimeCredential credential;
   try {

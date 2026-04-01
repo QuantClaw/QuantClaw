@@ -44,11 +44,10 @@ std::string GitHubCopilotProvider::ProviderId() const {
 CurlSlist GitHubCopilotProvider::CreateHeaders() const {
   auto headers = OpenAIProvider::CreateHeaders();
   headers.append(("User-Agent: " + std::string(kCopilotUserAgent)).c_str());
-  headers.append(("Editor-Version: " + std::string(kCopilotEditorVersion))
-                     .c_str());
   headers.append(
-      ("Editor-Plugin-Version: " +
-       std::string(kCopilotEditorPluginVersion))
+      ("Editor-Version: " + std::string(kCopilotEditorVersion)).c_str());
+  headers.append(
+      ("Editor-Plugin-Version: " + std::string(kCopilotEditorPluginVersion))
           .c_str());
   return headers;
 }

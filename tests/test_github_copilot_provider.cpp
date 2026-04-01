@@ -51,8 +51,7 @@ TEST(GitHubCopilotProviderTest, ChatCompletionUsesResolvedTokenAndBaseUrl) {
     seen_auth = req.get_header_value("Authorization");
     seen_user_agent = req.get_header_value("User-Agent");
     seen_editor_version = req.get_header_value("Editor-Version");
-    seen_editor_plugin_version =
-        req.get_header_value("Editor-Plugin-Version");
+    seen_editor_plugin_version = req.get_header_value("Editor-Plugin-Version");
     res.set_content(
         R"({"choices":[{"message":{"content":"copilot ok"},"finish_reason":"stop"}]})",
         "application/json");
