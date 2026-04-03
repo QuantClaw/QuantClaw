@@ -6,7 +6,9 @@
 #include <chrono>
 #include <iostream>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
 #endif
 
@@ -19,7 +21,7 @@ namespace {
 
 bool should_stream_to_stdout() {
 #ifdef _WIN32
-  return true;
+  return _isatty(_fileno(stdout)) != 0;
 #else
   return isatty(STDOUT_FILENO) == 1;
 #endif

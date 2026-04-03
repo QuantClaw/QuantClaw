@@ -15,8 +15,13 @@ namespace quantclaw::auth {
 
 bool ProviderAuthRecord::HasUsableAccessToken(std::int64_t now_epoch_seconds,
                                               int leeway_seconds) const {
-  return !access_token.empty() &&
-         expires_at > (now_epoch_seconds + leeway_seconds);
+  if (access_token.empty()) {
+    return false;
+  }
+  if (expires_at <= 0) {
+    return true;
+  }
+  return expires_at > (now_epoch_seconds + leeway_seconds);
 }
 
 bool ProviderAuthRecord::CanRefresh() const {
@@ -43,11 +48,15 @@ std::optional<ProviderAuthRecord> ProviderAuthStore::Load() const {
 
   std::ifstream in(path_);
   if (!in) {
-    throw std::runtime_error("Failed to open auth store: " + path_.string());
+    return std::nullopt;
   }
 
   nlohmann::json j;
-  in >> j;
+  try {
+    in >> j;
+  } catch (const std::exception&) {
+    return std::nullopt;
+  }
 
   ProviderAuthRecord record;
   record.provider = j.value("provider", "");
@@ -75,19 +84,31 @@ void ProviderAuthStore::Save(const ProviderAuthRecord& record) const {
       {"expiresAt", record.expires_at},
   };
 
-  std::ofstream out(path_);
+  const auto temp_path =
+      path_.parent_path() / (path_.filename().string() + ".tmp");
+#ifndef _WIN32
+  {
+    std::ofstream create(temp_path, std::ios::trunc);
+    if (!create) {
+      throw std::runtime_error("Failed to write auth store: " +
+                               temp_path.string());
+    }
+  }
+  std::filesystem::permissions(
+      temp_path,
+      std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+      std::filesystem::perm_options::replace);
+#endif
+  std::ofstream out(temp_path, std::ios::trunc);
   if (!out) {
-    throw std::runtime_error("Failed to write auth store: " + path_.string());
+    throw std::runtime_error("Failed to write auth store: " +
+                             temp_path.string());
   }
   out << j.dump(2) << '\n';
   out.close();
-
-#ifndef _WIN32
-  std::filesystem::permissions(path_,
-                               std::filesystem::perms::owner_read |
-                                   std::filesystem::perms::owner_write,
-                               std::filesystem::perm_options::replace);
-#endif
+  std::error_code remove_ec;
+  std::filesystem::remove(path_, remove_ec);
+  std::filesystem::rename(temp_path, path_);
 }
 
 bool ProviderAuthStore::Clear() const {

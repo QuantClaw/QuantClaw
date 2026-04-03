@@ -4,6 +4,8 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
+#include <optional>
 
 #include <spdlog/spdlog.h>
 
@@ -28,6 +30,10 @@ class GitHubCopilotProvider : public OpenAIProvider {
   CurlSlist CreateHeaders() const override;
 
  private:
+  const auth::GitHubCopilotRuntimeCredential& ResolveRuntimeCredential() const;
+
+  mutable std::mutex runtime_mu_;
+  mutable std::optional<auth::GitHubCopilotRuntimeCredential> cached_runtime_;
   std::shared_ptr<auth::GitHubCopilotRuntimeResolverInterface> resolver_;
 };
 

@@ -98,7 +98,7 @@ TEST(GitHubCopilotProviderTest, ChatCompletionUsesResolvedTokenAndBaseUrl) {
   EXPECT_EQ(seen_user_agent, "GithubCopilot/1.155.0");
   EXPECT_EQ(seen_editor_version, "vscode/1.85.1");
   EXPECT_EQ(seen_editor_plugin_version, "copilot/1.155.0");
-  EXPECT_EQ(resolver->resolve_calls, 2);
+  EXPECT_EQ(resolver->resolve_calls, 1);
 }
 
 }  // namespace quantclaw

@@ -4,7 +4,6 @@
 #include "quantclaw/auth/github_copilot_auth.hpp"
 
 #include <chrono>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -114,18 +113,6 @@ std::string trim(std::string value) {
     ++start;
   }
   return value.substr(start);
-}
-
-std::string resolve_github_token_from_env() {
-  constexpr const char* names[] = {"COPILOT_GITHUB_TOKEN", "GH_TOKEN",
-                                   "GITHUB_TOKEN"};
-  for (const char* name : names) {
-    const char* value = std::getenv(name);
-    if (value != nullptr && *value != '\0') {
-      return value;
-    }
-  }
-  return "";
 }
 
 }  // namespace
@@ -239,11 +226,14 @@ GitHubCopilotTokenCache::Load() const {
   }
   std::ifstream in(path_);
   if (!in) {
-    throw std::runtime_error("Failed to open Copilot token cache: " +
-                             path_.string());
+    return std::nullopt;
   }
   nlohmann::json j;
-  in >> j;
+  try {
+    in >> j;
+  } catch (const std::exception&) {
+    return std::nullopt;
+  }
   GitHubCopilotRuntimeCredential record;
   record.api_token = j.value("apiToken", "");
   record.base_url = j.value("baseUrl", std::string(kDefaultCopilotBaseUrl));
@@ -297,16 +287,20 @@ GitHubCopilotTokenClient::ExchangeForApiToken(const std::string& github_token) {
       nlohmann::json::parse(get_json(copilot_token_url_, github_token));
   GitHubCopilotRuntimeCredential credential;
   credential.api_token = json.value("token", "");
-  const auto expires_at = json["expires_at"];
-  if (expires_at.is_number_integer()) {
-    credential.expires_at = expires_at.get<std::int64_t>();
-  } else if (expires_at.is_string()) {
-    credential.expires_at = std::stoll(expires_at.get<std::string>());
+  if (json.contains("expires_at")) {
+    const auto& expires_at = json["expires_at"];
+    if (expires_at.is_number_integer()) {
+      credential.expires_at = expires_at.get<std::int64_t>();
+    } else if (expires_at.is_string()) {
+      credential.expires_at = std::stoll(expires_at.get<std::string>());
+    }
   }
-  if (credential.expires_at < 100000000000LL) {
+  if (credential.expires_at > 0 && credential.expires_at < 100000000000LL) {
     credential.expires_at *= 1000;
   }
-  credential.expires_at /= 1000;
+  if (credential.expires_at > 0) {
+    credential.expires_at /= 1000;
+  }
   credential.base_url = DeriveBaseUrlFromApiToken(credential.api_token);
   if (credential.base_url.empty()) {
     credential.base_url = kDefaultCopilotBaseUrl;
@@ -347,11 +341,13 @@ std::string GitHubCopilotTokenClient::DeriveBaseUrlFromApiToken(
 GitHubCopilotRuntimeResolver::GitHubCopilotRuntimeResolver(
     GitHubCopilotAuthStore store, GitHubCopilotTokenCache cache,
     std::shared_ptr<GitHubCopilotTokenClient> client,
-    std::shared_ptr<spdlog::logger> logger)
+    std::shared_ptr<spdlog::logger> logger,
+    GitHubTokenResolver env_token_resolver)
     : store_(std::move(store)),
       cache_(std::move(cache)),
       client_(std::move(client)),
-      logger_(std::move(logger)) {}
+      logger_(std::move(logger)),
+      env_token_resolver_(std::move(env_token_resolver)) {}
 
 GitHubCopilotRuntimeCredential
 GitHubCopilotRuntimeResolver::ResolveRuntimeCredential() {
@@ -361,16 +357,17 @@ GitHubCopilotRuntimeResolver::ResolveRuntimeCredential() {
 GitHubCopilotRuntimeCredential
 GitHubCopilotRuntimeResolver::ResolveRuntimeCredential(
     std::int64_t now_epoch_seconds) {
-  if (auto cached = cache_.Load();
-      cached.has_value() && cached->IsUsable(now_epoch_seconds)) {
-    return *cached;
-  }
-
-  auto github_token = resolve_github_token_from_env();
+  auto github_token =
+      env_token_resolver_ ? env_token_resolver_() : std::string();
   if (!github_token.empty()) {
     auto runtime = client_->ExchangeForApiToken(github_token);
     cache_.Save(runtime);
     return runtime;
+  }
+
+  if (auto cached = cache_.Load();
+      cached.has_value() && cached->IsUsable(now_epoch_seconds)) {
+    return *cached;
   }
 
   auto record = store_.Load();

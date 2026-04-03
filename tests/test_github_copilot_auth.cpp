@@ -1,6 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -103,9 +104,6 @@ TEST(GitHubCopilotAuthTest, RuntimeResolverPrefersEnvironmentTokens) {
   test_unsetenv("COPILOT_GITHUB_TOKEN");
   test_unsetenv("GH_TOKEN");
   test_unsetenv("GITHUB_TOKEN");
-  ASSERT_EQ(test_setenv("GITHUB_TOKEN", "from-github-token"), 0);
-  ASSERT_EQ(test_setenv("GH_TOKEN", "from-gh-token"), 0);
-  ASSERT_EQ(test_setenv("COPILOT_GITHUB_TOKEN", "from-copilot-token"), 0);
 
   const auto dir = test::MakeTestDir("github_copilot_runtime_env");
   GitHubCopilotAuthStore store(dir / "github-copilot.json");
@@ -117,17 +115,40 @@ TEST(GitHubCopilotAuthTest, RuntimeResolverPrefersEnvironmentTokens) {
 
   GitHubCopilotRuntimeResolver resolver(
       store, GitHubCopilotTokenCache(dir / "github-copilot-runtime.json"),
-      client, logger);
+      client, logger, [] { return "from-copilot-token"; });
 
   const auto result = resolver.ResolveRuntimeCredential(4000000000);
 
   EXPECT_EQ(result.api_token, "copilot-api-token");
   EXPECT_EQ(client->exchange_calls, 1);
   EXPECT_EQ(client->last_github_token, "from-copilot-token");
+}
 
-  test_unsetenv("COPILOT_GITHUB_TOKEN");
-  test_unsetenv("GH_TOKEN");
-  test_unsetenv("GITHUB_TOKEN");
+TEST(GitHubCopilotAuthTest, RuntimeResolverPrefersEnvironmentTokenOverCache) {
+  const auto dir = test::MakeTestDir("github_copilot_runtime_env_over_cache");
+  GitHubCopilotTokenCache cache(dir / "github-copilot-runtime.json");
+  GitHubCopilotRuntimeCredential cached;
+  cached.api_token = "cached-api-token";
+  cached.base_url = "https://cached.example";
+  cached.expires_at = 4102444800;
+  cache.Save(cached);
+
+  auto logger = make_logger("github-copilot-runtime-env-over-cache");
+  auto client = std::make_shared<FakeTokenClient>(logger);
+  client->result.api_token = "fresh-api-token";
+  client->result.base_url = "https://fresh.example";
+  client->result.expires_at = 4102444800;
+
+  GitHubCopilotRuntimeResolver resolver(
+      GitHubCopilotAuthStore(dir / "github-copilot.json"), cache, client,
+      logger, [] { return "env-token"; });
+
+  const auto result = resolver.ResolveRuntimeCredential(4000000000);
+
+  EXPECT_EQ(result.api_token, "fresh-api-token");
+  EXPECT_EQ(result.base_url, "https://fresh.example");
+  EXPECT_EQ(client->exchange_calls, 1);
+  EXPECT_EQ(client->last_github_token, "env-token");
 }
 
 TEST(GitHubCopilotAuthTest, TokenExchangeSendsUserAgentHeader) {

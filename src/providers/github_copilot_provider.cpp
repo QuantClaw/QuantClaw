@@ -3,6 +3,8 @@
 
 #include "quantclaw/providers/github_copilot_provider.hpp"
 
+#include <chrono>
+
 namespace quantclaw {
 namespace {
 
@@ -27,12 +29,24 @@ std::vector<std::string> GitHubCopilotProvider::GetSupportedModels() const {
   return {"gpt-4o", "gpt-4.1", "claude-3.7-sonnet", "claude-sonnet-4"};
 }
 
+const auth::GitHubCopilotRuntimeCredential&
+GitHubCopilotProvider::ResolveRuntimeCredential() const {
+  std::lock_guard<std::mutex> lock(runtime_mu_);
+  const auto now = std::chrono::duration_cast<std::chrono::seconds>(
+                       std::chrono::system_clock::now().time_since_epoch())
+                       .count();
+  if (!cached_runtime_.has_value() || !cached_runtime_->IsUsable(now)) {
+    cached_runtime_ = resolver_->ResolveRuntimeCredential();
+  }
+  return *cached_runtime_;
+}
+
 std::string GitHubCopilotProvider::ResolveApiKey() const {
-  return resolver_->ResolveRuntimeCredential().api_token;
+  return ResolveRuntimeCredential().api_token;
 }
 
 std::string GitHubCopilotProvider::ResolveBaseUrl() const {
-  const auto runtime = resolver_->ResolveRuntimeCredential();
+  const auto& runtime = ResolveRuntimeCredential();
   return runtime.base_url.empty() ? OpenAIProvider::ResolveBaseUrl()
                                   : runtime.base_url;
 }

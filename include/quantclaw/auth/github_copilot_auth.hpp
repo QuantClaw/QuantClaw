@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <istream>
 #include <memory>
 #include <ostream>
@@ -101,10 +102,13 @@ class GitHubCopilotTokenClient {
 class GitHubCopilotRuntimeResolver
     : public GitHubCopilotRuntimeResolverInterface {
  public:
+  using GitHubTokenResolver = std::function<std::string()>;
+
   GitHubCopilotRuntimeResolver(GitHubCopilotAuthStore store,
                                GitHubCopilotTokenCache cache,
                                std::shared_ptr<GitHubCopilotTokenClient> client,
-                               std::shared_ptr<spdlog::logger> logger);
+                               std::shared_ptr<spdlog::logger> logger,
+                               GitHubTokenResolver env_token_resolver = {});
 
   GitHubCopilotRuntimeCredential ResolveRuntimeCredential() override;
   GitHubCopilotRuntimeCredential
@@ -115,6 +119,7 @@ class GitHubCopilotRuntimeResolver
   GitHubCopilotTokenCache cache_;
   std::shared_ptr<GitHubCopilotTokenClient> client_;
   std::shared_ptr<spdlog::logger> logger_;
+  GitHubTokenResolver env_token_resolver_;
 };
 
 }  // namespace quantclaw::auth
