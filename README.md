@@ -17,13 +17,10 @@
   <a href="https://github.com/openclaw/openclaw"><img src="https://img.shields.io/badge/OpenClaw-compatible-orange.svg" alt="OpenClaw Compatible"></a>
 </p>
 
-<p align="center">
-  <a href="README_CN.md">中文文档</a>
-</p>
 
 ---
 
-QuantClaw is a native C++ implementation of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem — built for performance and low memory footprint while staying fully compatible with OpenClaw workspace files, skills, and the WebSocket RPC protocol.
+QwenClaw is the C++23 modules, local agent based fork of QuantClaw native C++ implementation of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem — built for performance and low memory footprint while staying fully compatible with OpenClaw workspace files, skills, and the WebSocket RPC protocol.
 
 ## Features
 
@@ -41,17 +38,6 @@ QuantClaw is a native C++ implementation of the [OpenClaw](https://github.com/op
 - **Plugin Ecosystem**: Full OpenClaw plugin compatibility via Node.js sidecar — tools, hooks, services, providers, commands, HTTP routes, and gateway methods
 - **MCP Support**: Model Context Protocol for external tool integration
 - **File System First**: No database dependencies — everything stored in your workspace
-
-## 📖 Documentation
-
-Full documentation available at: **[https://quantclaw.github.io/](https://quantclaw.github.io/)**
-
-Includes:
-- [Getting Started Guide](https://quantclaw.github.io/guide/getting-started)
-- [Installation Instructions](https://quantclaw.github.io/guide/installation)
-- [Architecture Overview](https://quantclaw.github.io/guide/architecture)
-- [Plugin Development Guide](https://quantclaw.github.io/guide/plugins)
-- [CLI Reference](https://quantclaw.github.io/guide/cli-reference)
 
 ## Quick Start
 
@@ -258,8 +244,7 @@ QuantClaw uses JSON configuration (`~/.quantclaw/quantclaw.json`):
 
 The model field uses `provider/model-name` prefix routing. If no prefix is given, it defaults to `openai`. For local inference with Anthropic-compatible runtimes, use `local/<your-model-id>` with `providers.local.baseUrl` pointing to your local `/v1/messages` endpoint. See `config.example.json` for a full example with all options.
 
-### Local inference (Anthropic-compatible runtime)
-
+### Local inference
 Use the built-in `local` provider for local gateways that expose an Anthropic-style `/v1/messages` API:
 
 ```json
@@ -288,25 +273,12 @@ QuantClaw enforces automatic log cleanup on every gateway startup to prevent dis
 
 Log files are stored at `~/.quantclaw/logs/`. The main application log (`quantclaw.log`) is size-rotated automatically by spdlog; the gateway service log (`gateway.log`, written by systemd) is time-pruned at every startup.
 
-### Dependencies
 
-**Required (system packages)**:
-- C++17 compiler (GCC 7+ or Clang 5+)
-- spdlog — logging
-- nlohmann/json — JSON library
-- libcurl — HTTP client
-- OpenSSL — TLS/SSL
-
-**Fetched automatically by CMake**:
-- IXWebSocket 11.4.5 — WebSocket server/client
-- cpp-httplib 0.18.3 — HTTP server
-- Google Test 1.14.0 — testing framework
-
-### Ubuntu / Debian one-liner
+### Fedora / RHEL one-liner
 
 ```bash
-sudo apt install build-essential cmake libssl-dev \
-  libcurl4-openssl-dev nlohmann-json3-dev libspdlog-dev zlib1g-dev
+sudo dnf install gcc gcc-c++ cmake libssl-dev \
+  libcurl-devel nlohmann-json-devel spdlog-devel zlib-devel
 ```
 
 ## Usage

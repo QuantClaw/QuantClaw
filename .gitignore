@@ -64,6 +64,10 @@ __pycache__/
 venv/
 .venv/
 
+# Local secrets
+.env
+.env.*
+
 # Reference code (local only, not committed)
 refs/
 .claude/

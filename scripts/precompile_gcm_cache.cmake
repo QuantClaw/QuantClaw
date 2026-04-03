@@ -27,10 +27,39 @@ set(_cxx_flags
 set(_project_includes
   -I${QC_SOURCE_DIR}/include
   -I${QC_SOURCE_DIR}/src
-  -I${QC_BINARY_DIR}/vcpkg_installed/x64-linux/include
-  -I${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed/x64-linux/include
-  -I${QC_SOURCE_DIR}/build-ninja/vcpkg_installed/x64-linux/include
 )
+
+set(_vcpkg_roots
+  "${QC_BINARY_DIR}/vcpkg_installed"
+  "${QC_SOURCE_DIR}/build-cmake43/vcpkg_installed"
+  "${QC_SOURCE_DIR}/build-vcpkg/vcpkg_installed"
+  "${QC_SOURCE_DIR}/build-ninja/vcpkg_installed"
+  "${QC_SOURCE_DIR}/build-coverage/vcpkg_installed"
+)
+
+foreach(_vcpkg_root IN LISTS _vcpkg_roots)
+  if(EXISTS "${_vcpkg_root}")
+    file(GLOB _candidate_triplet_includes LIST_DIRECTORIES TRUE "${_vcpkg_root}/*/include")
+    foreach(_include_dir IN LISTS _candidate_triplet_includes)
+      if(EXISTS "${_include_dir}")
+        list(APPEND _project_includes "-I${_include_dir}")
+      endif()
+    endforeach()
+  endif()
+endforeach()
+list(REMOVE_DUPLICATES _project_includes)
+
+set(_duckdb_header "")
+foreach(_vcpkg_root IN LISTS _vcpkg_roots)
+  if(EXISTS "${_vcpkg_root}")
+    file(GLOB _candidate_duckdb_headers "${_vcpkg_root}/*/include/duckdb.h")
+    list(LENGTH _candidate_duckdb_headers _duckdb_count)
+    if(_duckdb_count GREATER 0)
+      list(GET _candidate_duckdb_headers 0 _duckdb_header)
+      break()
+    endif()
+  endif()
+endforeach()
 
 execute_process(
   COMMAND "${QC_CXX_COMPILER}" -dumpfullversion
@@ -147,7 +176,11 @@ qc_run_compile("quantclaw.common.defer" FILE "${QC_SOURCE_DIR}/src/common/defer.
 
 # Third-party header units used throughout the project.
 qc_run_compile("nlohmann/json.hpp" FILE "${QC_SOURCE_DIR}/include/nlohmann/json.hpp" MODE header)
-qc_run_compile("duckdb.h" FILE "${QC_BINARY_DIR}/vcpkg_installed/x64-linux/include/duckdb.h" MODE system-header)
+if(_duckdb_header)
+  qc_run_compile("duckdb.h" FILE "${_duckdb_header}" MODE system-header)
+else()
+  message(STATUS "Skipping duckdb.h precompile: duckdb header not found in vcpkg install trees")
+endif()
 
 # The nlohmann.json named module exports the header unit above.
 qc_run_compile("nlohmann.json" FILE "${QC_SOURCE_DIR}/src/thirdparty/json.ixx" MODE module)

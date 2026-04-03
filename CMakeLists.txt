@@ -452,6 +452,14 @@ target_include_directories(quantclaw PRIVATE
 )
 set_property(TARGET quantclaw PROPERTY CXX_SCAN_FOR_MODULES ON)
 
+# Standalone TurboQuant GGUF quantization script.
+add_executable(tq_quantize scripts/tq.cpp)
+target_compile_definitions(tq_quantize PRIVATE
+    TQ_STANDALONE_MAIN=1
+)
+set_property(TARGET tq_quantize PROPERTY CXX_SCAN_FOR_MODULES ON)
+target_compile_options(tq_quantize PRIVATE -Wall -Wextra -Wpedantic -O2)
+
 if(QC_PRECOMPILE_GCC_STDLIB_MODULES)
     # GCC/libstdc++ ships C++23 named module sources at bits/std.cc and
     # bits/std.compat.cc. Build them once into this build tree so sources can
@@ -590,6 +598,7 @@ if(BUILD_TESTS)
         tests/test_multi_stage_compaction.cpp
         tests/test_hybrid_memory_search.cpp
         tests/test_dag_runtime.cpp
+        tests/test_turboquant_kv.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})

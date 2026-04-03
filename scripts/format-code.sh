@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # QuantClaw Code Formatting Script
 # This script formats all C++ source files using clang-format
 
-set -e
+set -euo pipefail
 
 # Color output
 RED='\033[0;31m'
@@ -14,7 +14,14 @@ echo -e "${GREEN}QuantClaw Code Formatter${NC}"
 echo "================================"
 
 # Check if clang-format is installed
-if ! command -v clang-format &> /dev/null; then
+CLANG_FORMAT_BIN=""
+if command -v clang-format >/dev/null 2>&1; then
+    CLANG_FORMAT_BIN="clang-format"
+elif command -v clang-format-14 >/dev/null 2>&1; then
+    CLANG_FORMAT_BIN="clang-format-14"
+fi
+
+if [ -z "$CLANG_FORMAT_BIN" ]; then
     echo -e "${RED}Error: clang-format not found${NC}"
     echo ""
     echo "Please install clang-format first:"
@@ -24,7 +31,7 @@ if ! command -v clang-format &> /dev/null; then
     exit 1
 fi
 
-CLANG_FORMAT_VERSION=$(clang-format --version | grep -oP '\d+\.\d+' | head -1)
+CLANG_FORMAT_VERSION=$($CLANG_FORMAT_BIN --version | grep -oP '\d+\.\d+' | head -1)
 echo -e "Using clang-format version: ${GREEN}${CLANG_FORMAT_VERSION}${NC}"
 echo ""
 
@@ -41,26 +48,39 @@ fi
 echo "Project root: $PROJECT_ROOT"
 echo ""
 
-# Find all C++ source files
+# Find all C++ source and module files
 echo "Finding C++ source files..."
-FILES=$(find src include tests -name "*.cpp" -o -name "*.hpp" 2>/dev/null || true)
+mapfile -d '' FILES < <(find src include tests -type f \( \
+    -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o \
+    -name "*.hpp" -o -name "*.h" -o -name "*.hh" -o \
+    -name "*.cppm" -o -name "*.ixx" \
+\) -print0 2>/dev/null || true)
 
-if [ -z "$FILES" ]; then
+if [ "${#FILES[@]}" -eq 0 ]; then
     echo -e "${YELLOW}No C++ files found${NC}"
     exit 0
 fi
 
-FILE_COUNT=$(echo "$FILES" | wc -l)
+FILE_COUNT=${#FILES[@]}
 echo -e "Found ${GREEN}${FILE_COUNT}${NC} files to format"
 echo ""
 
+CHECK_ONLY=false
+if [[ "${1:-}" == "--check" ]]; then
+    CHECK_ONLY=true
+elif [[ $# -gt 0 ]]; then
+    echo -e "${RED}Error: Unknown argument '$1'${NC}"
+    echo "Usage: ./scripts/format-code.sh [--check]"
+    exit 1
+fi
+
 # Check if --check flag is passed
-if [ "$1" = "--check" ]; then
+if [[ "$CHECK_ONLY" == "true" ]]; then
     echo "Running format check (dry-run)..."
     FAILED=0
 
-    for FILE in $FILES; do
-        if ! clang-format --dry-run --Werror "$FILE" 2>&1 > /dev/null; then
+    for FILE in "${FILES[@]}"; do
+        if ! $CLANG_FORMAT_BIN --dry-run --Werror "$FILE" >/dev/null 2>&1; then
             echo -e "${RED}✗${NC} $FILE"
             FAILED=$((FAILED + 1))
         else
@@ -82,8 +102,8 @@ else
     echo "Formatting files..."
     FORMATTED=0
 
-    for FILE in $FILES; do
-        clang-format -i "$FILE"
+    for FILE in "${FILES[@]}"; do
+        $CLANG_FORMAT_BIN -i "$FILE"
         echo -e "${GREEN}✓${NC} $FILE"
         FORMATTED=$((FORMATTED + 1))
     done

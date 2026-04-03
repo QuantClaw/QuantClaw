@@ -7,7 +7,7 @@
 #   ./scripts/release.sh [VERSION]
 #
 # Examples:
-#   ./scripts/release.sh                  # reads scripts/DOCKER_VERSION
+#   ./scripts/release.sh                  # reads scripts/DOCKER_VERSION or CMake project version
 #   ./scripts/release.sh 0.3.0-alpha      # explicit version
 #
 # Output:
@@ -36,8 +36,15 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 VERSION="${1:-}"
 if [[ -z "$VERSION" ]]; then
     VERSION_FILE="$SCRIPT_DIR/DOCKER_VERSION"
-    [[ -f "$VERSION_FILE" ]] || die "No version given and $VERSION_FILE not found."
-    VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
+    if [[ -f "$VERSION_FILE" ]]; then
+        VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
+    elif [[ -f "$ROOT/CMakeLists.txt" ]]; then
+        VERSION="$(sed -nE 's/^project\(quantclaw VERSION ([^ ]+) .*/\1/p' "$ROOT/CMakeLists.txt" | head -n1 | tr -d '[:space:]')"
+        [[ -n "$VERSION" ]] || die "Unable to infer version from $ROOT/CMakeLists.txt"
+        warn "$VERSION_FILE not found; using project version '$VERSION' from CMakeLists.txt"
+    else
+        die "No version given and no version source found."
+    fi
 fi
 [[ -n "$VERSION" ]] || die "Empty version string."
 
@@ -55,21 +62,20 @@ DIST_DIR="$ROOT/dist"
 mkdir -p "$DIST_DIR"
 
 # ── Build ─────────────────────────────────────────────────────────────────────
-BUILD_DIR="$ROOT/build"
 info "Building $ARTIFACT_NAME..."
 
-# Use build.sh if available, otherwise fall back to raw cmake
+# Use build.sh if available, otherwise fall back to direct preset build.
 if [[ -x "$SCRIPT_DIR/build.sh" ]]; then
-    "$SCRIPT_DIR/build.sh"
+    "$SCRIPT_DIR/build.sh" --release --no-tests
 else
     CPU_CORES=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
-    cmake -B "$BUILD_DIR" -S "$ROOT" \
+    cmake --preset gcc16-ninja \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_CXX_STANDARD=17 \
         -DBUILD_TESTS=OFF
-    cmake --build "$BUILD_DIR" --parallel "$CPU_CORES"
+    cmake --build --preset gcc16-ninja --parallel "$CPU_CORES"
 fi
 
+BUILD_DIR="$ROOT/build-cmake43"
 BINARY="$BUILD_DIR/quantclaw"
 [[ -f "$BINARY" ]] || die "Binary not found: $BINARY"
 
@@ -88,19 +94,27 @@ SIDECAR_MODS="$ROOT/sidecar/node_modules"
 if [[ -d "$SIDECAR_DIST" ]]; then
     mkdir -p "$STAGE/sidecar"
     cp -r "$SIDECAR_DIST" "$STAGE/sidecar/dist"
+    [[ -f "$ROOT/sidecar/package.json" ]] && cp "$ROOT/sidecar/package.json" "$STAGE/sidecar/package.json"
+    [[ -f "$ROOT/sidecar/package-lock.json" ]] && cp "$ROOT/sidecar/package-lock.json" "$STAGE/sidecar/package-lock.json"
     [[ -d "$SIDECAR_MODS" ]] && cp -r "$SIDECAR_MODS" "$STAGE/sidecar/node_modules"
     info "Sidecar included in release."
 fi
 
-# Include skills/
-SKILLS_DIR="$ROOT/skills"
+# Include built-in skills (current fork layout)
+SKILLS_DIR="$ROOT/assets/skills"
 if [[ -d "$SKILLS_DIR" ]]; then
-    cp -r "$SKILLS_DIR" "$STAGE/skills"
+    mkdir -p "$STAGE/assets"
+    cp -r "$SKILLS_DIR" "$STAGE/assets/skills"
 fi
 
 # Include scripts/install.sh renamed for convenience
 cp "$SCRIPT_DIR/install.sh" "$STAGE/install.sh"
 chmod +x "$STAGE/install.sh"
+cp "$SCRIPT_DIR/env.example.txt" "$STAGE/env.example.txt"
+
+# Include config template + license for convenience
+[[ -f "$ROOT/config.example.json" ]] && cp "$ROOT/config.example.json" "$STAGE/config.example.json"
+[[ -f "$ROOT/LICENSE" ]] && cp "$ROOT/LICENSE" "$STAGE/LICENSE"
 
 # Write version file
 echo "$VERSION" > "$STAGE/VERSION"
