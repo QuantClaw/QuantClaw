@@ -169,7 +169,7 @@ quantclaw models auth logout --provider github-copilot
 quantclaw models auth login-github-copilot
 ```
 
-`openai-codex` uses a browser-based OAuth flow and stores credentials in `~/.quantclaw/auth/openai-codex.json`. `github-copilot` uses GitHub device login and stores credentials in `~/.quantclaw/auth/github-copilot.json`; short-lived Copilot runtime tokens are cached in `~/.quantclaw/auth/github-copilot.token-cache.json`. `status` shows whether cached credentials exist and whether they are still valid or refreshable. `logout` clears the local cached OAuth credentials only; your provider configuration is not automatically switched — if it still points to `openai-codex/*`, subsequent requests will return an auth error until you log in again.
+`openai-codex` uses a browser-based OAuth flow and stores credentials in `~/.quantclaw/auth/openai-codex.json`. `github-copilot` uses GitHub device login and stores credentials in `~/.quantclaw/auth/github-copilot.json`; short-lived Copilot runtime tokens are cached in `~/.quantclaw/auth/github-copilot.token-cache.json`. `status` shows whether cached credentials exist and whether they are still valid or refreshable. `logout` removes the local authorization cache.
 
 ### config
 

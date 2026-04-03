@@ -82,12 +82,10 @@ int hex_value(char ch) {
 std::string url_decode(std::string_view value) {
   std::string out;
   out.reserve(value.size());
-  size_t i = 0;
-  while (i < value.size()) {
+  for (size_t i = 0; i < value.size(); ++i) {
     const char ch = value[i];
     if (ch == '+') {
       out.push_back(' ');
-      ++i;
       continue;
     }
     if (ch == '%' && i + 2 < value.size()) {
@@ -95,35 +93,11 @@ std::string url_decode(std::string_view value) {
       const int lo = hex_value(value[i + 2]);
       if (hi >= 0 && lo >= 0) {
         out.push_back(static_cast<char>((hi << 4) | lo));
-        i += 3;
+        i += 2;
         continue;
       }
     }
     out.push_back(ch);
-    ++i;
-  }
-  return out;
-}
-
-// Like url_decode but treats '+' as a literal '+', not a space.
-// Use this for opaque token strings (raw auth codes) that must not have
-// query-string '+' => space semantics applied.
-std::string url_decode_percent_only(std::string_view value) {
-  std::string out;
-  out.reserve(value.size());
-  size_t i = 0;
-  while (i < value.size()) {
-    if (value[i] == '%' && i + 2 < value.size()) {
-      const int hi = hex_value(value[i + 1]);
-      const int lo = hex_value(value[i + 2]);
-      if (hi >= 0 && lo >= 0) {
-        out.push_back(static_cast<char>((hi << 4) | lo));
-        i += 3;
-        continue;
-      }
-    }
-    out.push_back(value[i]);
-    ++i;
   }
   return out;
 }
@@ -313,9 +287,7 @@ std::string extract_query_param(const std::string& query,
 
 std::string parse_manual_code(std::string input) {
   if (input.find("code=") == std::string::npos) {
-    // Raw auth code: decode percent-encoded sequences but treat '+' literally,
-    // since auth codes are opaque tokens and '+' is not a space placeholder.
-    return url_decode_percent_only(input);
+    return url_decode(input);
   }
   auto pos = input.find('?');
   std::string query = pos == std::string::npos ? input : input.substr(pos + 1);

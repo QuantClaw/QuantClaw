@@ -7,12 +7,6 @@
 #include <fstream>
 #include <stdexcept>
 
-#ifndef _WIN32
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
-
 #include <nlohmann/json.hpp>
 
 #include "quantclaw/platform/process.hpp"
@@ -92,48 +86,29 @@ void ProviderAuthStore::Save(const ProviderAuthRecord& record) const {
 
   const auto temp_path =
       path_.parent_path() / (path_.filename().string() + ".tmp");
-  const std::string content = j.dump(2) + "\n";
 #ifndef _WIN32
   {
-    // Create with 0600 from the outset: eliminates the window where sensitive
-    // refresh-token bytes could be world-readable before a chmod.
-    const int fd =
-        ::open(temp_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
-               S_IRUSR | S_IWUSR);
-    if (fd < 0) {
-      throw std::runtime_error("Failed to write auth store: " +
-                               temp_path.string());
-    }
-    const ssize_t written =
-        ::write(fd, content.data(), content.size());
-    ::close(fd);
-    if (written < 0 ||
-        static_cast<size_t>(written) != content.size()) {
+    std::ofstream create(temp_path, std::ios::trunc);
+    if (!create) {
       throw std::runtime_error("Failed to write auth store: " +
                                temp_path.string());
     }
   }
-  // On POSIX, rename() atomically replaces the destination; no prior
-  // remove() is needed, so a failed rename cannot leave the old credentials
-  // deleted.
-  std::filesystem::rename(temp_path, path_);
-#else
-  {
-    std::ofstream out(temp_path, std::ios::trunc);
-    if (!out) {
-      throw std::runtime_error("Failed to write auth store: " +
-                               temp_path.string());
-    }
-    out << content;
-    out.close();
-  }
-  // Windows: std::filesystem::rename() cannot overwrite an existing file.
-  {
-    std::error_code remove_ec;
-    std::filesystem::remove(path_, remove_ec);
-  }
-  std::filesystem::rename(temp_path, path_);
+  std::filesystem::permissions(temp_path,
+                               std::filesystem::perms::owner_read |
+                                   std::filesystem::perms::owner_write,
+                               std::filesystem::perm_options::replace);
 #endif
+  std::ofstream out(temp_path, std::ios::trunc);
+  if (!out) {
+    throw std::runtime_error("Failed to write auth store: " +
+                             temp_path.string());
+  }
+  out << j.dump(2) << '\n';
+  out.close();
+  std::error_code remove_ec;
+  std::filesystem::remove(path_, remove_ec);
+  std::filesystem::rename(temp_path, path_);
 }
 
 bool ProviderAuthStore::Clear() const {

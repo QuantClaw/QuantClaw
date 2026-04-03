@@ -150,7 +150,7 @@ quantclaw models auth logout --provider github-copilot
 quantclaw models auth login-github-copilot
 ```
 
-`openai-codex` 会打开浏览器 OAuth 流程，并把凭证保存到 `~/.quantclaw/auth/openai-codex.json`。`github-copilot` 使用 GitHub device flow，长期凭证保存到 `~/.quantclaw/auth/github-copilot.json`，短期 Copilot 运行时 token 缓存在 `~/.quantclaw/auth/github-copilot.token-cache.json`。`status` 会显示本地是否已有缓存凭证，以及当前 token 是否仍然有效或可刷新。`logout` 仅清除本地缓存的 OAuth 凭证；已有的 provider 配置不会自动切换，若配置仍指向 `openai-codex/*`，后续请求将在重新登录前返回鉴权错误。
+`openai-codex` 会打开浏览器 OAuth 流程，并把凭证保存到 `~/.quantclaw/auth/openai-codex.json`。`github-copilot` 使用 GitHub device flow，长期凭证保存到 `~/.quantclaw/auth/github-copilot.json`，短期 Copilot 运行时 token 缓存在 `~/.quantclaw/auth/github-copilot.token-cache.json`。`status` 会显示本地是否已有缓存凭证，以及当前 token 是否仍然有效或可刷新。`logout` 会删除本地缓存授权。
 
 ### config
 
