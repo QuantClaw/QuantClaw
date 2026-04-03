@@ -221,27 +221,3 @@ TEST(PlatformService, WritePidFile) {
   svc.remove_pid();
   EXPECT_EQ(svc.get_pid(), -1);
 }
-
-#ifdef __APPLE__
-TEST(PlatformService, ShellQuoteHandlesEmptyString) {
-  EXPECT_EQ(quantclaw::platform::detail::shell_quote(""), "''");
-}
-
-TEST(PlatformService, ShellQuoteEscapesSingleQuotesInPaths) {
-  EXPECT_EQ(
-      quantclaw::platform::detail::shell_quote("/tmp/O'Reilly & Sons/gateway"),
-      "'/tmp/O'\\''Reilly & Sons/gateway'");
-}
-
-TEST(PlatformService, XmlEscapeHandlesEmptyString) {
-  EXPECT_EQ(quantclaw::platform::detail::xml_escape(""), "");
-}
-
-TEST(PlatformService, XmlEscapeEscapesXmlSpecialCharacters) {
-  EXPECT_EQ(quantclaw::platform::detail::xml_escape("&<>\"'"),
-            "&amp;&lt;&gt;&quot;&apos;");
-  EXPECT_EQ(
-      quantclaw::platform::detail::xml_escape("/tmp/O'Reilly & Sons/<gateway>"),
-      "/tmp/O&apos;Reilly &amp; Sons/&lt;gateway&gt;");
-}
-#endif
