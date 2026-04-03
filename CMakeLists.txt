@@ -94,9 +94,17 @@ elseif(ENABLE_ASAN OR ENABLE_TSAN OR ENABLE_UBSAN)
     message(WARNING "Sanitizers are not supported with MSVC; flags ignored.")
 endif()
 
+# Coverage (gcov) — works with C++23 modules since instrumentation is per-TU.
+option(ENABLE_COVERAGE "Build with gcov coverage instrumentation" OFF)
+if(ENABLE_COVERAGE)
+    add_compile_options(--coverage -fprofile-arcs -ftest-coverage)
+    add_link_options(--coverage)
+    message(STATUS "Coverage instrumentation enabled (gcov)")
+endif()
+
 # Required dependencies
 include(FetchContent)
-find_package(ut CONFIG REQUIRED)
+find_package(GTest CONFIG REQUIRED)
 find_package(spdlog CONFIG QUIET)
 find_package(CURL CONFIG QUIET)
 if(NOT CURL_FOUND)
@@ -594,7 +602,8 @@ if(BUILD_TESTS)
     )
     target_link_libraries(quantclaw_tests PRIVATE
         quantclaw_core
-        Boost::ut
+        GTest::gtest
+        GTest::gtest_main
     )
     set_property(TARGET quantclaw_tests PROPERTY CXX_SCAN_FOR_MODULES ON)
     target_compile_options(quantclaw_tests PRIVATE -Wall -Wextra -Wpedantic -O2)

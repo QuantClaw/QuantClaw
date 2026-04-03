@@ -205,7 +205,7 @@ void CronScheduler::Save(const std::string& filepath) const {
   }
 
   std::ofstream ofs(filepath);
-  ofs << arr.dump(2) << std::endl;
+  ofs << arr.dump(2) << '\n';
 }
 
 std::string CronScheduler::AddJob(const std::string& name,
@@ -254,7 +254,7 @@ bool CronScheduler::RemoveJob(const std::string& id) {
         for (const auto& j : jobs_)
           arr.push_back(j.ToJson());
         std::ofstream ofs(storage_path_);
-        ofs << arr.dump(2) << std::endl;
+        ofs << arr.dump(2) << '\n';
       }
       return true;
     }
@@ -276,7 +276,7 @@ bool CronScheduler::RemoveJob(const std::string& id) {
     for (const auto& j : jobs_)
       arr.push_back(j.ToJson());
     std::ofstream ofs(storage_path_);
-    ofs << arr.dump(2) << std::endl;
+    ofs << arr.dump(2) << '\n';
   }
 
   return true;

@@ -51,7 +51,7 @@ int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
   // Step 1: Config
   PrintStep(1, 5, "Configuration");
   if (SetupConfig() != 0) {
-    std::cerr << "Configuration setup failed" << std::endl;
+    std::cerr << "Configuration setup failed" << '\n';
     return 1;
   }
 
@@ -67,7 +67,7 @@ int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
   // Step 2: Workspace
   PrintStep(2, 5, "Workspace Setup");
   if (SetupWorkspace() != 0) {
-    std::cerr << "Workspace setup failed" << std::endl;
+    std::cerr << "Workspace setup failed" << '\n';
     return 1;
   }
 
@@ -94,15 +94,15 @@ int OnboardCommands::OnboardCommand(const std::vector<std::string>& args) {
     logger_->warn("Some verification checks failed");
   }
 
-  std::cout << "\n✓ Onboarding complete!" << std::endl;
-  std::cout << "\nNext steps:" << std::endl;
-  std::cout << "  1. Start the gateway:  quantclaw gateway start" << std::endl;
-  std::cout << "  2. Check status:       quantclaw status" << std::endl;
+  std::cout << "\n✓ Onboarding complete!" << '\n';
+  std::cout << "\nNext steps:" << '\n';
+  std::cout << "  1. Start the gateway:  quantclaw gateway start" << '\n';
+  std::cout << "  2. Check status:       quantclaw status" << '\n';
   std::cout << "  3. Send a message:     quantclaw agent -m \"Hello\""
-            << std::endl;
+            << '\n';
   std::cout << "  4. Open the dashboard: http://127.0.0.1:" << port + 1
-            << std::endl;
-  std::cout << "\nFor help: quantclaw --help" << std::endl;
+            << '\n';
+  std::cout << "\nFor help: quantclaw --help" << '\n';
 
   return 0;
 }
@@ -118,21 +118,21 @@ int OnboardCommands::InstallDaemonCommand(
       port = cfg.gateway.port;
   } catch (...) {
     // No config yet — run quick setup so config exists
-    std::cout << "No config found. Running quick setup first..." << std::endl;
+    std::cout << "No config found. Running quick setup first..." << '\n';
     if (QuickSetupCommand({}) != 0)
       return 1;
   }
 
-  std::cout << "Installing QuantClaw as user service..." << std::endl;
+  std::cout << "Installing QuantClaw as user service..." << '\n';
   if (InstallDaemon(port)) {
-    std::cout << "✓ Daemon installed successfully" << std::endl;
-    std::cout << "\nManage the service:" << std::endl;
-    std::cout << "  quantclaw gateway start" << std::endl;
-    std::cout << "  quantclaw gateway stop" << std::endl;
-    std::cout << "  quantclaw gateway status" << std::endl;
+    std::cout << "✓ Daemon installed successfully" << '\n';
+    std::cout << "\nManage the service:" << '\n';
+    std::cout << "  quantclaw gateway start" << '\n';
+    std::cout << "  quantclaw gateway stop" << '\n';
+    std::cout << "  quantclaw gateway status" << '\n';
     return 0;
   }
-  std::cerr << "✗ Failed to install daemon" << std::endl;
+  std::cerr << "✗ Failed to install daemon" << '\n';
   return 1;
 }
 
@@ -144,24 +144,24 @@ int OnboardCommands::InstallDaemonCommand(
 // Returns 0 on success, 1 on fatal error.
 int OnboardCommands::QuickSetupCommand(
     const std::vector<std::string>& /*args*/) {
-  std::cout << "Running quick setup..." << std::endl;
+  std::cout << "Running quick setup..." << '\n';
 
   // Token
   std::string token = GenerateToken();
 
   if (!CreateWorkspaceDirectory()) {
-    std::cerr << "Failed to create workspace" << std::endl;
+    std::cerr << "Failed to create workspace" << '\n';
     return 1;
   }
   if (!CreateConfigFile("anthropic/claude-sonnet-4-6", 18800, "127.0.0.1",
                         token)) {
-    std::cerr << "Failed to create config" << std::endl;
+    std::cerr << "Failed to create config" << '\n';
     return 1;
   }
   if (!CreateSOULFile() || !CreateMemoryFile() || !CreateSkillFile() ||
       !CreateIdentityFile() || !CreateHeartbeatFile() || !CreateUserFile() ||
       !CreateAgentsFile() || !CreateToolsFile()) {
-    std::cerr << "Failed to create workspace files" << std::endl;
+    std::cerr << "Failed to create workspace files" << '\n';
     return 1;
   }
 
@@ -169,37 +169,37 @@ int OnboardCommands::QuickSetupCommand(
     logger_->warn("Skills setup had issues during quick setup, but continuing");
   }
 
-  std::cout << "✓ Quick setup complete" << std::endl;
+  std::cout << "✓ Quick setup complete" << '\n';
   return 0;
 }
 
 void OnboardCommands::PrintWelcome() {
   std::cout << "\n";
   std::cout << "╔════════════════════════════════════════════════════════════╗"
-            << std::endl;
+            << '\n';
   std::cout << "║                                                            ║"
-            << std::endl;
+            << '\n';
   std::cout << "║          Welcome to QuantClaw Onboarding Wizard            ║"
-            << std::endl;
+            << '\n';
   std::cout << "║                                                            ║"
-            << std::endl;
+            << '\n';
   std::cout << "║  This wizard will guide you through the initial setup of   ║"
-            << std::endl;
+            << '\n';
   std::cout << "║  QuantClaw, including configuration, workspace creation,   ║"
-            << std::endl;
+            << '\n';
   std::cout << "║  and optional daemon installation.                         ║"
-            << std::endl;
+            << '\n';
   std::cout << "║                                                            ║"
-            << std::endl;
+            << '\n';
   std::cout << "╚════════════════════════════════════════════════════════════╝"
-            << std::endl;
-  std::cout << std::endl;
+            << '\n';
+  std::cout << '\n';
 }
 
 void OnboardCommands::PrintStep(int current, int total,
                                 const std::string& title) {
-  std::cout << "\n[" << current << "/" << total << "] " << title << std::endl;
-  std::cout << std::string(40, '-') << std::endl;
+  std::cout << "\n[" << current << "/" << total << "] " << title << '\n';
+  std::cout << std::string(40, '-') << '\n';
 }
 
 std::string OnboardCommands::PromptString(const std::string& prompt,
@@ -239,9 +239,9 @@ bool OnboardCommands::PromptYesNo(const std::string& prompt,
 std::string
 OnboardCommands::PromptChoice(const std::string& prompt,
                               const std::vector<std::string>& choices) {
-  std::cout << prompt << std::endl;
+  std::cout << prompt << '\n';
   for (size_t i = 0; i < choices.size(); ++i) {
-    std::cout << "  " << (i + 1) << ") " << choices[i] << std::endl;
+    std::cout << "  " << (i + 1) << ") " << choices[i] << '\n';
   }
   std::cout << "Choose [1]: ";
   std::cout.flush();
@@ -269,13 +269,13 @@ int OnboardCommands::SetupConfig() {
   std::string config_path = QuantClawConfig::DefaultConfigPath();
 
   if (std::filesystem::exists(config_path)) {
-    std::cout << "Config file already exists at: " << config_path << std::endl;
+    std::cout << "Config file already exists at: " << config_path << '\n';
     if (!PromptYesNo("Overwrite?", false)) {
       return 0;
     }
   }
 
-  std::cout << "\nLet's configure QuantClaw:" << std::endl;
+  std::cout << "\nLet's configure QuantClaw:" << '\n';
 
   std::string model =
       PromptString("Default AI model", "anthropic/claude-sonnet-4-6");
@@ -290,13 +290,13 @@ int OnboardCommands::SetupConfig() {
 
   // Auto-generate auth token (OpenClaw-compatible behaviour)
   std::string token = GenerateToken();
-  std::cout << "  Auto-generated gateway auth token." << std::endl;
+  std::cout << "  Auto-generated gateway auth token." << '\n';
 
   if (!CreateConfigFile(model, port, bind, token)) {
     return 1;
   }
 
-  std::cout << "✓ Configuration saved to: " << config_path << std::endl;
+  std::cout << "✓ Configuration saved to: " << config_path << '\n';
   return 0;
 }
 
@@ -321,7 +321,7 @@ int OnboardCommands::SetupWorkspace() {
   if (!CreateToolsFile())
     return 1;
 
-  std::cout << "✓ Workspace created successfully" << std::endl;
+  std::cout << "✓ Workspace created successfully" << '\n';
   return 0;
 }
 
@@ -335,19 +335,19 @@ int OnboardCommands::SetupDaemon() {
   } catch (...) {}
 
   std::cout << "\nSetting up QuantClaw as a user service (systemd --user)..."
-            << std::endl;
+            << '\n';
 
   if (InstallDaemon(port)) {
-    std::cout << "✓ Daemon installed successfully" << std::endl;
-    std::cout << "\nManage the service:" << std::endl;
-    std::cout << "  quantclaw gateway start" << std::endl;
-    std::cout << "  quantclaw gateway stop" << std::endl;
-    std::cout << "  quantclaw gateway status" << std::endl;
+    std::cout << "✓ Daemon installed successfully" << '\n';
+    std::cout << "\nManage the service:" << '\n';
+    std::cout << "  quantclaw gateway start" << '\n';
+    std::cout << "  quantclaw gateway stop" << '\n';
+    std::cout << "  quantclaw gateway status" << '\n';
     return 0;
   }
-  std::cerr << "✗ Failed to install daemon" << std::endl;
+  std::cerr << "✗ Failed to install daemon" << '\n';
   std::cerr << "You can still run QuantClaw manually: quantclaw gateway"
-            << std::endl;
+            << '\n';
   return 1;
 }
 
@@ -396,7 +396,7 @@ int OnboardCommands::SetupSkills() {
         ++failed;
         continue;
       }
-      std::cout << "  + skill: " << skill.name << std::endl;
+      std::cout << "  + skill: " << skill.name << '\n';
       ++installed;
     } catch (const std::exception& e) {
       logger_->warn("Failed to install skill '{}': {}", skill.name, e.what());
@@ -406,16 +406,16 @@ int OnboardCommands::SetupSkills() {
 
   if (installed > 0) {
     std::cout << "✓ Installed " << installed << " built-in skill(s) to "
-              << skills_dir.string() << std::endl;
+              << skills_dir.string() << '\n';
   } else {
     std::cout << "✓ Built-in skills already present (" << skipped << " skipped)"
-              << std::endl;
+              << '\n';
   }
   return failed > 0 ? 1 : 0;
 }
 
 int OnboardCommands::VerifySetup() {
-  std::cout << "\nVerifying setup..." << std::endl;
+  std::cout << "\nVerifying setup..." << '\n';
 
   const char* home = std::getenv("HOME");
   std::string home_str = home ? home : "/tmp";
@@ -423,44 +423,44 @@ int OnboardCommands::VerifySetup() {
   // Check config
   std::string config_path = QuantClawConfig::DefaultConfigPath();
   bool config_ok = std::filesystem::exists(config_path);
-  std::cout << "  [" << (config_ok ? "✓" : "✗") << "] Config file" << std::endl;
+  std::cout << "  [" << (config_ok ? "✓" : "✗") << "] Config file" << '\n';
 
   // Check workspace
   auto workspace =
       std::filesystem::path(home_str) / ".quantclaw/agents/main/workspace";
   bool ws_ok = std::filesystem::exists(workspace);
   std::cout << "  [" << (ws_ok ? "✓" : "✗") << "] Workspace directory"
-            << std::endl;
+            << '\n';
 
   // Check SOUL.md
   bool soul_ok = std::filesystem::exists(workspace / "SOUL.md");
-  std::cout << "  [" << (soul_ok ? "✓" : "✗") << "] SOUL.md" << std::endl;
+  std::cout << "  [" << (soul_ok ? "✓" : "✗") << "] SOUL.md" << '\n';
 
   // Check AGENTS.md
   bool agents_ok = std::filesystem::exists(workspace / "AGENTS.md");
-  std::cout << "  [" << (agents_ok ? "✓" : "✗") << "] AGENTS.md" << std::endl;
+  std::cout << "  [" << (agents_ok ? "✓" : "✗") << "] AGENTS.md" << '\n';
 
   // Check MEMORY.md
   bool memory_ok = std::filesystem::exists(workspace / "MEMORY.md");
-  std::cout << "  [" << (memory_ok ? "✓" : "✗") << "] MEMORY.md" << std::endl;
+  std::cout << "  [" << (memory_ok ? "✓" : "✗") << "] MEMORY.md" << '\n';
 
   // Check IDENTITY.md
   bool identity_ok = std::filesystem::exists(workspace / "IDENTITY.md");
   std::cout << "  [" << (identity_ok ? "✓" : "✗") << "] IDENTITY.md"
-            << std::endl;
+            << '\n';
 
   // Check SKILL.md
   bool skill_ok = std::filesystem::exists(workspace / "SKILL.md");
-  std::cout << "  [" << (skill_ok ? "✓" : "✗") << "] SKILL.md" << std::endl;
+  std::cout << "  [" << (skill_ok ? "✓" : "✗") << "] SKILL.md" << '\n';
 
   // Check HEARTBEAT.md
   bool heartbeat_ok = std::filesystem::exists(workspace / "HEARTBEAT.md");
   std::cout << "  [" << (heartbeat_ok ? "✓" : "✗") << "] HEARTBEAT.md"
-            << std::endl;
+            << '\n';
 
   // Check USER.md
   bool user_ok = std::filesystem::exists(workspace / "USER.md");
-  std::cout << "  [" << (user_ok ? "✓" : "✗") << "] USER.md" << std::endl;
+  std::cout << "  [" << (user_ok ? "✓" : "✗") << "] USER.md" << '\n';
 
   // Try gateway connection
   int port = 18800;
@@ -474,7 +474,7 @@ int OnboardCommands::VerifySetup() {
   std::cout << "  [" << (gw_ok ? "✓" : "-") << "] Gateway connection"
             << (gw_ok ? ""
                       : " (not running — start with: quantclaw gateway start)")
-            << std::endl;
+            << '\n';
 
   return (config_ok && ws_ok && soul_ok && agents_ok && memory_ok &&
           identity_ok && skill_ok && heartbeat_ok && user_ok)

@@ -44,12 +44,12 @@ void ProviderRegistry::RegisterFactory(const std::string& provider_id,
 
 void ProviderRegistry::RegisterBuiltinFactories() {
   RegisterFactory("local", [](const ProviderEntry& entry,
-                 std::shared_ptr<spdlog::logger> logger) {
-  std::string url =
-    entry.base_url.empty() ? "http://127.0.0.1:8081" : entry.base_url;
-  std::string api_key = entry.api_key.empty() ? "local" : entry.api_key;
-  return std::make_shared<AnthropicProvider>(api_key, url, entry.timeout,
-                         logger);
+                               std::shared_ptr<spdlog::logger> logger) {
+    std::string url =
+        entry.base_url.empty() ? "http://127.0.0.1:8081" : entry.base_url;
+    std::string api_key = entry.api_key.empty() ? "local" : entry.api_key;
+    return std::make_shared<AnthropicProvider>(api_key, url, entry.timeout,
+                                              logger);
   });
 }
 

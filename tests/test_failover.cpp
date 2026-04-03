@@ -477,9 +477,8 @@ TEST(ProviderErrorTest, HttpErrorClassification_Billing402) {
 }
 
 TEST(ProviderErrorTest, HttpErrorClassification_Timeout408) {
-  // 408 Request Timeout is in the 4xx range without explicit mapping,
-  // classified as kUnknown
-  EXPECT_EQ(ClassifyHttpError(408), ProviderErrorKind::kUnknown);
+  // 408 Request Timeout is explicitly mapped to kTimeout
+  EXPECT_EQ(ClassifyHttpError(408), ProviderErrorKind::kTimeout);
 }
 
 TEST(ProviderErrorTest, HttpErrorClassification_ServerError502) {

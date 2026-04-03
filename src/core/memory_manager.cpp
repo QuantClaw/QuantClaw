@@ -153,30 +153,40 @@ MemoryManager::SearchMemory(const std::string& query) const {
     return {};
   }
 
-  // Candidate files: start with the set for the first token, intersect the rest
+  // Candidate files: intersect posting lists for all query tokens.
+  // Sort tokens by ascending document frequency so that we start with the
+  // smallest set and intersect progressively, minimising allocations.
   std::unordered_set<std::string> candidates;
   {
     std::shared_lock<std::shared_mutex> lock(cache_mutex_);
-    bool first = true;
+
+    // Collect pointers to each token's posting list, bail early on miss.
+    std::vector<const std::unordered_set<std::string>*> posting_lists;
+    posting_lists.reserve(query_tokens.size());
     for (const auto& tok : query_tokens) {
       auto it = token_index_.find(tok);
-      if (it == token_index_.end()) {
-        // Token not found — no file can satisfy all tokens
+      if (it == token_index_.end())
         return {};
+      posting_lists.push_back(&it->second);
+    }
+
+    // Sort by posting-list size (smallest first).
+    std::sort(posting_lists.begin(), posting_lists.end(),
+              [](const auto* a, const auto* b) {
+                return a->size() < b->size();
+              });
+
+    // Seed with the smallest set, then intersect the rest in-place.
+    candidates = *posting_lists[0];
+    for (std::size_t i = 1; i < posting_lists.size() && !candidates.empty();
+         ++i) {
+      const auto& plist = *posting_lists[i];
+      for (auto cit = candidates.begin(); cit != candidates.end();) {
+        if (plist.count(*cit) == 0)
+          cit = candidates.erase(cit);
+        else
+          ++cit;
       }
-      if (first) {
-        candidates = it->second;
-        first = false;
-      } else {
-        std::unordered_set<std::string> intersection;
-        for (const auto& f : candidates) {
-          if (it->second.count(f))
-            intersection.insert(f);
-        }
-        candidates = std::move(intersection);
-      }
-      if (candidates.empty())
-        return {};
     }
   }
 

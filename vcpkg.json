@@ -9,7 +9,7 @@
     "openssl",
     "duckdb",
     "ixwebsocket",
-    "bext-ut",
+    "gtest",
     "cpp-httplib"
   ]
 }

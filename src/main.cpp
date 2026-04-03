@@ -61,20 +61,31 @@ static void enforce_log_size_cap(const std::string& log_dir, int max_size_mb) {
   }
 
   // Sort oldest-first by last-write-time.
+  // Use error_code overloads so externally-deleted files don't throw.
   std::sort(log_files.begin(), log_files.end(),
             [](const fs::directory_entry& a, const fs::directory_entry& b) {
-              return fs::last_write_time(a) < fs::last_write_time(b);
+              std::error_code ea, eb;
+              auto ta = fs::last_write_time(a, ea);
+              auto tb = fs::last_write_time(b, eb);
+              if (ea) return true;   // errors sort first (will be removed)
+              if (eb) return false;
+              return ta < tb;
             });
 
   // Sum total size and remove oldest until within budget.
   std::uintmax_t total = 0;
-  for (const auto& f : log_files)
-    total += fs::file_size(f);
+  for (const auto& f : log_files) {
+    std::error_code ec;
+    auto sz = fs::file_size(f, ec);
+    if (!ec)
+      total += sz;
+  }
 
   auto cap = static_cast<std::uintmax_t>(max_size_mb) * 1024 * 1024;
   for (size_t i = 0; i < log_files.size() && total > cap; ++i) {
-    auto sz = fs::file_size(log_files[i]);
     std::error_code ec;
+    auto sz = fs::file_size(log_files[i], ec);
+    if (ec) continue;
     fs::remove(log_files[i].path(), ec);
     if (!ec)
       total -= sz;
@@ -252,10 +263,10 @@ int main(int argc, char* argv[]) {
            return gateway_cmds->ForegroundCommand(args);
          }
 
-         std::cerr << "Unknown gateway subcommand: " << sub << std::endl;
+         std::cerr << "Unknown gateway subcommand: " << sub << '\n';
          std::cerr << "Available: run, install, uninstall, start, stop, "
                       "restart, status, call"
-                   << std::endl;
+                   << '\n';
          return 1;
        }});
 
@@ -304,7 +315,7 @@ int main(int argc, char* argv[]) {
          if (sub == "reset")
            return session_cmds->ResetCommand(sub_args);
 
-         std::cerr << "Unknown sessions subcommand: " << sub << std::endl;
+         std::cerr << "Unknown sessions subcommand: " << sub << '\n';
          return 1;
        }});
 
@@ -342,9 +353,9 @@ int main(int argc, char* argv[]) {
                gateway_url, auth_token, logger);
            if (!client->Connect(timeout_ms)) {
              if (json_output) {
-               std::cout << R"({"status":"unreachable"})" << std::endl;
+               std::cout << R"({"status":"unreachable"})" << '\n';
              } else {
-               std::cout << "Gateway: unreachable" << std::endl;
+               std::cout << "Gateway: unreachable" << '\n';
              }
              return 1;
            }
@@ -353,18 +364,18 @@ int main(int argc, char* argv[]) {
            client->Disconnect();
 
            if (json_output) {
-             std::cout << result.dump(2) << std::endl;
+             std::cout << result.dump(2) << '\n';
            } else {
              std::cout << "Gateway: " << result.value("status", "unknown")
-                       << std::endl;
+                       << '\n';
              std::cout << "Version: " << result.value("version", "unknown")
-                       << std::endl;
+                       << '\n';
              std::cout << "Uptime:  " << result.value("uptime", 0) << "s"
-                       << std::endl;
+                       << '\n';
            }
            return 0;
          } catch (const std::exception& e) {
-           std::cerr << "Error: " << e.what() << std::endl;
+           std::cerr << "Error: " << e.what() << '\n';
            return 1;
          }
        }});
@@ -382,7 +393,7 @@ int main(int argc, char* argv[]) {
          if (args.empty()) {
            std::cerr << "Usage: quantclaw config "
                         "<get|set|unset|reload|validate|schema> [path] [value]"
-                     << std::endl;
+                     << '\n';
            return 1;
          }
 
@@ -393,15 +404,15 @@ int main(int argc, char* argv[]) {
              auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                  gateway_url, auth_token, logger);
              if (!client->Connect(3000)) {
-               std::cerr << "Error: Gateway not running" << std::endl;
+               std::cerr << "Error: Gateway not running" << '\n';
                return 1;
              }
              client->Call("config.reload", {});
              client->Disconnect();
-             std::cout << "Configuration reloaded" << std::endl;
+             std::cout << "Configuration reloaded" << '\n';
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
@@ -422,12 +433,12 @@ int main(int argc, char* argv[]) {
                auto config = quantclaw::QuantClawConfig::LoadFromFile(
                    quantclaw::QuantClawConfig::DefaultConfigPath());
                if (path == "gateway.port") {
-                 std::cout << config.gateway.port << std::endl;
+                 std::cout << config.gateway.port << '\n';
                } else if (path == "agent.model") {
-                 std::cout << config.agent.model << std::endl;
+                 std::cout << config.agent.model << '\n';
                } else {
                  std::cerr << "Gateway not running. Limited config access."
-                           << std::endl;
+                           << '\n';
                }
                return 0;
              }
@@ -439,17 +450,17 @@ int main(int argc, char* argv[]) {
              client->Disconnect();
 
              if (json_output) {
-               std::cout << result.dump(2) << std::endl;
+               std::cout << result.dump(2) << '\n';
              } else {
                if (result.is_primitive()) {
-                 std::cout << result << std::endl;
+                 std::cout << result << '\n';
                } else {
-                 std::cout << result.dump(2) << std::endl;
+                 std::cout << result.dump(2) << '\n';
                }
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
@@ -457,7 +468,7 @@ int main(int argc, char* argv[]) {
          if (sub == "set") {
            if (args.size() < 3) {
              std::cerr << "Usage: quantclaw config set <path> <value>"
-                       << std::endl;
+                       << '\n';
              return 1;
            }
            std::string path = args[1];
@@ -474,7 +485,7 @@ int main(int argc, char* argv[]) {
            try {
              auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
              quantclaw::QuantClawConfig::SetValue(config_file, path, value);
-             std::cout << path << " = " << value.dump() << std::endl;
+             std::cout << path << " = " << value.dump() << '\n';
 
              // Notify running gateway to reload
              auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
@@ -485,14 +496,14 @@ int main(int argc, char* argv[]) {
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
 
          if (sub == "unset") {
            if (args.size() < 2) {
-             std::cerr << "Usage: quantclaw config unset <path>" << std::endl;
+             std::cerr << "Usage: quantclaw config unset <path>" << '\n';
              return 1;
            }
            std::string path = args[1];
@@ -500,7 +511,7 @@ int main(int argc, char* argv[]) {
            try {
              auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
              quantclaw::QuantClawConfig::UnsetValue(config_file, path);
-             std::cout << "Removed: " << path << std::endl;
+             std::cout << "Removed: " << path << '\n';
 
              // Notify running gateway to reload
              auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
@@ -511,7 +522,7 @@ int main(int argc, char* argv[]) {
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
@@ -521,31 +532,31 @@ int main(int argc, char* argv[]) {
              auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
              auto config =
                  quantclaw::QuantClawConfig::LoadFromFile(config_file);
-             std::cout << "Configuration is valid" << std::endl;
+             std::cout << "Configuration is valid" << '\n';
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Configuration is invalid: " << e.what() << std::endl;
+             std::cerr << "Configuration is invalid: " << e.what() << '\n';
              return 1;
            }
          }
 
          if (sub == "schema") {
-           std::cout << "Configuration schema:" << std::endl
-                     << "  agent:" << std::endl
-                     << "    model: string (default: gpt-4o-mini)" << std::endl
-                     << "    maxTokens: integer (default: 4096)" << std::endl
-                     << "    maxIterations: integer (default: 100)" << std::endl
-                     << "  gateway:" << std::endl
-                     << "    port: integer (default: 18800)" << std::endl
-                     << "  system:" << std::endl
+           std::cout << "Configuration schema:" << '\n'
+                     << "  agent:" << '\n'
+                     << "    model: string (default: gpt-4o-mini)" << '\n'
+                     << "    maxTokens: integer (default: 4096)" << '\n'
+                     << "    maxIterations: integer (default: 100)" << '\n'
+                     << "  gateway:" << '\n'
+                     << "    port: integer (default: 18800)" << '\n'
+                     << "  system:" << '\n'
                      << "    logLevel: string (debug|info|warn|error)"
-                     << std::endl;
+                     << '\n';
            return 0;
          }
 
-         std::cerr << "Unknown config subcommand: " << sub << std::endl;
+         std::cerr << "Unknown config subcommand: " << sub << '\n';
          std::cerr << "Available: get, set, unset, reload, validate, schema"
-                   << std::endl;
+                   << '\n';
          return 1;
        }});
 
@@ -588,9 +599,9 @@ int main(int argc, char* argv[]) {
                skill_loader->LoadSkills(skills_config, workspace_path);
 
            if (skills.empty()) {
-             std::cout << "No skills found" << std::endl;
+             std::cout << "No skills found" << '\n';
            } else {
-             std::cout << "Skills (" << skills.size() << "):" << std::endl;
+             std::cout << "Skills (" << skills.size() << "):" << '\n';
              for (const auto& skill : skills) {
                std::cout << "  ";
                if (!skill.emoji.empty())
@@ -599,7 +610,7 @@ int main(int argc, char* argv[]) {
                if (!skill.description.empty()) {
                  std::cout << " - " << skill.description;
                }
-               std::cout << std::endl;
+               std::cout << '\n';
              }
            }
            return 0;
@@ -607,7 +618,7 @@ int main(int argc, char* argv[]) {
 
          if (sub == "install") {
            if (args.size() < 2) {
-             std::cerr << "Usage: quantclaw skills install <name>" << std::endl;
+             std::cerr << "Usage: quantclaw skills install <name>" << '\n';
              return 1;
            }
            const std::string& skill_name = args[1];
@@ -638,24 +649,24 @@ int main(int argc, char* argv[]) {
                                     return s.name == skill_name;
                                   });
            if (it == skills.end()) {
-             std::cerr << "Skill not found: " << skill_name << std::endl;
+             std::cerr << "Skill not found: " << skill_name << '\n';
              return 1;
            }
 
            std::cout << "Installing dependencies for skill: " << skill_name
-                     << std::endl;
+                     << '\n';
            bool ok = skill_loader->InstallSkill(*it);
            if (ok) {
-             std::cout << "Done." << std::endl;
+             std::cout << "Done." << '\n';
              return 0;
            } else {
-             std::cerr << "Some dependencies failed to install." << std::endl;
+             std::cerr << "Some dependencies failed to install." << '\n';
              return 1;
            }
          }
 
-         std::cerr << "Unknown skills subcommand: " << sub << std::endl;
-         std::cerr << "Available: list, install <name>" << std::endl;
+         std::cerr << "Unknown skills subcommand: " << sub << '\n';
+         std::cerr << "Available: list, install <name>" << '\n';
          return 1;
        }});
 
@@ -665,15 +676,15 @@ int main(int argc, char* argv[]) {
        "Health check (config, deps, connectivity)",
        {},
        [logger, gateway_url, auth_token](int /*argc*/, char** /*argv*/) -> int {
-         std::cout << "QuantClaw Doctor" << std::endl;
-         std::cout << std::string(40, '=') << std::endl;
+         std::cout << "QuantClaw Doctor" << '\n';
+         std::cout << std::string(40, '=') << '\n';
 
          // Check config file
          std::string config_path =
              quantclaw::QuantClawConfig::DefaultConfigPath();
          bool config_ok = std::filesystem::exists(config_path);
          std::cout << "[" << (config_ok ? "OK" : "!!")
-                   << "] Config file: " << config_path << std::endl;
+                   << "] Config file: " << config_path << '\n';
 
          // Check workspace
          const char* home = std::getenv("HOME");
@@ -682,13 +693,13 @@ int main(int argc, char* argv[]) {
                           ".quantclaw/agents/main/workspace";
          bool ws_ok = std::filesystem::exists(workspace);
          std::cout << "[" << (ws_ok ? "OK" : "!!")
-                   << "] Workspace: " << workspace.string() << std::endl;
+                   << "] Workspace: " << workspace.string() << '\n';
 
          // Check SOUL.md
          auto soul_path = workspace / "SOUL.md";
          bool soul_ok = std::filesystem::exists(soul_path);
          std::cout << "[" << (soul_ok ? "OK" : "--") << "] SOUL.md"
-                   << std::endl;
+                   << '\n';
 
          // Check gateway connectivity
          bool gw_ok = false;
@@ -701,9 +712,9 @@ int main(int argc, char* argv[]) {
          } catch (const std::exception&) {}
          std::cout << "[" << (gw_ok ? "OK" : "!!")
                    << "] Gateway: " << (gw_ok ? "running" : "not running")
-                   << std::endl;
+                   << '\n';
 
-         std::cout << std::string(40, '=') << std::endl;
+         std::cout << std::string(40, '=') << '\n';
          return (config_ok && ws_ok) ? 0 : 1;
        }});
 
@@ -736,7 +747,7 @@ int main(int argc, char* argv[]) {
                  jobs_arr = result;
                }
                if (jobs_arr.empty()) {
-                 std::cout << "No cron jobs" << std::endl;
+                 std::cout << "No cron jobs" << '\n';
                } else {
                  for (const auto& job : jobs_arr) {
                    std::string id = job.value("id", "");
@@ -750,13 +761,13 @@ int main(int argc, char* argv[]) {
                    std::cout << id << "  " << sched << "  "
                              << job.value("name", "") << "  "
                              << (job.value("enabled", true) ? "ON" : "OFF")
-                             << std::endl;
+                             << '\n';
                  }
                }
                return 0;
              }
            } catch (const std::exception&) {}
-           std::cerr << "Gateway not running" << std::endl;
+           std::cerr << "Gateway not running" << '\n';
            return 1;
          }
 
@@ -792,14 +803,14 @@ int main(int argc, char* argv[]) {
                                                 {"name", name},
                                             });
                client->Disconnect();
-               std::cout << "Added: " << result.value("id", "") << std::endl;
+               std::cout << "Added: " << result.value("id", "") << '\n';
                return 0;
              }
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
-           std::cerr << "Error: Gateway not running" << std::endl;
+           std::cerr << "Error: Gateway not running" << '\n';
            return 1;
          }
 
@@ -810,15 +821,15 @@ int main(int argc, char* argv[]) {
              if (client->Connect(3000)) {
                client->Call("cron.remove", {{"id", args[1]}});
                client->Disconnect();
-               std::cout << "Removed" << std::endl;
+               std::cout << "Removed" << '\n';
                return 0;
              }
            } catch (const std::exception&) {}
-           std::cerr << "Gateway not running" << std::endl;
+           std::cerr << "Gateway not running" << '\n';
            return 1;
          }
 
-         std::cerr << "Usage: quantclaw cron [list|add|remove]" << std::endl;
+         std::cerr << "Usage: quantclaw cron [list|add|remove]" << '\n';
          return 1;
        }});
 
@@ -834,7 +845,7 @@ int main(int argc, char* argv[]) {
 
          if (args.empty()) {
            std::cerr << "Usage: quantclaw memory <search|status> [query]"
-                     << std::endl;
+                     << '\n';
            return 1;
          }
 
@@ -857,7 +868,7 @@ int main(int argc, char* argv[]) {
                    std::cout << "[" << r.value("source", "") << ":"
                              << r.value("lineNumber", 0) << "] "
                              << r.value("content", "").substr(0, 120)
-                             << std::endl;
+                             << '\n';
                  }
                }
                return 0;
@@ -875,7 +886,7 @@ int main(int argc, char* argv[]) {
            auto results = search.Search(query);
            for (const auto& r : results) {
              std::cout << "[" << r.source << ":" << r.line_number << "] "
-                       << r.content.substr(0, 120) << std::endl;
+                       << r.content.substr(0, 120) << '\n';
            }
            return 0;
          }
@@ -887,16 +898,16 @@ int main(int argc, char* argv[]) {
              if (client->Connect(3000)) {
                auto result = client->Call("memory.status", {});
                client->Disconnect();
-               std::cout << result.dump(2) << std::endl;
+               std::cout << result.dump(2) << '\n';
                return 0;
              }
            } catch (const std::exception&) {}
            std::cout << "Gateway not running. Memory status unavailable."
-                     << std::endl;
+                     << '\n';
            return 1;
          }
 
-         std::cerr << "Unknown memory subcommand: " << args[0] << std::endl;
+         std::cerr << "Unknown memory subcommand: " << args[0] << '\n';
          return 1;
        }});
 
@@ -921,7 +932,7 @@ int main(int argc, char* argv[]) {
                     std::string url =
                         "http://127.0.0.1:" + std::to_string(port) +
                         "/__quantclaw__/control/";
-                    std::cout << "Dashboard: " << url << std::endl;
+                    std::cout << "Dashboard: " << url << '\n';
 
                     if (!no_open) {
 #ifdef _WIN32
@@ -956,7 +967,7 @@ int main(int argc, char* argv[]) {
            auto c = std::make_shared<quantclaw::gateway::GatewayClient>(
                gateway_url, auth_token, logger);
            if (!c->Connect(3000)) {
-             std::cerr << "Error: Gateway not running" << std::endl;
+             std::cerr << "Error: Gateway not running" << '\n';
              return nullptr;
            }
            return c;
@@ -975,25 +986,25 @@ int main(int argc, char* argv[]) {
              auto result = client->Call("channels.list", {});
              client->Disconnect();
              if (json_output) {
-               std::cout << result.dump(2) << std::endl;
+               std::cout << result.dump(2) << '\n';
              } else {
                if (result.is_array()) {
                  if (result.empty()) {
-                   std::cout << "No channels configured" << std::endl;
+                   std::cout << "No channels configured" << '\n';
                  } else {
                    for (const auto& ch : result) {
                      std::cout << "  " << ch.value("id", "") << "  ["
                                << ch.value("type", "") << "]" << "  "
                                << (ch.value("enabled", false) ? "ON" : "OFF")
                                << "  " << ch.value("status", "unknown")
-                               << std::endl;
+                               << '\n';
                    }
                  }
                }
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
@@ -1009,10 +1020,10 @@ int main(int argc, char* argv[]) {
                params["id"] = channel_id;
              auto result = client->Call("channels.status", params);
              client->Disconnect();
-             std::cout << result.dump(2) << std::endl;
+             std::cout << result.dump(2) << '\n';
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
@@ -1021,7 +1032,7 @@ int main(int argc, char* argv[]) {
            if (sub_args.size() < 2) {
              std::cerr
                  << "Usage: quantclaw channels add <type> <token> [--id <name>]"
-                 << std::endl;
+                 << '\n';
              return 1;
            }
            std::string type = sub_args[0];
@@ -1041,7 +1052,7 @@ int main(int argc, char* argv[]) {
              quantclaw::QuantClawConfig::SetValue(config_file, "channels." + id,
                                                   channel_json);
              std::cout << "Added channel: " << id << " (" << type << ")"
-                       << std::endl;
+                       << '\n';
 
              // Notify gateway to reload
              auto client = make_client();
@@ -1051,21 +1062,21 @@ int main(int argc, char* argv[]) {
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
 
          if (sub == "remove") {
            if (sub_args.empty()) {
-             std::cerr << "Usage: quantclaw channels remove <id>" << std::endl;
+             std::cerr << "Usage: quantclaw channels remove <id>" << '\n';
              return 1;
            }
            try {
              auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
              quantclaw::QuantClawConfig::UnsetValue(config_file,
                                                     "channels." + sub_args[0]);
-             std::cout << "Removed channel: " << sub_args[0] << std::endl;
+             std::cout << "Removed channel: " << sub_args[0] << '\n';
 
              auto client = make_client();
              if (client) {
@@ -1074,21 +1085,21 @@ int main(int argc, char* argv[]) {
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
 
          if (sub == "login") {
            if (sub_args.empty()) {
-             std::cerr << "Usage: quantclaw channels login <id>" << std::endl;
+             std::cerr << "Usage: quantclaw channels login <id>" << '\n';
              return 1;
            }
            try {
              auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
              quantclaw::QuantClawConfig::SetValue(
                  config_file, "channels." + sub_args[0] + ".enabled", true);
-             std::cout << "Enabled channel: " << sub_args[0] << std::endl;
+             std::cout << "Enabled channel: " << sub_args[0] << '\n';
 
              auto client = make_client();
              if (client) {
@@ -1097,21 +1108,21 @@ int main(int argc, char* argv[]) {
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
 
          if (sub == "logout") {
            if (sub_args.empty()) {
-             std::cerr << "Usage: quantclaw channels logout <id>" << std::endl;
+             std::cerr << "Usage: quantclaw channels logout <id>" << '\n';
              return 1;
            }
            try {
              auto config_file = quantclaw::QuantClawConfig::DefaultConfigPath();
              quantclaw::QuantClawConfig::SetValue(
                  config_file, "channels." + sub_args[0] + ".enabled", false);
-             std::cout << "Disabled channel: " << sub_args[0] << std::endl;
+             std::cout << "Disabled channel: " << sub_args[0] << '\n';
 
              auto client = make_client();
              if (client) {
@@ -1120,14 +1131,14 @@ int main(int argc, char* argv[]) {
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
 
-         std::cerr << "Unknown channels subcommand: " << sub << std::endl;
+         std::cerr << "Unknown channels subcommand: " << sub << '\n';
          std::cerr << "Available: list, status, add, remove, login, logout"
-                   << std::endl;
+                   << '\n';
          return 1;
        }});
 
@@ -1160,23 +1171,23 @@ int main(int argc, char* argv[]) {
                auto config = quantclaw::QuantClawConfig::LoadFromFile(
                    quantclaw::QuantClawConfig::DefaultConfigPath());
                std::cout << "Current model: " << config.agent.model
-                         << std::endl;
+                         << '\n';
                std::cout << "(Gateway not running, showing config only)"
-                         << std::endl;
+                         << '\n';
                return 0;
              }
              auto result = client->Call("models.list", {});
              client->Disconnect();
              if (json_output) {
-               std::cout << result.dump(2) << std::endl;
+               std::cout << result.dump(2) << '\n';
              } else {
                if (result.contains("current")) {
                  std::cout << "Current: "
-                           << result["current"].get<std::string>() << std::endl;
+                           << result["current"].get<std::string>() << '\n';
                }
                // New format: models array with metadata
                if (result.contains("models") && result["models"].is_array()) {
-                 std::cout << "\nAvailable models:" << std::endl;
+                 std::cout << "\nAvailable models:" << '\n';
                  for (const auto& m : result["models"]) {
                    bool active = m.value("active", false);
                    std::string id = m.value("id", "");
@@ -1208,19 +1219,19 @@ int main(int argc, char* argv[]) {
                    }
                    if (active)
                      std::cout << "   [active]";
-                   std::cout << std::endl;
+                   std::cout << '\n';
                  }
                } else if (result.contains("providers") &&
                           result["providers"].is_array()) {
                  // Legacy format fallback
-                 std::cout << "\nProviders:" << std::endl;
+                 std::cout << "\nProviders:" << '\n';
                  for (const auto& p : result["providers"]) {
                    std::cout << "  " << p.value("id", "") << " ("
-                             << p.value("type", "") << ")" << std::endl;
+                             << p.value("type", "") << ")" << '\n';
                    if (p.contains("models") && p["models"].is_array()) {
                      for (const auto& m : p["models"]) {
                        std::cout << "    - " << m.get<std::string>()
-                                 << std::endl;
+                                 << '\n';
                      }
                    }
                  }
@@ -1230,23 +1241,23 @@ int main(int argc, char* argv[]) {
                if (result.contains("aliases") &&
                    result["aliases"].is_object() &&
                    !result["aliases"].empty()) {
-                 std::cout << "\nAliases:" << std::endl;
+                 std::cout << "\nAliases:" << '\n';
                  for (const auto& item : result["aliases"].items()) {
                    std::cout << "  " << item.key() << " -> "
-                             << item.value().get<std::string>() << std::endl;
+                             << item.value().get<std::string>() << '\n';
                  }
                }
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
 
          if (sub == "set") {
            if (sub_args.empty()) {
-             std::cerr << "Usage: quantclaw models set <model>" << std::endl;
+             std::cerr << "Usage: quantclaw models set <model>" << '\n';
              return 1;
            }
            std::string model = sub_args[0];
@@ -1263,10 +1274,10 @@ int main(int argc, char* argv[]) {
                client->Call("models.set", {{"model", model}});
                client->Disconnect();
              }
-             std::cout << "Model set to: " << model << std::endl;
+             std::cout << "Model set to: " << model << '\n';
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
@@ -1276,7 +1287,7 @@ int main(int argc, char* argv[]) {
              auto client = std::make_shared<quantclaw::gateway::GatewayClient>(
                  gateway_url, auth_token, logger);
              if (!client->Connect(3000)) {
-               std::cerr << "Gateway not running" << std::endl;
+               std::cerr << "Gateway not running" << '\n';
                return 1;
              }
              auto result = client->Call("models.list", {});
@@ -1284,20 +1295,20 @@ int main(int argc, char* argv[]) {
              if (result.contains("aliases") && result["aliases"].is_object()) {
                for (const auto& item : result["aliases"].items()) {
                  std::cout << "  " << item.key() << " -> "
-                           << item.value().get<std::string>() << std::endl;
+                           << item.value().get<std::string>() << '\n';
                }
              } else {
-               std::cout << "No model aliases configured" << std::endl;
+               std::cout << "No model aliases configured" << '\n';
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
 
-         std::cerr << "Unknown models subcommand: " << sub << std::endl;
-         std::cerr << "Available: list, set, aliases" << std::endl;
+         std::cerr << "Unknown models subcommand: " << sub << '\n';
+         std::cerr << "Available: list, set, aliases" << '\n';
          return 1;
        }});
 
@@ -1318,7 +1329,7 @@ int main(int argc, char* argv[]) {
              if (auto parsed = quantclaw::ParsePositiveInt(argv[++i])) {
                lines = *parsed;
              } else {
-               std::cerr << "Invalid value for -n: " << argv[i] << std::endl;
+               std::cerr << "Invalid value for -n: " << argv[i] << '\n';
                return 1;
              }
            }
@@ -1328,9 +1339,9 @@ int main(int argc, char* argv[]) {
          if (!std::filesystem::exists(log_file)) {
 #ifdef _WIN32
            std::cerr << "No log file found at: " << log_file.string()
-                     << std::endl;
+                     << '\n';
            std::cerr << "Start the gateway first: quantclaw gateway run"
-                     << std::endl;
+                     << '\n';
            return 1;
 #else
            // Try journalctl on Linux
@@ -1350,12 +1361,12 @@ int main(int argc, char* argv[]) {
          if (follow) {
            std::cerr << "Follow mode (-f) is not supported "
                         "on Windows"
-                     << std::endl;
+                     << '\n';
            return 1;
          }
          std::ifstream f(log_file);
          if (!f.is_open()) {
-           std::cerr << "Cannot open: " << log_file.string() << std::endl;
+           std::cerr << "Cannot open: " << log_file.string() << '\n';
            return 1;
          }
          std::deque<std::string> tail_lines;
@@ -1414,7 +1425,7 @@ int main(int argc, char* argv[]) {
            auto c = std::make_shared<quantclaw::gateway::GatewayClient>(
                gateway_url, auth_token, logger);
            if (!c->Connect(3000)) {
-             std::cerr << "Error: Gateway not running" << std::endl;
+             std::cerr << "Error: Gateway not running" << '\n';
              return nullptr;
            }
            return c;
@@ -1446,7 +1457,7 @@ int main(int argc, char* argv[]) {
              auto result = client->Call("plugins.list", {});
              client->Disconnect();
              if (json_output) {
-               std::cout << result.dump(2) << std::endl;
+               std::cout << result.dump(2) << '\n';
                return 0;
              }
              // result is a JSON array of plugin records
@@ -1455,9 +1466,9 @@ int main(int argc, char* argv[]) {
                                                  ? result["plugins"]
                                                  : Json::array());
              if (arr.empty()) {
-               std::cout << "No plugins loaded" << std::endl;
+               std::cout << "No plugins loaded" << '\n';
              } else {
-               std::cout << "Plugins (" << arr.size() << "):" << std::endl;
+               std::cout << "Plugins (" << arr.size() << "):" << '\n';
                for (const auto& p : arr) {
                  std::string id = p.value("id", "");
                  std::string status = p.value("status", "unknown");
@@ -1471,12 +1482,12 @@ int main(int argc, char* argv[]) {
                  std::cout << "  [" << status << "]";
                  if (!desc.empty())
                    std::cout << "  " << desc;
-                 std::cout << std::endl;
+                 std::cout << '\n';
                }
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
@@ -1498,36 +1509,36 @@ int main(int argc, char* argv[]) {
                if (!plugin_id.empty() && p.value("id", "") != plugin_id)
                  continue;
                found = true;
-               std::cout << "Plugin: " << p.value("id", "") << std::endl;
+               std::cout << "Plugin: " << p.value("id", "") << '\n';
                if (p.contains("version"))
-                 std::cout << "  version:  " << p["version"] << std::endl;
+                 std::cout << "  version:  " << p["version"] << '\n';
                std::cout << "  enabled:  "
                          << (p.value("enabled", true) ? "yes" : "no")
-                         << std::endl;
+                         << '\n';
                std::cout << "  status:   " << p.value("status", "unknown")
-                         << std::endl;
+                         << '\n';
                std::cout << "  origin:   " << p.value("origin", "")
-                         << std::endl;
+                         << '\n';
                if (p.contains("description"))
-                 std::cout << "  desc:     " << p["description"] << std::endl;
+                 std::cout << "  desc:     " << p["description"] << '\n';
                if (p.contains("tools") && !p["tools"].empty())
-                 std::cout << "  tools:    " << p["tools"].dump() << std::endl;
+                 std::cout << "  tools:    " << p["tools"].dump() << '\n';
                if (p.contains("channels") && !p["channels"].empty())
                  std::cout << "  channels: " << p["channels"].dump()
-                           << std::endl;
+                           << '\n';
                if (p.contains("hooks") && !p["hooks"].empty())
-                 std::cout << "  hooks:    " << p["hooks"].dump() << std::endl;
+                 std::cout << "  hooks:    " << p["hooks"].dump() << '\n';
                if (p.contains("error"))
-                 std::cout << "  error:    " << p["error"] << std::endl;
-               std::cout << std::endl;
+                 std::cout << "  error:    " << p["error"] << '\n';
+               std::cout << '\n';
              }
              if (!plugin_id.empty() && !found) {
-               std::cerr << "Plugin not found: " << plugin_id << std::endl;
+               std::cerr << "Plugin not found: " << plugin_id << '\n';
                return 1;
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
@@ -1535,12 +1546,12 @@ int main(int argc, char* argv[]) {
          if (sub == "enable" || sub == "disable") {
            if (sub_args.empty()) {
              std::cerr << "Usage: quantclaw plugins " << sub << " <id>"
-                       << std::endl;
+                       << '\n';
              return 1;
            }
            std::string plugin_id = sub_args[0];
            if (!validate_plugin_id(plugin_id)) {
-             std::cerr << "Invalid plugin id: " << plugin_id << std::endl;
+             std::cerr << "Invalid plugin id: " << plugin_id << '\n';
              return 1;
            }
            bool enable = (sub == "enable");
@@ -1550,7 +1561,7 @@ int main(int argc, char* argv[]) {
                  config_file, "plugins.entries." + plugin_id + ".enabled",
                  enable);
              std::cout << (enable ? "Enabled" : "Disabled")
-                       << " plugin: " << plugin_id << std::endl;
+                       << " plugin: " << plugin_id << '\n';
              auto client = make_client();
              if (client) {
                client->Call("config.reload", {});
@@ -1558,7 +1569,7 @@ int main(int argc, char* argv[]) {
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
@@ -1567,7 +1578,7 @@ int main(int argc, char* argv[]) {
            if (sub_args.empty()) {
              std::cerr
                  << "Usage: quantclaw plugins install <path> [--id <name>]"
-                 << std::endl;
+                 << '\n';
              return 1;
            }
            std::string plugin_path = sub_args[0];
@@ -1581,13 +1592,13 @@ int main(int argc, char* argv[]) {
              plugin_id = std::filesystem::path(plugin_path).filename().string();
 
            if (!validate_plugin_id(plugin_id)) {
-             std::cerr << "Invalid plugin id: " << plugin_id << std::endl;
+             std::cerr << "Invalid plugin id: " << plugin_id << '\n';
              return 1;
            }
            if (!std::filesystem::exists(plugin_path) ||
                !std::filesystem::is_directory(plugin_path)) {
              std::cerr << "Plugin path not found or not a directory: "
-                       << plugin_path << std::endl;
+                       << plugin_path << '\n';
              return 1;
            }
 
@@ -1599,7 +1610,7 @@ int main(int argc, char* argv[]) {
              quantclaw::QuantClawConfig::SetValue(
                  config_file, "plugins.installs." + plugin_id, install_entry);
              std::cout << "Installed plugin: " << plugin_id << " from "
-                       << plugin_path << std::endl;
+                       << plugin_path << '\n';
              auto client = make_client();
              if (client) {
                client->Call("config.reload", {});
@@ -1607,19 +1618,19 @@ int main(int argc, char* argv[]) {
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
 
          if (sub == "remove") {
            if (sub_args.empty()) {
-             std::cerr << "Usage: quantclaw plugins remove <id>" << std::endl;
+             std::cerr << "Usage: quantclaw plugins remove <id>" << '\n';
              return 1;
            }
            std::string plugin_id = sub_args[0];
            if (!validate_plugin_id(plugin_id)) {
-             std::cerr << "Invalid plugin id: " << plugin_id << std::endl;
+             std::cerr << "Invalid plugin id: " << plugin_id << '\n';
              return 1;
            }
            try {
@@ -1639,7 +1650,7 @@ int main(int argc, char* argv[]) {
                logger->debug("plugins.entries.{} not found: {}", plugin_id,
                              ue.what());
              }
-             std::cout << "Removed plugin: " << plugin_id << std::endl;
+             std::cout << "Removed plugin: " << plugin_id << '\n';
              auto client = make_client();
              if (client) {
                client->Call("config.reload", {});
@@ -1647,15 +1658,15 @@ int main(int argc, char* argv[]) {
              }
              return 0;
            } catch (const std::exception& e) {
-             std::cerr << "Error: " << e.what() << std::endl;
+             std::cerr << "Error: " << e.what() << '\n';
              return 1;
            }
          }
 
-         std::cerr << "Unknown plugins subcommand: " << sub << std::endl;
+         std::cerr << "Unknown plugins subcommand: " << sub << '\n';
          std::cerr
              << "Available: list, status, enable, disable, install, remove"
-             << std::endl;
+             << '\n';
          return 1;
        }});
 
@@ -1690,7 +1701,7 @@ int main(int argc, char* argv[]) {
                     if (message.empty()) {
                       std::cerr
                           << "Usage: quantclaw run <message> [-s <session>]"
-                          << std::endl;
+                          << '\n';
                       return 1;
                     }
 
@@ -1718,7 +1729,7 @@ int main(int argc, char* argv[]) {
            prompt += argv[i];
          }
          if (prompt.empty()) {
-           std::cerr << "Usage: quantclaw eval <prompt>" << std::endl;
+           std::cerr << "Usage: quantclaw eval <prompt>" << '\n';
            return 1;
          }
          // Use --no-session flag so no history is persisted

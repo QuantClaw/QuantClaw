@@ -130,16 +130,16 @@ TEST(ProviderRegistryTest, GetProviderCreatesInstance) {
   reg->RegisterBuiltinFactories();
 
   ProviderEntry entry;
-  entry.id = "openai";
+  entry.id = "local";
   entry.api_key = "test-key";
   reg->AddProvider(entry);
 
-  auto provider = reg->GetProvider("openai");
+  auto provider = reg->GetProvider("local");
   ASSERT_NE(provider, nullptr);
-  EXPECT_EQ(provider->GetProviderName(), "openai");
+  EXPECT_EQ(provider->GetProviderName(), "anthropic");
 
   // Second call returns same instance
-  auto provider2 = reg->GetProvider("openai");
+  auto provider2 = reg->GetProvider("local");
   EXPECT_EQ(provider.get(), provider2.get());
 }
 
@@ -148,11 +148,11 @@ TEST(ProviderRegistryTest, GetProviderForModel) {
   reg->RegisterBuiltinFactories();
 
   ProviderEntry entry;
-  entry.id = "anthropic";
+  entry.id = "local";
   entry.api_key = "test-key";
   reg->AddProvider(entry);
 
-  auto ref = ModelRef::parse("anthropic/claude-opus-4-6");
+  auto ref = ModelRef::parse("local/some-model");
   auto provider = reg->GetProviderForModel(ref);
   ASSERT_NE(provider, nullptr);
 }
@@ -163,34 +163,29 @@ TEST(ProviderRegistryTest, NullForUnknownProvider) {
   EXPECT_EQ(provider, nullptr);
 }
 
-TEST(ProviderRegistryTest, GitHubCopilotBuiltinFactoryWorks) {
+TEST(ProviderRegistryTest, LocalBuiltinFactoryCreatesProvider) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
   reg->RegisterBuiltinFactories();
 
   ProviderEntry entry;
-  entry.id = "github-copilot";
-  entry.api_key = "ghu_test_token";
+  entry.id = "local";
+  entry.api_key = "test-token";
   reg->AddProvider(entry);
 
-  auto provider = reg->GetProvider("github-copilot");
+  auto provider = reg->GetProvider("local");
   ASSERT_NE(provider, nullptr);
 }
 
-TEST(ProviderRegistryTest, ProviderIdDashUsesTokenEnvFallback) {
-#ifndef _WIN32
-  setenv("GITHUB_COPILOT_TOKEN", "ghu_env_token", 1);
-#else
-  _putenv_s("GITHUB_COPILOT_TOKEN", "ghu_env_token");
-#endif
-
+TEST(ProviderRegistryTest, LocalProviderDefaultApiKey) {
   auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
   reg->RegisterBuiltinFactories();
 
+  // Entry with no api_key — factory should default to "local"
   ProviderEntry entry;
-  entry.id = "github-copilot";
+  entry.id = "local";
   reg->AddProvider(entry);
 
-  auto provider = reg->GetProvider("github-copilot");
+  auto provider = reg->GetProvider("local");
   ASSERT_NE(provider, nullptr);
 }
 

@@ -35,7 +35,7 @@ int SessionCommands::ListCommand(const std::vector<std::string>& args) {
     auto client = std::make_shared<gateway::GatewayClient>(
         gateway_url_, auth_token_, logger_);
     if (!client->Connect()) {
-      std::cerr << "Error: Cannot connect to gateway" << std::endl;
+      std::cerr << "Error: Cannot connect to gateway" << '\n';
       return 1;
     }
 
@@ -50,15 +50,15 @@ int SessionCommands::ListCommand(const std::vector<std::string>& args) {
     }
 
     if (json_output) {
-      std::cout << sessions_arr.dump(2) << std::endl;
+      std::cout << sessions_arr.dump(2) << '\n';
     } else {
       if (sessions_arr.empty()) {
-        std::cout << "No sessions found" << std::endl;
+        std::cout << "No sessions found" << '\n';
       } else {
         std::cout << std::left << std::setw(35) << "KEY" << std::setw(15)
                   << "ID" << std::setw(25) << "UPDATED" << std::setw(20)
-                  << "NAME" << std::endl;
-        std::cout << std::string(95, '-') << std::endl;
+                  << "NAME" << '\n';
+        std::cout << std::string(95, '-') << '\n';
 
         for (const auto& session : sessions_arr) {
           // updatedAt may be a string ISO timestamp or a number (ms epoch)
@@ -74,7 +74,7 @@ int SessionCommands::ListCommand(const std::vector<std::string>& args) {
           std::cout << std::left << std::setw(35) << session.value("key", "")
                     << std::setw(15) << session.value("sessionId", "")
                     << std::setw(25) << updated_at << std::setw(20)
-                    << session.value("displayName", "") << std::endl;
+                    << session.value("displayName", "") << '\n';
         }
       }
     }
@@ -83,7 +83,7 @@ int SessionCommands::ListCommand(const std::vector<std::string>& args) {
     return 0;
 
   } catch (const std::exception& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << "Error: " << e.what() << '\n';
     return 1;
   }
 }
@@ -106,8 +106,8 @@ int SessionCommands::HistoryCommand(const std::vector<std::string>& args) {
   }
 
   if (session_key.empty()) {
-    std::cerr << "Error: session key required" << std::endl;
-    std::cerr << "Usage: quantclaw sessions history <session-key>" << std::endl;
+    std::cerr << "Error: session key required" << '\n';
+    std::cerr << "Usage: quantclaw sessions history <session-key>" << '\n';
     return 1;
   }
 
@@ -115,7 +115,7 @@ int SessionCommands::HistoryCommand(const std::vector<std::string>& args) {
     auto client = std::make_shared<gateway::GatewayClient>(
         gateway_url_, auth_token_, logger_);
     if (!client->Connect()) {
-      std::cerr << "Error: Cannot connect to gateway" << std::endl;
+      std::cerr << "Error: Cannot connect to gateway" << '\n';
       return 1;
     }
 
@@ -126,7 +126,7 @@ int SessionCommands::HistoryCommand(const std::vector<std::string>& args) {
     auto result = client->Call("sessions.history", params);
 
     if (json_output) {
-      std::cout << result.dump(2) << std::endl;
+      std::cout << result.dump(2) << '\n';
     } else if (result.is_array()) {
       for (const auto& msg : result) {
         std::string role = msg.value("role", "unknown");
@@ -152,15 +152,15 @@ int SessionCommands::HistoryCommand(const std::vector<std::string>& args) {
 
         if (role == "user") {
           std::cout << "\033[36m[" << ts << "] User:\033[0m " << content
-                    << std::endl;
+                    << '\n';
         } else if (role == "assistant") {
           std::cout << "\033[32m[" << ts << "] Assistant:\033[0m " << content
-                    << std::endl;
+                    << '\n';
         } else {
           std::cout << "[" << ts << "] " << role << ": " << content
-                    << std::endl;
+                    << '\n';
         }
-        std::cout << std::endl;
+        std::cout << '\n';
       }
     }
 
@@ -168,7 +168,7 @@ int SessionCommands::HistoryCommand(const std::vector<std::string>& args) {
     return 0;
 
   } catch (const std::exception& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << "Error: " << e.what() << '\n';
     return 1;
   }
 }
@@ -183,8 +183,8 @@ int SessionCommands::DeleteCommand(const std::vector<std::string>& args) {
   }
 
   if (session_key.empty()) {
-    std::cerr << "Error: session key required" << std::endl;
-    std::cerr << "Usage: quantclaw sessions delete <session-key>" << std::endl;
+    std::cerr << "Error: session key required" << '\n';
+    std::cerr << "Usage: quantclaw sessions delete <session-key>" << '\n';
     return 1;
   }
 
@@ -192,7 +192,7 @@ int SessionCommands::DeleteCommand(const std::vector<std::string>& args) {
     auto client = std::make_shared<gateway::GatewayClient>(
         gateway_url_, auth_token_, logger_);
     if (!client->Connect()) {
-      std::cerr << "Error: Cannot connect to gateway" << std::endl;
+      std::cerr << "Error: Cannot connect to gateway" << '\n';
       return 1;
     }
 
@@ -200,11 +200,11 @@ int SessionCommands::DeleteCommand(const std::vector<std::string>& args) {
         client->Call("sessions.delete", {{"sessionKey", session_key}});
     client->Disconnect();
 
-    std::cout << "Session deleted: " << session_key << std::endl;
+    std::cout << "Session deleted: " << session_key << '\n';
     return 0;
 
   } catch (const std::exception& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << "Error: " << e.what() << '\n';
     return 1;
   }
 }
@@ -219,8 +219,8 @@ int SessionCommands::ResetCommand(const std::vector<std::string>& args) {
   }
 
   if (session_key.empty()) {
-    std::cerr << "Error: session key required" << std::endl;
-    std::cerr << "Usage: quantclaw sessions reset <session-key>" << std::endl;
+    std::cerr << "Error: session key required" << '\n';
+    std::cerr << "Usage: quantclaw sessions reset <session-key>" << '\n';
     return 1;
   }
 
@@ -228,18 +228,18 @@ int SessionCommands::ResetCommand(const std::vector<std::string>& args) {
     auto client = std::make_shared<gateway::GatewayClient>(
         gateway_url_, auth_token_, logger_);
     if (!client->Connect()) {
-      std::cerr << "Error: Cannot connect to gateway" << std::endl;
+      std::cerr << "Error: Cannot connect to gateway" << '\n';
       return 1;
     }
 
     auto result = client->Call("sessions.reset", {{"sessionKey", session_key}});
     client->Disconnect();
 
-    std::cout << "Session reset: " << session_key << std::endl;
+    std::cout << "Session reset: " << session_key << '\n';
     return 0;
 
   } catch (const std::exception& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << "Error: " << e.what() << '\n';
     return 1;
   }
 }

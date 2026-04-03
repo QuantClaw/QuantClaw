@@ -100,8 +100,11 @@ TEST_F(MemoryManagerTest, SearchMemory) {
   user << "The user is interested in AI and C++ programming.";
   user.close();
 
+  // Rebuild the inverted index so newly-written files are discoverable.
+  memory_manager_->LoadWorkspaceFiles();
+
   auto results = memory_manager_->SearchMemory("quantum");
-  EXPECT_FALSE(results.empty());
+  ASSERT_FALSE(results.empty());
   EXPECT_TRUE(results[0].find("quantum") != std::string::npos);
 
   auto no_results = memory_manager_->SearchMemory("zzz_nonexistent_zzz");

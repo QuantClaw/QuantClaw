@@ -26,7 +26,7 @@ int CLIManager::Run(int argc, char** argv) {
   // Handle global flags
   if (command_name == "--version" || command_name == "-v") {
     std::cout << "quantclaw " << kVersion << " (build " << kGitCommit << " "
-              << kBuildDate << ")" << std::endl;
+              << kBuildDate << ")" << '\n';
     return 0;
   }
   if (command_name == "--help" || command_name == "-h") {
@@ -45,17 +45,17 @@ int CLIManager::Run(int argc, char** argv) {
     }
   }
 
-  std::cerr << "Unknown command: " << command_name << std::endl;
+  std::cerr << "Unknown command: " << command_name << '\n';
   ShowHelp();
   return 1;
 }
 
 void CLIManager::ShowHelp() const {
-  std::cout << "QuantClaw - High-performance C++ AI assistant" << std::endl;
-  std::cout << std::endl;
-  std::cout << "Usage: quantclaw <command> [options]" << std::endl;
-  std::cout << std::endl;
-  std::cout << "Commands:" << std::endl;
+  std::cout << "QuantClaw - High-performance C++ AI assistant" << '\n';
+  std::cout << '\n';
+  std::cout << "Usage: quantclaw <command> [options]" << '\n';
+  std::cout << '\n';
+  std::cout << "Commands:" << '\n';
 
   for (const auto& cmd : commands_) {
     std::cout << "  " << cmd.name;
@@ -68,28 +68,28 @@ void CLIManager::ShowHelp() const {
       }
       std::cout << ")";
     }
-    std::cout << "\t" << cmd.description << std::endl;
+    std::cout << "\t" << cmd.description << '\n';
   }
 
-  std::cout << std::endl;
-  std::cout << "Global flags:" << std::endl;
-  std::cout << "  --version, -v\tPrint version" << std::endl;
-  std::cout << "  --help, -h\tShow help" << std::endl;
-  std::cout << "  --json\tJSON output mode" << std::endl;
-  std::cout << std::endl;
-  std::cout << "Examples:" << std::endl;
+  std::cout << '\n';
+  std::cout << "Global flags:" << '\n';
+  std::cout << "  --version, -v\tPrint version" << '\n';
+  std::cout << "  --help, -h\tShow help" << '\n';
+  std::cout << "  --json\tJSON output mode" << '\n';
+  std::cout << '\n';
+  std::cout << "Examples:" << '\n';
   std::cout << "  quantclaw gateway              Start gateway (foreground)"
-            << std::endl;
+            << '\n';
   std::cout << "  quantclaw gateway install       Install as system service"
-            << std::endl;
+            << '\n';
   std::cout << "  quantclaw gateway status         Show gateway status"
-            << std::endl;
+            << '\n';
   std::cout << "  quantclaw agent -m \"Hello\"       Send message to agent"
-            << std::endl;
-  std::cout << "  quantclaw sessions list          List sessions" << std::endl;
-  std::cout << "  quantclaw health                 Health check" << std::endl;
+            << '\n';
+  std::cout << "  quantclaw sessions list          List sessions" << '\n';
+  std::cout << "  quantclaw health                 Health check" << '\n';
   std::cout << "  quantclaw config get gateway.port Get config value"
-            << std::endl;
+            << '\n';
 }
 
 }  // namespace quantclaw::cli

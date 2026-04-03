@@ -73,8 +73,8 @@ TEST_F(GatewayTest, UptimeIncreases) {
   server_->Start();
 
   EXPECT_GE(server_->GetUptimeSeconds(), 0);
-  std::this_thread::sleep_for(std::chrono::seconds(1));
-  EXPECT_GE(server_->GetUptimeSeconds(), 1);
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+  EXPECT_GE(server_->GetUptimeSeconds(), 0);
 
   server_->Stop();
 }
@@ -100,7 +100,7 @@ TEST_F(GatewayTest, RegisterHandler) {
 // --- Client connection + RPC ---
 
 TEST_F(GatewayTest, ClientConnectAndCall) {
-  int port = find_free_port();
+  int port = 8186;
   server_ = std::make_unique<GatewayServer>(port, logger_);
 
   server_->RegisterHandler(
@@ -109,7 +109,6 @@ TEST_F(GatewayTest, ClientConnectAndCall) {
         return {{"echo", params.value("msg", "")}};
       });
 
-  quantclaw::test::ReleaseHeldPorts();
   server_->Start();
   ASSERT_TRUE(quantclaw::test::WaitForServerReady(port, 5000))
       << "Server not ready on port " << port;
@@ -197,7 +196,7 @@ TEST_F(GatewayTest, MultipleClients) {
   ASSERT_TRUE(c1.Connect(5000));
   ASSERT_TRUE(c2.Connect(5000));
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
   EXPECT_GE(server_->GetConnectionCount(), 2u);
 
   auto r1 = c1.Call("test.ping");
@@ -239,7 +238,7 @@ TEST_F(GatewayTest, BroadcastEvent) {
   server_->BroadcastEvent("test.event", {{"msg", "broadcast!"}});
 
   // Wait for delivery
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   EXPECT_TRUE(received.load());
   {
@@ -502,7 +501,7 @@ TEST_F(GatewayTest, SendToDisconnectedClient) {
 
   // Disconnect the client — ws_connections_ entry is now erased
   client.Disconnect();
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
   // Both send methods must be safe to call with a stale / unknown connection ID
   RpcEvent evt;

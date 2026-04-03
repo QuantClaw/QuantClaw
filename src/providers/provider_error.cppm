@@ -124,8 +124,10 @@ inline ProviderErrorKind ClassifyHttpError(int http_status,
     return ProviderErrorKind::kBillingError;
   }
   if (body_lower.find("context_length") != std::string::npos ||
+      body_lower.find("context length") != std::string::npos ||
       body_lower.find("context window") != std::string::npos ||
-      body_lower.find("context_length_exceeded") != std::string::npos) {
+      body_lower.find("context_window") != std::string::npos ||
+      body_lower.find("token limit") != std::string::npos) {
     return ProviderErrorKind::kContextOverflow;
   }
   if (body_lower.find("rate limit") != std::string::npos ||

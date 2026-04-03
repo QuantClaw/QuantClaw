@@ -124,9 +124,7 @@ static void expand_env_in_json(nlohmann::json& j) {
     }
   } else if (j.is_object()) {
     for (auto it = j.begin(); it != j.end(); ++it) {
-      auto key = it.key();
-      auto value = it.value();
-      expand_env_in_json(value);
+      expand_env_in_json(it.value());
     }
   } else if (j.is_array()) {
     for (auto& element : j) {
@@ -615,7 +613,7 @@ static void write_json_file(const std::string& filepath,
   if (!file.is_open()) {
     throw std::runtime_error("Cannot write config file: " + filepath);
   }
-  file << j.dump(2) << std::endl;
+  file << j.dump(2) << '\n';
 }
 
 void QuantClawConfig::SetValue(const std::string& filepath,

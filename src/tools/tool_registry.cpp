@@ -1321,7 +1321,7 @@ std::string ToolRegistry::web_search_tool(const nlohmann::json& params) {
           size_t i = 0;
           while (i < encoded.size()) {
             if (encoded[i] == '%' && i + 2 < encoded.size()) {
-              int hi = 0;
+              unsigned int hi = 0;
               if (std::sscanf(encoded.substr(i + 1, 2).c_str(), "%x", &hi) ==
                   1) {
                 decoded << static_cast<char>(hi);

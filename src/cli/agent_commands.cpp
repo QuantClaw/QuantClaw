@@ -60,7 +60,7 @@ int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
     std::cerr
         << "Usage: quantclaw agent -m \"your message\" [--session-id <id>] "
            "[--timeout <seconds>] [--json]"
-        << std::endl;
+        << '\n';
     return 1;
   }
 
@@ -69,9 +69,9 @@ int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
         gateway_url_, auth_token_, logger_);
     if (!client->Connect(timeout_ms)) {
       std::cerr << "Error: Cannot connect to gateway at " << gateway_url_
-                << std::endl;
+                << '\n';
       std::cerr << "Is the gateway running? Start it with: quantclaw gateway"
-                << std::endl;
+                << '\n';
       return 1;
     }
 
@@ -85,7 +85,7 @@ int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
       });
       client->Subscribe("agent.message_end",
                         [](const std::string&, const nlohmann::json&) {
-                          std::cout << std::endl;
+                          std::cout << '\n';
                         });
     }
 
@@ -97,14 +97,14 @@ int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
     auto result = client->Call("agent.request", params, timeout_ms);
 
     if (json_output) {
-      std::cout << result.dump(2) << std::endl;
+      std::cout << result.dump(2) << '\n';
     }
 
     client->Disconnect();
     return 0;
 
   } catch (const std::exception& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << "Error: " << e.what() << '\n';
     return 1;
   }
 }
@@ -114,17 +114,17 @@ int AgentCommands::StopCommand(const std::vector<std::string>& /*args*/) {
     auto client = std::make_shared<gateway::GatewayClient>(
         gateway_url_, auth_token_, logger_);
     if (!client->Connect()) {
-      std::cerr << "Error: Cannot connect to gateway" << std::endl;
+      std::cerr << "Error: Cannot connect to gateway" << '\n';
       return 1;
     }
 
     auto result = client->Call("agent.stop", {});
-    std::cout << "Agent stopped" << std::endl;
+    std::cout << "Agent stopped" << '\n';
 
     client->Disconnect();
     return 0;
   } catch (const std::exception& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << "Error: " << e.what() << '\n';
     return 1;
   }
 }

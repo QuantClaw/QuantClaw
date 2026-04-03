@@ -91,10 +91,10 @@ inline constexpr const char* kMemorySearch = "memory.search";
 
 namespace events {
 inline constexpr const char* kConnectChallenge = "connect.challenge";
-inline constexpr const char* kTextDelta = "text.delta";
-inline constexpr const char* kToolUse = "tool.use";
-inline constexpr const char* kToolResult = "tool.result";
-inline constexpr const char* kMessageEnd = "message.end";
+inline constexpr const char* kTextDelta = "agent.text_delta";
+inline constexpr const char* kToolUse = "agent.tool_use";
+inline constexpr const char* kToolResult = "agent.tool_result";
+inline constexpr const char* kMessageEnd = "agent.message_end";
 inline constexpr const char* kOcChat = "chat";
 inline constexpr const char* kOcAgent = "agent";
 }
@@ -243,9 +243,9 @@ struct HelloOkPayload {
   nlohmann::json snapshot;
 
   nlohmann::json ToJson() const {
-    nlohmann::json server_info = {{"version", server_version}};
+    nlohmann::json server = {{"version", server_version}};
     if (!conn_id.empty()) {
-      server_info["connId"] = conn_id;
+      server["connId"] = conn_id;
     }
 
     nlohmann::json features = {
@@ -262,16 +262,30 @@ struct HelloOkPayload {
                                            "cron.add", "cron.remove",
                                            "cron.update", "cron.run",
                                            "cron.runs", "memory.status",
-                                           "memory.search", "exec.approval.request"})}};
+                                           "memory.search", "exec.approval.request"})},
+        {"events", nlohmann::json::array({"agent.text_delta", "agent.tool_use",
+                                          "agent.tool_result", "agent.message_end"})}
+    };
 
-    return {{"protocol", protocol},
-            {"policy", policy},
-            {"authenticated", authenticated},
-            {"tickIntervalMs", tick_interval_ms},
-            {"openclawFormat", openclaw_format},
-            {"serverInfo", server_info},
-            {"features", features},
-            {"snapshot", snapshot}};
+    nlohmann::json j = {{"protocol", protocol},
+                        {"authenticated", authenticated},
+                        {"tickIntervalMs", tick_interval_ms},
+                        {"openclawFormat", openclaw_format},
+                        {"server", server},
+                        {"features", features}};
+
+    if (openclaw_format) {
+      j["policy"] = nlohmann::json::object({{"name", policy}, {"maxPayload", 1048576}});
+      j["capabilities"] = nlohmann::json::array();
+    } else {
+      j["policy"] = policy;
+    }
+
+    if (!snapshot.is_null()) {
+      j["snapshot"] = snapshot;
+    }
+
+    return j;
   }
 };
 

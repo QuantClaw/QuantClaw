@@ -164,9 +164,9 @@ TEST_F(AnthropicProviderTest, ResponseWithToolCalls) {
 
 TEST_F(AnthropicProviderTest, StreamingMultipleChunks) {
   provider_->stream_chunks = {
-      {/*.content=*/"Hello ", {}, "", false},
-      {/*.content=*/"world", {}, "", false},
-      {/*.content=*/"", {}, "", true}  // stream end
+      {/*.content=*/"Hello ", {}, "", false, {}},
+      {/*.content=*/"world", {}, "", false, {}},
+      {/*.content=*/"", {}, "", true, {}}  // stream end
   };
 
   quantclaw::ChatCompletionRequest request;

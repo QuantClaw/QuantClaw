@@ -17,16 +17,14 @@ module;
 #include <winsock2.h>
 #pragma comment(lib, "ws2_32.lib")
 typedef int socklen_t;
-using socket_t = SOCKET;
-static constexpr socket_t kInvalidSocket = INVALID_SOCKET;
 #else
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
-using socket_t = int;
-static constexpr socket_t kInvalidSocket = -1;
 #endif
+
+#include "test_helpers_platform.h"
 
 export module quantclaw.test.helpers;
 
@@ -60,13 +58,22 @@ inline int FindFreePort() {
 
   for (int attempt = 0; attempt < 100; ++attempt) {
     socket_t sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == kInvalidSocket)
-      return 0;
+    if (sock == kInvalidSocket) {
+      // Transient resource exhaustion (EMFILE/ENFILE) — yield and retry.
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      continue;
+    }
+
+    // Allow the port to be reused immediately after the reservation socket
+    // is closed (avoids EADDRINUSE when the server binds the same port).
+    int reuse = 1;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+               reinterpret_cast<const char*>(&reuse), sizeof(reuse));
 
     struct sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = 0x7f000001U;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     addr.sin_port = 0;
 
     if (bind(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) <
@@ -82,8 +89,7 @@ inline int FindFreePort() {
       continue;
     }
 
-    int port = static_cast<int>((static_cast<uint16_t>(addr.sin_port) >> 8) |
-                  (static_cast<uint16_t>(addr.sin_port) << 8));
+    int port = static_cast<int>(ntohs(addr.sin_port));
     detail::held_sockets().push_back({port, sock});
     return port;
   }
@@ -134,9 +140,8 @@ inline bool WaitForServerReady(int port, int timeout_ms = 5000) {
     struct sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = 0x7f000001U;
-    uint16_t net_port = static_cast<uint16_t>(port);
-    addr.sin_port = static_cast<uint16_t>((net_port >> 8) | (net_port << 8));
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = htons(static_cast<uint16_t>(port));
 
     int rc =
         connect(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr));

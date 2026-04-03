@@ -590,7 +590,7 @@ int GatewayCommands::UninstallCommand(
 int GatewayCommands::CallCommand(const std::vector<std::string>& args) {
   if (args.empty()) {
     std::cerr << "Usage: quantclaw gateway call <method> [json-params]"
-              << std::endl;
+              << '\n';
     return 1;
   }
 
@@ -600,7 +600,7 @@ int GatewayCommands::CallCommand(const std::vector<std::string>& args) {
     try {
       params = nlohmann::json::parse(args[1]);
     } catch (const nlohmann::json::exception& e) {
-      std::cerr << "Invalid JSON params: " << e.what() << std::endl;
+      std::cerr << "Invalid JSON params: " << e.what() << '\n';
       return 1;
     }
   }
@@ -609,16 +609,16 @@ int GatewayCommands::CallCommand(const std::vector<std::string>& args) {
     auto client = std::make_shared<gateway::GatewayClient>(
         gateway_url_, auth_token_, logger_);
     if (!client->Connect(3000)) {
-      std::cerr << "Error: Gateway not running" << std::endl;
+      std::cerr << "Error: Gateway not running" << '\n';
       return 1;
     }
 
     auto result = client->Call(method, params);
     client->Disconnect();
-    std::cout << result.dump(2) << std::endl;
+    std::cout << result.dump(2) << '\n';
     return 0;
   } catch (const std::exception& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << "Error: " << e.what() << '\n';
     return 1;
   }
 }
@@ -656,21 +656,21 @@ int GatewayCommands::StatusCommand(const std::vector<std::string>& args) {
       client->Disconnect();
 
       if (json_output) {
-        std::cout << result.dump(2) << std::endl;
+        std::cout << result.dump(2) << '\n';
       } else {
-        std::cout << "Gateway Status:" << std::endl;
+        std::cout << "Gateway Status:" << '\n';
         std::cout << "  Running:     "
                   << (result.value("running", false) ? "yes" : "no")
-                  << std::endl;
-        std::cout << "  Port:        " << result.value("port", 0) << std::endl;
+                  << '\n';
+        std::cout << "  Port:        " << result.value("port", 0) << '\n';
         std::cout << "  Connections: " << result.value("connections", 0)
-                  << std::endl;
+                  << '\n';
         std::cout << "  Sessions:    " << result.value("sessions", 0)
-                  << std::endl;
+                  << '\n';
         std::cout << "  Uptime:      " << result.value("uptime", 0) << "s"
-                  << std::endl;
+                  << '\n';
         std::cout << "  Version:     " << result.value("version", "unknown")
-                  << std::endl;
+                  << '\n';
       }
       return 0;
     }
@@ -680,10 +680,10 @@ int GatewayCommands::StatusCommand(const std::vector<std::string>& args) {
   gateway::DaemonManager daemon(logger_);
   if (daemon.IsRunning()) {
     std::cout << "Gateway daemon is running (PID: " << daemon.GetPid() << ")"
-              << std::endl;
-    std::cout << "But could not connect via WebSocket" << std::endl;
+              << '\n';
+    std::cout << "But could not connect via WebSocket" << '\n';
   } else {
-    std::cout << "Gateway is not running" << std::endl;
+    std::cout << "Gateway is not running" << '\n';
   }
   return 1;
 }
