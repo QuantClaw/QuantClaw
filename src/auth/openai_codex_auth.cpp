@@ -254,9 +254,9 @@ std::string html_response(const std::string& title, const std::string& body) {
 
 bool open_browser(const std::string& url) {
 #ifdef _WIN32
-  return reinterpret_cast<intptr_t>(
-             ShellExecuteA(nullptr, "open", url.c_str(), nullptr, nullptr,
-                           SW_SHOWNORMAL)) > 32;
+  return reinterpret_cast<intptr_t>(ShellExecuteA(nullptr, "open", url.c_str(),
+                                                  nullptr, nullptr,
+                                                  SW_SHOWNORMAL)) > 32;
 #elif defined(__APPLE__)
   std::string cmd = "open \"" + url + "\"";
   return std::system(cmd.c_str()) == 0;

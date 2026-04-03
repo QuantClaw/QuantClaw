@@ -138,15 +138,14 @@ TEST(OpenAICodexAuthTest, ResolverRefreshesExpiredCredential) {
 }
 
 TEST(OpenAICodexAuthTest, ParseManualCodeDecodesCallbackUrl) {
-  EXPECT_EQ(
-      ParseOpenAICodexManualCode(
-          "http://localhost:1455/auth/callback?code=abc%2Fdef%2Bghi%3D&state=unused"),
-      "abc/def+ghi=");
+  EXPECT_EQ(ParseOpenAICodexManualCode(
+                "http://localhost:1455/auth/"
+                "callback?code=abc%2Fdef%2Bghi%3D&state=unused"),
+            "abc/def+ghi=");
 }
 
 TEST(OpenAICodexAuthTest, ParseManualCodeDecodesRawPastedCode) {
-  EXPECT_EQ(ParseOpenAICodexManualCode("abc%2Fdef%2Bghi%3D"),
-            "abc/def+ghi=");
+  EXPECT_EQ(ParseOpenAICodexManualCode("abc%2Fdef%2Bghi%3D"), "abc/def+ghi=");
 }
 
 }  // namespace quantclaw::auth

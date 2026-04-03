@@ -94,10 +94,10 @@ void ProviderAuthStore::Save(const ProviderAuthRecord& record) const {
                                temp_path.string());
     }
   }
-  std::filesystem::permissions(
-      temp_path,
-      std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
-      std::filesystem::perm_options::replace);
+  std::filesystem::permissions(temp_path,
+                               std::filesystem::perms::owner_read |
+                                   std::filesystem::perms::owner_write,
+                               std::filesystem::perm_options::replace);
 #endif
   std::ofstream out(temp_path, std::ios::trunc);
   if (!out) {

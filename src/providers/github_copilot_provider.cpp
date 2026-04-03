@@ -56,7 +56,11 @@ std::string GitHubCopilotProvider::ProviderId() const {
 }
 
 CurlSlist GitHubCopilotProvider::CreateHeaders() const {
-  auto headers = OpenAIProvider::CreateHeaders();
+  auto headers = CurlSlist();
+  headers.append("Content-Type: application/json");
+  headers.append(
+      ("Authorization: Bearer " + ResolveRuntimeCredential().api_token)
+          .c_str());
   headers.append(("User-Agent: " + std::string(kCopilotUserAgent)).c_str());
   headers.append(
       ("Editor-Version: " + std::string(kCopilotEditorVersion)).c_str());
