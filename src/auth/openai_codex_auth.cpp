@@ -17,6 +17,12 @@
 #include <string_view>
 #include <thread>
 
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 #include <curl/curl.h>
 #include <httplib.h>
 #include <nlohmann/json.hpp>
@@ -84,10 +90,12 @@ int hex_value(char ch) {
 std::string url_decode(std::string_view value) {
   std::string out;
   out.reserve(value.size());
-  for (size_t i = 0; i < value.size(); ++i) {
+  size_t i = 0;
+  while (i < value.size()) {
     const char ch = value[i];
     if (ch == '+') {
       out.push_back(' ');
+      ++i;
       continue;
     }
     if (ch == '%' && i + 2 < value.size()) {
@@ -95,11 +103,34 @@ std::string url_decode(std::string_view value) {
       const int lo = hex_value(value[i + 2]);
       if (hi >= 0 && lo >= 0) {
         out.push_back(static_cast<char>((hi << 4) | lo));
-        i += 2;
+        i += 3;
         continue;
       }
     }
     out.push_back(ch);
+    ++i;
+  }
+  return out;
+}
+
+// Like url_decode but treats '+' as a literal '+', not a space.
+// Use for opaque auth codes that must not have query-string semantics applied.
+std::string url_decode_percent_only(std::string_view value) {
+  std::string out;
+  out.reserve(value.size());
+  size_t i = 0;
+  while (i < value.size()) {
+    if (value[i] == '%' && i + 2 < value.size()) {
+      const int hi = hex_value(value[i + 1]);
+      const int lo = hex_value(value[i + 2]);
+      if (hi >= 0 && lo >= 0) {
+        out.push_back(static_cast<char>((hi << 4) | lo));
+        i += 3;
+        continue;
+      }
+    }
+    out.push_back(value[i]);
+    ++i;
   }
   return out;
 }
@@ -289,7 +320,9 @@ std::string extract_query_param(const std::string& query,
 
 std::string parse_manual_code(std::string input) {
   if (input.find("code=") == std::string::npos) {
-    return url_decode(input);
+    // Raw auth code: decode percent-encoded sequences but treat '+' literally,
+    // since auth codes are opaque tokens and '+' is not a space placeholder.
+    return url_decode_percent_only(input);
   }
   auto pos = input.find('?');
   std::string query = pos == std::string::npos ? input : input.substr(pos + 1);
@@ -365,29 +398,45 @@ void OpenAICodexAuthStore::Save(const OpenAICodexAuthRecord& record) const {
 
   const auto temp_path =
       path_.parent_path() / (path_.filename().string() + ".tmp");
+  const std::string content = j.dump(2) + "\n";
 #ifndef _WIN32
   {
-    std::ofstream create(temp_path, std::ios::trunc);
-    if (!create) {
+    // Create with 0600 from the outset to eliminate the window where sensitive
+    // refresh-token bytes could be world-readable before a chmod.
+    const int fd =
+        ::open(temp_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
+               S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+      throw std::runtime_error("Failed to write auth store: " +
+                               temp_path.string());
+    }
+    const ssize_t written = ::write(fd, content.data(), content.size());
+    ::close(fd);
+    if (written < 0 || static_cast<size_t>(written) != content.size()) {
       throw std::runtime_error("Failed to write auth store: " +
                                temp_path.string());
     }
   }
-  std::filesystem::permissions(temp_path,
-                               std::filesystem::perms::owner_read |
-                                   std::filesystem::perms::owner_write,
-                               std::filesystem::perm_options::replace);
-#endif
-  std::ofstream out(temp_path, std::ios::trunc);
-  if (!out) {
-    throw std::runtime_error("Failed to write auth store: " +
-                             temp_path.string());
-  }
-  out << j.dump(2) << '\n';
-  out.close();
-  std::error_code remove_ec;
-  std::filesystem::remove(path_, remove_ec);
+  // On POSIX, rename() atomically replaces the destination; no prior
+  // remove() needed — a failed rename cannot leave old credentials deleted.
   std::filesystem::rename(temp_path, path_);
+#else
+  {
+    std::ofstream out(temp_path, std::ios::trunc);
+    if (!out) {
+      throw std::runtime_error("Failed to write auth store: " +
+                               temp_path.string());
+    }
+    out << content;
+    out.close();
+  }
+  // Windows: std::filesystem::rename() cannot overwrite an existing file.
+  {
+    std::error_code remove_ec;
+    std::filesystem::remove(path_, remove_ec);
+  }
+  std::filesystem::rename(temp_path, path_);
+#endif
 }
 
 bool OpenAICodexAuthStore::Clear() const {

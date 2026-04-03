@@ -164,7 +164,7 @@ quantclaw models auth status --provider openai-codex
 quantclaw models auth logout --provider openai-codex
 ```
 
-`login` opens a browser-based OAuth flow and stores credentials in `~/.quantclaw/auth/openai-codex.json`. `status` shows whether cached credentials exist and whether they are still valid or refreshable. `logout` removes the locally cached authorization and falls back to the normal API-key-based `openai` provider flow.
+`login` opens a browser-based OAuth flow and stores credentials in `~/.quantclaw/auth/openai-codex.json`. `status` shows whether cached credentials exist and whether they are still valid or refreshable. `logout` clears the local cached OAuth credentials only; your provider configuration is not automatically switched — if it still points to `openai-codex/*`, subsequent requests will return an auth error until you log in again.
 
 ### config
 

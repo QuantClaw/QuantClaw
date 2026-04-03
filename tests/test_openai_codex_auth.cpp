@@ -148,4 +148,10 @@ TEST(OpenAICodexAuthTest, ParseManualCodeDecodesRawPastedCode) {
   EXPECT_EQ(ParseOpenAICodexManualCode("abc%2Fdef%2Bghi%3D"), "abc/def+ghi=");
 }
 
+TEST(OpenAICodexAuthTest, ParseManualCodeRawCodePreservesLiteralPlus) {
+  // Raw auth codes are opaque tokens; a literal '+' must not be decoded as
+  // a space the way query-string encoding would.
+  EXPECT_EQ(ParseOpenAICodexManualCode("abc+def"), "abc+def");
+}
+
 }  // namespace quantclaw::auth

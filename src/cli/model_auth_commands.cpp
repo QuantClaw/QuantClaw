@@ -31,16 +31,17 @@ std::string format_expiry(std::int64_t expires_at) {
 bool parse_provider_flag(const std::vector<std::string>& args,
                          std::string* provider) {
   *provider = "openai-codex";
-  for (size_t i = 0; i < args.size();) {
+  size_t i = 0;
+  while (i < args.size()) {
     if (args[i] == "--provider") {
       if (i + 1 >= args.size()) {
         return false;
       }
       *provider = args[i + 1];
       i += 2;
-      continue;
+    } else {
+      ++i;
     }
-    ++i;
   }
   return true;
 }

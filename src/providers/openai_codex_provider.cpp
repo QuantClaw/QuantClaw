@@ -240,6 +240,10 @@ nlohmann::json build_codex_payload(const ChatCompletionRequest& request) {
     payload["tools"] = convert_tools_to_responses(request.tools);
   }
 
+  if (request.max_tokens > 0) {
+    payload["max_output_tokens"] = request.max_tokens;
+  }
+
   return payload;
 }
 
@@ -286,10 +290,6 @@ OpenAICodexProvider::ChatCompletion(const ChatCompletionRequest& request) {
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout_);
 
   CURLcode code = curl_easy_perform(curl);
-  if (!ctx.callback_error.empty()) {
-    throw ProviderError(ProviderErrorKind::kUnknown, 0, ctx.callback_error,
-                        "openai-codex");
-  }
   if (code != CURLE_OK) {
     throw ProviderError(ProviderErrorKind::kUnknown, 0,
                         "OpenAI Codex request failed: " +
@@ -303,6 +303,10 @@ OpenAICodexProvider::ChatCompletion(const ChatCompletionRequest& request) {
     throw ProviderError(
         ClassifyHttpError(static_cast<int>(http_code), ctx.raw_body),
         static_cast<int>(http_code), ctx.raw_body, "openai-codex");
+  }
+  if (!ctx.callback_error.empty()) {
+    throw ProviderError(ProviderErrorKind::kUnknown, 0, ctx.callback_error,
+                        "openai-codex");
   }
 
   if (aggregated.finish_reason.empty()) {
@@ -331,10 +335,6 @@ void OpenAICodexProvider::ChatCompletionStream(
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout_);
 
   CURLcode code = curl_easy_perform(curl);
-  if (!ctx.callback_error.empty()) {
-    throw ProviderError(ProviderErrorKind::kUnknown, 0, ctx.callback_error,
-                        "openai-codex");
-  }
   if (code != CURLE_OK) {
     throw ProviderError(ProviderErrorKind::kUnknown, 0,
                         "OpenAI Codex streaming request failed: " +
@@ -348,6 +348,10 @@ void OpenAICodexProvider::ChatCompletionStream(
     throw ProviderError(
         ClassifyHttpError(static_cast<int>(http_code), ctx.raw_body),
         static_cast<int>(http_code), ctx.raw_body, "openai-codex");
+  }
+  if (!ctx.callback_error.empty()) {
+    throw ProviderError(ProviderErrorKind::kUnknown, 0, ctx.callback_error,
+                        "openai-codex");
   }
 }
 

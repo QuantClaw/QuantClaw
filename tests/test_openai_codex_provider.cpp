@@ -54,7 +54,7 @@ TEST(OpenAICodexProviderTest, ChatCompletionUsesBearerTokenAndParsesOutput) {
     EXPECT_EQ(body.value("stream", false), true);
     EXPECT_EQ(body.value("store", true), false);
     EXPECT_FALSE(body.contains("temperature"));
-    EXPECT_FALSE(body.contains("max_output_tokens"));
+    EXPECT_EQ(body.value("max_output_tokens", 0), 8192);
     ASSERT_TRUE(body.contains("input"));
     ASSERT_TRUE(body["input"].is_array());
     ASSERT_FALSE(body["input"].empty());
@@ -117,7 +117,7 @@ TEST(OpenAICodexProviderTest, StreamingParsesTextDeltas) {
     EXPECT_EQ(body.value("stream", false), true);
     EXPECT_EQ(body.value("store", true), false);
     EXPECT_FALSE(body.contains("temperature"));
-    EXPECT_FALSE(body.contains("max_output_tokens"));
+    EXPECT_EQ(body.value("max_output_tokens", 0), 8192);
     res.set_chunked_content_provider(
         "text/event-stream", [](size_t /*offset*/, httplib::DataSink& sink) {
           const char event1[] =
