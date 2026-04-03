@@ -1,6 +1,7 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -234,6 +235,25 @@ TEST_F(AgentLoopTest, StreamingUsesConfigModel) {
 
   EXPECT_EQ(mock_provider_->last_request.model, "test-model");
   EXPECT_TRUE(mock_provider_->last_request.stream);
+}
+
+TEST_F(AgentLoopTest, StreamingRequestIncludesBuiltinToolSchemas) {
+  mock_provider_->response_text = "streamed";
+
+  agent_loop_->ProcessMessageStream("test", {}, "sys",
+                                    [](const quantclaw::AgentEvent&) {});
+
+  ASSERT_FALSE(mock_provider_->last_request.tools.empty());
+  EXPECT_TRUE(mock_provider_->last_request.tool_choice_auto);
+
+  const auto has_exec_tool = std::any_of(
+      mock_provider_->last_request.tools.begin(),
+      mock_provider_->last_request.tools.end(), [](const nlohmann::json& tool) {
+        return tool.value("type", "") == "function" &&
+               tool.contains("function") &&
+               tool["function"].value("name", "") == "exec";
+      });
+  EXPECT_TRUE(has_exec_tool);
 }
 
 TEST_F(AgentLoopTest, GetConfigReturnsCurrentConfig) {
