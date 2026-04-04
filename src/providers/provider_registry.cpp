@@ -64,7 +64,7 @@ void ProviderRegistry::RegisterBuiltinFactories() {
                                        std::shared_ptr<spdlog::logger> logger) {
     auto token_client =
         std::make_shared<auth::GitHubCopilotTokenClient>(logger);
-    const auto github_token =
+    std::string github_token =
         entry.extra.is_object()
             ? entry.extra.value("githubToken", std::string{})
             : std::string{};
