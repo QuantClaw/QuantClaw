@@ -128,6 +128,22 @@ TEST_F(ConfigTest, ParseOpenClawFormat) {
   EXPECT_EQ(config.tools_permission.allow[0], "group:fs");
 }
 
+TEST_F(ConfigTest, ParseChannelAllowedIdsCamelCase) {
+  nlohmann::json json_config = {
+      {"channels",
+       {{"discord",
+         {{"enabled", true},
+          {"token", "discord-token"},
+          {"allowedIds", {"user-1", "channel-2"}}}}}}};
+
+  auto config = quantclaw::QuantClawConfig::FromJson(json_config);
+
+  ASSERT_TRUE(config.channels.count("discord"));
+  EXPECT_EQ(config.channels.at("discord").allowed_ids.size(), 2u);
+  EXPECT_EQ(config.channels.at("discord").allowed_ids[0], "user-1");
+  EXPECT_EQ(config.channels.at("discord").allowed_ids[1], "channel-2");
+}
+
 // --- Defaults ---
 
 TEST_F(ConfigTest, EmptyConfigUsesDefaults) {

@@ -55,7 +55,8 @@ void register_rpc_handlers(
     std::shared_ptr<quantclaw::ExecApprovalManager> exec_approval_mgr = nullptr,
     quantclaw::PluginSystem* plugin_system = nullptr,
     gateway::CommandQueue* command_queue = nullptr,
-    std::string log_file_path = {});
+    std::string log_file_path = {},
+    std::function<std::vector<std::string>()> running_adapters_fn = {});
 }
 
 namespace quantclaw::cli {
@@ -401,6 +402,8 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       logger_);
   command_queue->Start();
 
+  std::unique_ptr<quantclaw::ChannelAdapterManager> adapter_manager;
+
   // Initialize plugin system
   quantclaw::PluginSystem plugin_system(logger_);
   plugin_system.Initialize(config, workspace_dir);
@@ -410,7 +413,10 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       server, session_manager, agent_loop, prompt_builder, tool_registry,
       config, logger_, reload_fn, provider_registry, skill_loader,
       cron_scheduler, exec_approval_mgr, &plugin_system, command_queue.get(),
-      (base_dir / "logs" / "gateway.log").string());
+      (base_dir / "logs" / "gateway.log").string(), [&adapter_manager]() {
+        return adapter_manager ? adapter_manager->RunningAdapters()
+                               : std::vector<std::string>{};
+      });
 
   // Start server
   try {
@@ -495,7 +501,6 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   }
 
   // Start channel adapters (Discord, Telegram, etc.)
-  std::unique_ptr<quantclaw::ChannelAdapterManager> adapter_manager;
   if (!config.channels.empty()) {
     adapter_manager = std::make_unique<quantclaw::ChannelAdapterManager>(
         port, auth_token, config.channels, logger_);

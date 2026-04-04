@@ -55,7 +55,8 @@ void register_rpc_handlers(
     std::shared_ptr<quantclaw::ExecApprovalManager> exec_approval_mgr = nullptr,
     quantclaw::PluginSystem* plugin_system = nullptr,
     quantclaw::gateway::CommandQueue* command_queue = nullptr,
-    std::string log_file_path = {});
+    std::string log_file_path = {},
+    std::function<std::vector<std::string>()> running_adapters_fn = {});
 }  // namespace quantclaw::gateway
 
 // Minimal mock LLM
@@ -109,6 +110,8 @@ class RpcMockLLMProvider : public quantclaw::LLMProvider {
 
 class RpcHandlersTest : public ::testing::Test {
  protected:
+  virtual void ConfigureConfig() {}
+
   void SetUp() override {
     test_dir_ = quantclaw::test::MakeTestDir("quantclaw_rpc_test");
     workspace_dir_ = test_dir_ / "workspace";
@@ -125,6 +128,7 @@ class RpcHandlersTest : public ::testing::Test {
     config_.agent.max_tokens = 512;
     config_.gateway.port = port_;
     config_.gateway.auth.mode = "none";
+    ConfigureConfig();
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
@@ -146,9 +150,10 @@ class RpcHandlersTest : public ::testing::Test {
         std::make_unique<quantclaw::gateway::GatewayServer>(port_, logger_);
     server_->SetAuth("none", "");
 
-    quantclaw::gateway::register_rpc_handlers(*server_, session_manager_,
-                                              agent_loop_, prompt_builder_,
-                                              tool_registry_, config_, logger_);
+    quantclaw::gateway::register_rpc_handlers(
+        *server_, session_manager_, agent_loop_, prompt_builder_,
+        tool_registry_, config_, logger_, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, {}, [this]() { return running_adapters_; });
 
     quantclaw::test::ReleaseHeldPorts();
     server_->Start();
@@ -190,6 +195,24 @@ class RpcHandlersTest : public ::testing::Test {
   std::shared_ptr<quantclaw::SessionManager> session_manager_;
   std::shared_ptr<quantclaw::PromptBuilder> prompt_builder_;
   std::unique_ptr<quantclaw::gateway::GatewayServer> server_;
+  std::vector<std::string> running_adapters_;
+};
+
+class RpcHandlersChannelsStatusTest : public RpcHandlersTest {
+ protected:
+  void ConfigureConfig() override {
+    auto& discord = config_.channels["discord"];
+    discord.enabled = true;
+    discord.token = "discord-token";
+  }
+};
+
+class RpcHandlersChannelsRunningTest : public RpcHandlersChannelsStatusTest {
+ protected:
+  void ConfigureConfig() override {
+    RpcHandlersChannelsStatusTest::ConfigureConfig();
+    running_adapters_ = {"discord"};
+  }
 };
 
 // --- config.get edge cases ---
@@ -241,6 +264,33 @@ TEST_F(RpcHandlersTest, ConfigGetAgentMaxIterations) {
 
   auto result = client->Call("config.get", {{"path", "agent.maxIterations"}});
   EXPECT_EQ(result.get<int>(), 3);
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersChannelsStatusTest,
+       ChannelsStatusDoesNotMarkConfiguredChannelRunningWithoutAdapter) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  auto result = client->Call("channels.status");
+  ASSERT_TRUE(result.contains("channels"));
+  ASSERT_TRUE(result["channels"].contains("discord"));
+  EXPECT_TRUE(result["channels"]["discord"]["enabled"].get<bool>());
+  EXPECT_FALSE(result["channels"]["discord"]["running"].get<bool>());
+
+  client->Disconnect();
+}
+
+TEST_F(RpcHandlersChannelsRunningTest,
+       ChannelsStatusMarksChannelRunningWhenAdapterCallbackReportsIt) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  auto result = client->Call("channels.status");
+  ASSERT_TRUE(result.contains("channels"));
+  ASSERT_TRUE(result["channels"].contains("discord"));
+  EXPECT_TRUE(result["channels"]["discord"]["running"].get<bool>());
 
   client->Disconnect();
 }

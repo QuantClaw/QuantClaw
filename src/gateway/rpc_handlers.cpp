@@ -9,6 +9,7 @@
 #include <functional>
 #include <iomanip>
 #include <sstream>
+#include <unordered_set>
 
 #include "quantclaw/config.hpp"
 #include "quantclaw/constants.hpp"
@@ -45,7 +46,8 @@ void register_rpc_handlers(
     std::shared_ptr<quantclaw::CronScheduler> cron_scheduler,
     std::shared_ptr<quantclaw::ExecApprovalManager> exec_approval_mgr,
     quantclaw::PluginSystem* plugin_system, CommandQueue* command_queue,
-    std::string log_file_path) {
+    std::string log_file_path,
+    std::function<std::vector<std::string>()> running_adapters_fn) {
   // --- gateway.health ---
   server.RegisterHandler(
       methods::kGatewayHealth,
@@ -467,11 +469,17 @@ void register_rpc_handlers(
   // Returns ChannelsStatusSnapshot shape expected by the UI.
   server.RegisterHandler(
       methods::kChannelsStatus,
-      [&config, logger](const nlohmann::json& params,
-                        ClientConnection& /*client*/) -> nlohmann::json {
+      [&config, logger,
+       running_adapters_fn](const nlohmann::json& params,
+                            ClientConnection& /*client*/) -> nlohmann::json {
         auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                           std::chrono::system_clock::now().time_since_epoch())
                           .count();
+        const auto running_adapters = running_adapters_fn
+                                          ? running_adapters_fn()
+                                          : std::vector<std::string>{};
+        const std::unordered_set<std::string> running_set(
+            running_adapters.begin(), running_adapters.end());
 
         // Build ordered list: cli first, then configured channels
         nlohmann::json channel_order = nlohmann::json::array();
@@ -481,29 +489,31 @@ void register_rpc_handlers(
         nlohmann::json channel_default_account = nlohmann::json::object();
 
         auto add_channel = [&](const std::string& cid, bool enabled,
+                               bool configured, bool running,
                                const std::string& label) {
           channel_order.push_back(cid);
           channel_labels[cid] = label;
           channels[cid] = {{"enabled", enabled},
-                           {"running", enabled},
-                           {"configured", enabled}};
+                           {"running", running},
+                           {"configured", configured}};
           // Each channel has a default account entry
           nlohmann::json account;
           account["accountId"] = cid + ":default";
           account["enabled"] = enabled;
-          account["configured"] = enabled;
-          account["running"] = enabled;
-          account["connected"] = enabled;
+          account["configured"] = configured;
+          account["running"] = running;
+          account["connected"] = running;
           channel_accounts[cid] = nlohmann::json::array({account});
           channel_default_account[cid] = cid + ":default";
         };
 
-        add_channel("cli", true, "CLI");
+        add_channel("cli", true, true, true, "CLI");
         for (const auto& [cid, ch] : config.channels) {
           std::string label = cid;
           label[0] = static_cast<char>(
               std::toupper(static_cast<unsigned char>(label[0])));
-          add_channel(cid, ch.enabled, label);
+          add_channel(cid, ch.enabled, true,
+                      ch.enabled && running_set.count(cid) > 0, label);
         }
 
         return {{"ts", now_ms},

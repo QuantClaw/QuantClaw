@@ -22,6 +22,8 @@ import WebSocket from "ws";
 
 export interface ChannelConfig {
   token: string;
+  allowedIds?: string[];
+  allowed_ids?: string[];
   allowedChannels?: string[];
   allowedUsers?: string[];
   [key: string]: unknown;
@@ -344,7 +346,16 @@ export abstract class ChannelAdapter {
     replyTo?: string
   ): Promise<void> {
     // Check allowlists
-    const { allowedUsers, allowedChannels } = this.channelConfig;
+    const { allowedUsers, allowedChannels, allowedIds, allowed_ids } =
+      this.channelConfig;
+    const genericAllowedIds = allowedIds ?? allowed_ids;
+    if (
+      genericAllowedIds?.length &&
+      !genericAllowedIds.includes(senderId) &&
+      !genericAllowedIds.includes(channelId)
+    ) {
+      return;
+    }
     if (allowedUsers?.length && !allowedUsers.includes(senderId)) return;
     if (allowedChannels?.length && !allowedChannels.includes(channelId)) return;
 

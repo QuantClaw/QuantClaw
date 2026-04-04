@@ -56,7 +56,8 @@ void register_rpc_handlers(
     std::shared_ptr<quantclaw::ExecApprovalManager> exec_approval_mgr = nullptr,
     quantclaw::PluginSystem* plugin_system = nullptr,
     quantclaw::gateway::CommandQueue* command_queue = nullptr,
-    std::string log_file_path = {});
+    std::string log_file_path = {},
+    std::function<std::vector<std::string>()> running_adapters_fn = {});
 }  // namespace quantclaw::gateway
 
 // --- Capture helpers ---
