@@ -12,6 +12,7 @@ import std;
 import nlohmann.json;
 
 import quantclaw.providers.anthropic_provider;
+import quantclaw.providers.llama_provider;
 import quantclaw.providers.llm_provider;
 
 namespace quantclaw {
@@ -43,10 +44,20 @@ void ProviderRegistry::RegisterFactory(const std::string& provider_id,
 }
 
 void ProviderRegistry::RegisterBuiltinFactories() {
+  // "local" → llama-server (llama.cpp) via its OpenAI-compatible API.
+  // Default port matches llama-server's --port default (8080).
   RegisterFactory("local", [](const ProviderEntry& entry,
                                std::shared_ptr<spdlog::logger> logger) {
     std::string url =
-        entry.base_url.empty() ? "http://127.0.0.1:8081" : entry.base_url;
+        entry.base_url.empty() ? "http://127.0.0.1:8080" : entry.base_url;
+    return std::make_shared<LlamaProvider>(url, entry.timeout, logger);
+  });
+
+  // "anthropic" kept as an explicit opt-in for legacy/cloud fallback.
+  RegisterFactory("anthropic", [](const ProviderEntry& entry,
+                                   std::shared_ptr<spdlog::logger> logger) {
+    std::string url = entry.base_url.empty() ? "https://api.anthropic.com"
+                                             : entry.base_url;
     std::string api_key = entry.api_key.empty() ? "local" : entry.api_key;
     return std::make_shared<AnthropicProvider>(api_key, url, entry.timeout,
                                               logger);

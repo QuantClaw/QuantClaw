@@ -57,6 +57,7 @@ sidecar/node_modules/
 sidecar/dist/
 ui/dist/
 ui/node_modules/
+ui/llama.cpp/
 
 # Python
 __pycache__/

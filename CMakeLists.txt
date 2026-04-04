@@ -287,6 +287,7 @@ set(QUANTCLAW_CORE_MODULE_SOURCES
     src/providers/embedding_provider.cppm
     src/providers/curl_raii.cppm
     src/providers/anthropic_provider.cppm
+    src/providers/llama_provider.cppm
     src/providers/provider_registry.cppm
     src/providers/provider_error.cppm
     src/providers/cooldown_tracker.cppm
@@ -453,12 +454,19 @@ target_include_directories(quantclaw PRIVATE
 set_property(TARGET quantclaw PROPERTY CXX_SCAN_FOR_MODULES ON)
 
 # Standalone TurboQuant GGUF quantization script.
-add_executable(tq_quantize scripts/tq.cpp)
-target_compile_definitions(tq_quantize PRIVATE
-    TQ_STANDALONE_MAIN=1
-)
-set_property(TARGET tq_quantize PROPERTY CXX_SCAN_FOR_MODULES ON)
-target_compile_options(tq_quantize PRIVATE -Wall -Wextra -Wpedantic -O2)
+# ── llama.cpp (llama-server) ─────────────────────────────────────────────────
+# Build only the server binary; skip tests, examples, and shared libs so the
+# sub-build stays lean and doesn't clash with our own GTest or OpenSSL targets.
+set(LLAMA_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TOOLS    ON  CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER   ON  CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_COMMON   ON  CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_WEBUI    OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS    OFF CACHE BOOL "" FORCE)
+set(LLAMA_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
+set(LLAMA_ALL_WARNINGS   OFF CACHE BOOL "" FORCE)
+add_subdirectory(ui/llama.cpp/llama.cpp EXCLUDE_FROM_ALL)
 
 if(QC_PRECOMPILE_GCC_STDLIB_MODULES)
     # GCC/libstdc++ ships C++23 named module sources at bits/std.cc and
@@ -563,6 +571,7 @@ if(BUILD_TESTS)
         tests/test_mcp_server.cpp
         tests/test_mcp_integration.cpp
         tests/test_anthropic_provider.cpp
+        tests/test_llama_provider.cpp
         tests/test_security_sandbox.cpp
         tests/test_tool_registry.cpp
         tests/test_tool_chain.cpp
@@ -598,7 +607,6 @@ if(BUILD_TESTS)
         tests/test_multi_stage_compaction.cpp
         tests/test_hybrid_memory_search.cpp
         tests/test_dag_runtime.cpp
-        tests/test_turboquant_kv.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})

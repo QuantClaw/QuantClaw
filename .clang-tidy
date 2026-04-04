@@ -154,8 +154,6 @@ WarningsAsErrors: '*'
 # Only lint QuantClaw's own headers; ignore third-party / generated files.
 HeaderFilterRegex: '(include/quantclaw/.+\.hpp|src/.+\.(hpp|h))'
 
-AnalyzeTemporaryDtors: true
-
 CheckOptions:
   # Naming conventions (Google C++ Style Guide, adapted for QuantClaw)
   - { key: readability-identifier-naming.ClassCase,              value: CamelCase  }
