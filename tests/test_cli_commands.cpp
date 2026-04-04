@@ -160,7 +160,8 @@ class CLIManagerTest : public ::testing::Test {
 
     // Register a test command
     cli_->AddCommand(
-        {"test", "A test command", {"t"}, [this](int argc, char** argv) -> int {
+        {"test", "A test command", {"t"},
+         [this](int argc, char** /*argv*/) -> int {
            handler_called_ = true;
            handler_argc_ = argc;
            return 0;

@@ -366,6 +366,13 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            target_compile_options(quantclaw_tests PRIVATE /W4 /wd4100 /Od /RTC1 /EHsc)
+        else()
+            target_compile_options(quantclaw_tests PRIVATE /W4 /wd4100 /O2 /EHsc)
+        endif()
+    endif()
 
     include(GoogleTest)
     if(WIN32)
