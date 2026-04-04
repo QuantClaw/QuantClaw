@@ -151,7 +151,7 @@ void register_rpc_handlers(
   };
 
   auto execute_agent_request =
-      [session_manager, agent_loop, prompt_builder, logger, &server](
+      [session_manager, agent_loop, prompt_builder, logger](
           const nlohmann::json& params, ClientConnection& /*client*/,
           quantclaw::AgentEventCallback event_callback) -> AgentRequestResult {
     std::string session_key = params.value("sessionKey", "agent:main:main");
@@ -177,8 +177,8 @@ void register_rpc_handlers(
           // Simple truncation (keep last 20 messages)
           session_manager->ResetSession(key);
           int keep = std::min(20, static_cast<int>(history.size()));
-          for (int i = static_cast<int>(history.size()) - keep;
-               i < static_cast<int>(history.size()); ++i) {
+          const auto start_index = history.size() - static_cast<size_t>(keep);
+          for (size_t i = start_index; i < history.size(); ++i) {
             session_manager->AppendMessage(key, history[i]);
           }
           logger->info("Compacted session {}: kept {} of {} messages", key,
@@ -308,7 +308,7 @@ void register_rpc_handlers(
 
         auto sessions = session_manager->ListSessions();
         int total = static_cast<int>(sessions.size());
-        int start = std::min(offset, total);
+        int start = std::clamp(offset, 0, total);
         int end = (limit > 0) ? std::min(start + limit, total) : total;
 
         // Helper: Convert ISO timestamp "YYYY-MM-DDTHH:MM:SSZ" to milliseconds
@@ -333,7 +333,8 @@ void register_rpc_handlers(
         };
 
         nlohmann::json session_rows = nlohmann::json::array();
-        for (int i = start; i < end; ++i) {
+        for (size_t i = static_cast<size_t>(start);
+             i < static_cast<size_t>(end); ++i) {
           const auto& s = sessions[i];
           nlohmann::json row;
           row["key"] = s.session_key;
@@ -470,7 +471,7 @@ void register_rpc_handlers(
   server.RegisterHandler(
       methods::kChannelsStatus,
       [&config, logger,
-       running_adapters_fn](const nlohmann::json& params,
+       running_adapters_fn](const nlohmann::json& /*params*/,
                             ClientConnection& /*client*/) -> nlohmann::json {
         auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                           std::chrono::system_clock::now().time_since_epoch())
@@ -742,8 +743,9 @@ void register_rpc_handlers(
         // Build sessions.recent (last 5, lightweight)
         nlohmann::json recent = nlohmann::json::array();
         int recent_count = std::min(5, static_cast<int>(sessions.size()));
-        for (int i = static_cast<int>(sessions.size()) - recent_count;
-             i < static_cast<int>(sessions.size()); ++i) {
+        const auto recent_start =
+            sessions.size() - static_cast<size_t>(recent_count);
+        for (size_t i = recent_start; i < sessions.size(); ++i) {
           recent.push_back({{"key", sessions[i].session_key},
                             {"sessionId", sessions[i].session_id},
                             {"updatedAt", sessions[i].updated_at},
@@ -1072,7 +1074,7 @@ void register_rpc_handlers(
           int offset = params.value("offset", 0);
           auto jobs = cron_scheduler->ListJobs();
           int total = static_cast<int>(jobs.size());
-          int start = std::min(offset, total);
+          int start = std::clamp(offset, 0, total);
           int end = (limit > 0) ? std::min(start + limit, total) : total;
 
           auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -1087,7 +1089,8 @@ void register_rpc_handlers(
           };
 
           nlohmann::json job_list = nlohmann::json::array();
-          for (int i = start; i < end; ++i) {
+          for (size_t i = static_cast<size_t>(start);
+               i < static_cast<size_t>(end); ++i) {
             const auto& job = jobs[i];
             long long last_ms = tp_to_ms(job.last_run);
             long long next_ms = tp_to_ms(job.next_run);
@@ -1338,11 +1341,12 @@ void register_rpc_handlers(
           }
 
           int total = static_cast<int>(all_entries.size());
-          int start = std::min(offset, total);
+          int start = std::clamp(offset, 0, total);
           int end = (limit > 0) ? std::min(start + limit, total) : total;
 
           nlohmann::json entries = nlohmann::json::array();
-          for (int i = start; i < end; ++i)
+          for (size_t i = static_cast<size_t>(start);
+               i < static_cast<size_t>(end); ++i)
             entries.push_back(all_entries[i]);
 
           bool has_more = end < total;
@@ -1640,15 +1644,14 @@ void register_rpc_handlers(
 
   // --- agent.identity.get ---
   // Called on every UI connect to show assistant name/avatar.
-  server.RegisterHandler(
-      "agent.identity.get",
-      [&config](const nlohmann::json& /*params*/,
-                ClientConnection& /*client*/) -> nlohmann::json {
-        return {{"agentId", "main"},
-                {"name", "QuantClaw Agent"},
-                {"avatar", ""},
-                {"emoji", "\xF0\x9F\xA6\x9E"}};
-      });
+  server.RegisterHandler("agent.identity.get",
+                         [](const nlohmann::json& /*params*/,
+                            ClientConnection& /*client*/) -> nlohmann::json {
+                           return {{"agentId", "main"},
+                                   {"name", "QuantClaw Agent"},
+                                   {"avatar", ""},
+                                   {"emoji", "\xF0\x9F\xA6\x9E"}};
+                         });
 
   // --- node.list ---
   // QuantClaw is a single-node deployment; return empty list.
@@ -1699,7 +1702,8 @@ void register_rpc_handlers(
             }
             int total = static_cast<int>(all_lines.size());
             int start = std::max(0, total - req_limit);
-            for (int i = start; i < total; ++i) {
+            for (size_t i = static_cast<size_t>(start);
+                 i < static_cast<size_t>(total); ++i) {
               lines.push_back(all_lines[i]);
             }
             new_cursor = total;

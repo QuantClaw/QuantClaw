@@ -166,7 +166,7 @@ TEST_F(SessionCompactionTest, Truncate_KeepsRecentMessages) {
   // 1 system note + 5 recent = 6
   EXPECT_EQ(result.size(), 6u);
   // The 5 recent messages should be messages 15-19
-  for (int i = 1; i <= 5; ++i) {
+  for (size_t i = 1; i <= 5; ++i) {
     EXPECT_EQ(result[i]["content"], "Message " + std::to_string(15 + i - 1));
   }
 }
@@ -233,8 +233,8 @@ TEST_F(SessionCompactionTest, Compact_PreservesMessageOrder) {
 
   auto result = compaction_->Compact(messages, opts, summary_fn);
   // result[0] is summary, result[1..5] are messages 25-29
-  for (int i = 1; i < static_cast<int>(result.size()); ++i) {
-    int expected_idx = 25 + i - 1;
+  for (size_t i = 1; i < result.size(); ++i) {
+    size_t expected_idx = 25 + i - 1;
     EXPECT_EQ(result[i]["content"], "Ordered_" + std::to_string(expected_idx));
   }
 }

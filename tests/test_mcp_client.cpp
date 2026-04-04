@@ -6,6 +6,7 @@
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 using socket_t = SOCKET;
+using socket_send_len_t = int;
 #define CLOSE_SOCKET(s) closesocket(s)
 static constexpr socket_t kInvalidSocket = INVALID_SOCKET;
 #else
@@ -13,6 +14,7 @@ static constexpr socket_t kInvalidSocket = INVALID_SOCKET;
 #include <sys/socket.h>
 #include <unistd.h>
 using socket_t = int;
+using socket_send_len_t = size_t;
 #define CLOSE_SOCKET(s) close(s)
 static constexpr socket_t kInvalidSocket = -1;
 #endif
@@ -135,7 +137,8 @@ class MiniHTTPServer {
         "Connection: close\r\n\r\n" +
         canned_body_;
 
-    send(fd, response.c_str(), static_cast<int>(response.size()), 0);
+    send(fd, response.c_str(), static_cast<socket_send_len_t>(response.size()),
+         0);
     CLOSE_SOCKET(fd);
   }
 

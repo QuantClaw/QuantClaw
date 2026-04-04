@@ -1,0 +1,114 @@
+name: Nightly Hardening
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-hardening-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tsan:
+    name: TSan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld ninja-build pkg-config
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+          "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=${RUNNER_TEMP}/vcpkg" >> "${GITHUB_ENV}"
+
+      - name: Configure
+        run: >
+          cmake --preset tsan
+          -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build --preset tsan --parallel
+
+      - name: Test
+        env:
+          TSAN_OPTIONS: halt_on_error=1:history_size=7:second_deadlock_stack=1
+        run: ctest --preset tsan
+
+  glibcxx-assertions:
+    name: libstdc++ Assertions
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ ninja-build pkg-config
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+          "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=${RUNNER_TEMP}/vcpkg" >> "${GITHUB_ENV}"
+
+      - name: Configure
+        run: >
+          cmake --preset glibcxx-assertions
+          -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build --preset glibcxx-assertions --parallel
+
+      - name: Test
+        run: ctest --preset glibcxx-assertions
+
+  cppcheck-strict:
+    name: cppcheck Strict
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang ninja-build cppcheck pkg-config
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+          "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=${RUNNER_TEMP}/vcpkg" >> "${GITHUB_ENV}"
+
+      - name: Configure
+        run: >
+          cmake --preset strict-clang
+          -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Run cppcheck
+        run: >
+          cppcheck
+          --enable=warning,performance,portability,style
+          --error-exitcode=2
+          --inline-suppr
+          --project=out/build/strict-clang/compile_commands.json

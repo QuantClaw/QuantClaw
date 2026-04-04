@@ -28,14 +28,16 @@ static std::string substitute_env_vars(const std::string& input) {
   size_t last_pos = 0;
   for (auto it = begin; it != end; ++it) {
     auto& match = *it;
-    result.append(input, last_pos, match.position() - last_pos);
+    const auto match_pos = static_cast<size_t>(match.position());
+    const auto match_len = static_cast<size_t>(match.length());
+    result.append(input, last_pos, match_pos - last_pos);
     std::string var_name = match[1].str();
     const char* env_val = std::getenv(var_name.c_str());
     if (env_val) {
       result.append(env_val);
     }
     // If env var not set, replace with empty string (same as OpenClaw)
-    last_pos = match.position() + match.length();
+    last_pos = match_pos + match_len;
   }
   result.append(input, last_pos, std::string::npos);
   return result;

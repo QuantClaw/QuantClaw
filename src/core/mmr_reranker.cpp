@@ -63,11 +63,12 @@ MMRReranker::Rerank(const std::vector<RankedItem>& items, int top_k,
   std::vector<RankedItem> selected;
   std::vector<bool> picked(items.size(), false);
 
-  for (int k = 0; k < top_k && k < static_cast<int>(items.size()); ++k) {
+  const auto keep_count = std::min(items.size(), static_cast<size_t>(top_k));
+  for (size_t k = 0; k < keep_count; ++k) {
     double best_mmr = -1e9;
-    int best_idx = -1;
+    size_t best_idx = items.size();
 
-    for (int i = 0; i < static_cast<int>(items.size()); ++i) {
+    for (size_t i = 0; i < items.size(); ++i) {
       if (picked[i])
         continue;
 
@@ -88,7 +89,7 @@ MMRReranker::Rerank(const std::vector<RankedItem>& items, int top_k,
       }
     }
 
-    if (best_idx >= 0) {
+    if (best_idx < items.size()) {
       picked[best_idx] = true;
       selected.push_back(items[best_idx]);
     }

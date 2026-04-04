@@ -130,9 +130,15 @@ jobs:
     - name: Create and push multi-arch manifest
       working-directory: /tmp/digests
       run: |
-        docker buildx imagetools create \
-          $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-          $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+        mapfile -t tag_args < <(
+          jq -r '.tags[] | "-t", .' <<< "$DOCKER_METADATA_OUTPUT_JSON"
+        )
+        digest_args=()
+        shopt -s nullglob
+        for digest in *; do
+          digest_args+=("ghcr.io/${{ github.repository }}@sha256:${digest}")
+        done
+        docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
 
     - name: Inspect final image
       run: |

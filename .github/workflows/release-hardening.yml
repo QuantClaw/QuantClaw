@@ -1,0 +1,119 @@
+name: Release Hardening
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-hardening-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hardened-build:
+    name: Hardened Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld ninja-build pkg-config
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+          "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=${RUNNER_TEMP}/vcpkg" >> "${GITHUB_ENV}"
+
+      - name: Configure
+        run: >
+          cmake --preset hardened-release
+          -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build --preset hardened-release --parallel
+
+      - name: Test
+        run: ctest --preset hardened-release
+
+      - name: Upload build tree
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardened-build-tree
+          path: out/build/hardened-release
+
+  docker-trivy:
+    name: Docker Trivy Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Detect Dockerfile
+        id: dockerfile
+        shell: bash
+        run: |
+          if [ -f Dockerfile ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip scan when Dockerfile is missing
+        if: steps.dockerfile.outputs.present != 'true'
+        run: echo "No Dockerfile present; skipping Trivy scan."
+
+      - name: Build image
+        if: steps.dockerfile.outputs.present == 'true'
+        run: docker build -t quantclaw:hardening .
+
+      - name: Install Trivy
+        if: steps.dockerfile.outputs.present == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Run Trivy
+        if: steps.dockerfile.outputs.present == 'true'
+        run: trivy image --exit-code 1 --severity CRITICAL,HIGH quantclaw:hardening
+
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+
+      - name: Generate SBOM
+        run: syft dir:. -o spdx-json=sbom.spdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json

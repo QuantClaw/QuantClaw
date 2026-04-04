@@ -1,0 +1,136 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "ci-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "BUILD_TESTS": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "strict-clang",
+      "inherits": "ci-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_C_FLAGS": "-Werror -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wformat=2 -Wimplicit-fallthrough",
+        "CMAKE_CXX_FLAGS": "-Werror -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wformat=2 -Wimplicit-fallthrough -Wnon-virtual-dtor -Wnull-dereference"
+      }
+    },
+    {
+      "name": "asan-ubsan",
+      "inherits": "ci-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "ENABLE_ASAN": "ON",
+        "ENABLE_UBSAN": "ON"
+      }
+    },
+    {
+      "name": "tsan",
+      "inherits": "ci-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "ENABLE_TSAN": "ON"
+      }
+    },
+    {
+      "name": "glibcxx-assertions",
+      "inherits": "ci-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_C_FLAGS": "-D_GLIBCXX_ASSERTIONS",
+        "CMAKE_CXX_FLAGS": "-D_GLIBCXX_ASSERTIONS"
+      }
+    },
+    {
+      "name": "hardened-release",
+      "inherits": "ci-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
+        "CMAKE_C_FLAGS": "-D_FORTIFY_SOURCE=3 -fstack-protector-strong",
+        "CMAKE_CXX_FLAGS": "-D_FORTIFY_SOURCE=3 -fstack-protector-strong",
+        "CMAKE_EXE_LINKER_FLAGS": "-Wl,-z,relro,-z,now",
+        "CMAKE_SHARED_LINKER_FLAGS": "-Wl,-z,relro,-z,now"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "strict-clang",
+      "configurePreset": "strict-clang"
+    },
+    {
+      "name": "asan-ubsan",
+      "configurePreset": "asan-ubsan"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    },
+    {
+      "name": "glibcxx-assertions",
+      "configurePreset": "glibcxx-assertions"
+    },
+    {
+      "name": "hardened-release",
+      "configurePreset": "hardened-release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "strict-clang",
+      "configurePreset": "strict-clang",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "asan-ubsan",
+      "configurePreset": "asan-ubsan",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "glibcxx-assertions",
+      "configurePreset": "glibcxx-assertions",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "hardened-release",
+      "configurePreset": "hardened-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

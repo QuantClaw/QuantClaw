@@ -129,9 +129,9 @@ MultiStageCompaction::CompactMultiStage(const std::vector<Message>& messages,
 
   // Stage 1: Summarize each chunk
   std::vector<std::string> chunk_summaries;
-  chunk_summaries.reserve(num_chunks);
+  chunk_summaries.reserve(chunks.size());
 
-  for (int i = 0; i < num_chunks; i++) {
+  for (size_t i = 0; i < chunks.size(); ++i) {
     int chunk_tokens = EstimateTokens(chunks[i]);
     logger_->debug("Summarizing chunk {}/{}: {} messages, ~{} tokens", i + 1,
                    num_chunks, static_cast<int>(chunks[i].size()),
@@ -145,7 +145,7 @@ MultiStageCompaction::CompactMultiStage(const std::vector<Message>& messages,
   // If merged summaries are small enough, combine directly.
   // Otherwise, recursively compact.
   std::string merged;
-  for (int i = 0; i < num_chunks; i++) {
+  for (size_t i = 0; i < chunks.size(); ++i) {
     if (!merged.empty()) {
       merged += "\n\n---\n\n";
     }

@@ -482,7 +482,8 @@ SkillLoader::parse_skill_file(const std::filesystem::path& skill_file) const {
   // Content is everything after frontmatter
   std::string content_part = file_content;
   if (!matches.empty()) {
-    content_part = file_content.substr(matches[0].length());
+    content_part =
+        file_content.substr(static_cast<size_t>(matches[0].length()));
   }
   skill.content = content_part;
 

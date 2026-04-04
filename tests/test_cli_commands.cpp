@@ -115,7 +115,7 @@ static std::string capture_stdout(std::function<void()> fn) {
   char buf[1024];
   ssize_t n;
   while ((n = read(pipefd[0], buf, sizeof(buf))) > 0) {
-    result.append(buf, n);
+    result.append(buf, static_cast<size_t>(n));
   }
   close(pipefd[0]);
   return result;
@@ -142,7 +142,7 @@ static std::string capture_stderr(std::function<void()> fn) {
   char buf[1024];
   ssize_t n;
   while ((n = read(pipefd[0], buf, sizeof(buf))) > 0) {
-    result.append(buf, n);
+    result.append(buf, static_cast<size_t>(n));
   }
   close(pipefd[0]);
   return result;
@@ -159,12 +159,14 @@ class CLIManagerTest : public ::testing::Test {
     handler_argc_ = 0;
 
     // Register a test command
-    cli_->AddCommand(
-        {"test", "A test command", {"t"}, [this](int argc, char** argv) -> int {
-           handler_called_ = true;
-           handler_argc_ = argc;
-           return 0;
-         }});
+    cli_->AddCommand({"test",
+                      "A test command",
+                      {"t"},
+                      [this](int argc, char** /*argv*/) -> int {
+                        handler_called_ = true;
+                        handler_argc_ = argc;
+                        return 0;
+                      }});
   }
 
   std::unique_ptr<CLIManager> cli_;

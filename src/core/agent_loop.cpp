@@ -89,17 +89,17 @@ static std::string truncate_tool_result(const std::string& result,
   while (std::getline(stream, line))
     lines.push_back(line);
 
-  if (static_cast<int>(lines.size()) <= keep_lines * 2)
+  const auto keep_count = static_cast<size_t>(std::max(keep_lines, 0));
+  if (keep_count == 0 || lines.size() <= keep_count * 2)
     return result;
 
   std::string truncated;
-  for (int i = 0; i < keep_lines; ++i) {
+  for (size_t i = 0; i < keep_count; ++i) {
     truncated += lines[i] + "\n";
   }
-  int omitted = static_cast<int>(lines.size()) - keep_lines * 2;
+  const auto omitted = lines.size() - keep_count * 2;
   truncated += "\n... [" + std::to_string(omitted) + " lines omitted] ...\n\n";
-  for (int i = static_cast<int>(lines.size()) - keep_lines;
-       i < static_cast<int>(lines.size()); ++i) {
+  for (size_t i = lines.size() - keep_count; i < lines.size(); ++i) {
     truncated += lines[i] + "\n";
   }
   return truncated;

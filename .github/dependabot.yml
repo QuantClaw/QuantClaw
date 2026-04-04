@@ -3,7 +3,6 @@
 
 version: 2
 updates:
-  # GitHub Actions dependency updates
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -13,7 +12,6 @@ updates:
       - "dependencies"
       - "github-actions"
 
-  # Docker dependency updates
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -23,13 +21,22 @@ updates:
       - "dependencies"
       - "docker"
 
-  # Node.js dependencies (for channel adapters)
   - package-ecosystem: "npm"
-    directory: "/adapters"
+    directory: "/sidecar"
     schedule:
       interval: "weekly"
     target-branch: "main"
     labels:
       - "dependencies"
       - "npm"
-      - "channel-adapters"
+      - "sidecar"
+
+  - package-ecosystem: "npm"
+    directory: "/website"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "website"

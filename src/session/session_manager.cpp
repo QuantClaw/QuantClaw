@@ -373,8 +373,11 @@ SessionManager::GetHistory(const std::string& session_key,
   }
 
   if (max_messages > 0 && static_cast<int>(messages.size()) > max_messages) {
-    messages.erase(messages.begin(),
-                   messages.begin() + (messages.size() - max_messages));
+    const auto keep_count = static_cast<size_t>(max_messages);
+    messages.erase(
+        messages.begin(),
+        std::next(messages.begin(),
+                  static_cast<std::ptrdiff_t>(messages.size() - keep_count)));
   }
 
   return messages;

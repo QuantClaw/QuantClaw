@@ -36,7 +36,7 @@ std::string ChainTemplateEngine::resolve_string(
     result += match.prefix().str();
     int index = std::stoi(match[1].str());
     if (index >= 0 && index < static_cast<int>(previous_results.size())) {
-      result += previous_results[index].result;
+      result += previous_results[static_cast<size_t>(index)].result;
     }
     working = match.suffix().str();
   }
@@ -80,10 +80,10 @@ ChainResult ToolChainExecutor::Execute(const ToolChainDef& chain) {
   result.chain_name = chain.name;
   result.success = true;
 
-  for (int i = 0; i < static_cast<int>(chain.steps.size()); ++i) {
+  for (size_t i = 0; i < chain.steps.size(); ++i) {
     const auto& step = chain.steps[i];
     ChainStepResult step_result;
-    step_result.step_index = i;
+    step_result.step_index = static_cast<int>(i);
     step_result.tool_name = step.tool_name;
     step_result.success = false;
 
@@ -92,7 +92,8 @@ ChainResult ToolChainExecutor::Execute(const ToolChainDef& chain) {
         ChainTemplateEngine::resolve(step.arguments, result.step_results);
 
     logger_->debug("Chain '{}' step {}: executing tool '{}' with args: {}",
-                   chain.name, i, step.tool_name, resolved_args.dump());
+                   chain.name, step_result.step_index, step.tool_name,
+                   resolved_args.dump());
 
     int attempts = 0;
     int max_attempts = (chain.error_policy == ChainErrorPolicy::kRetry)
@@ -109,7 +110,7 @@ ChainResult ToolChainExecutor::Execute(const ToolChainDef& chain) {
         step_result.error = e.what();
         attempts++;
         logger_->warn("Chain '{}' step {} attempt {}/{} failed: {}", chain.name,
-                      i, attempts, max_attempts, e.what());
+                      step_result.step_index, attempts, max_attempts, e.what());
       }
     }
 
@@ -119,8 +120,9 @@ ChainResult ToolChainExecutor::Execute(const ToolChainDef& chain) {
       if (chain.error_policy == ChainErrorPolicy::kStopOnError ||
           chain.error_policy == ChainErrorPolicy::kRetry) {
         result.success = false;
-        result.final_result = "Chain stopped at step " + std::to_string(i) +
-                              ": " + step_result.error;
+        result.final_result = "Chain stopped at step " +
+                              std::to_string(step_result.step_index) + ": " +
+                              step_result.error;
         return result;
       }
       // ContinueOnError: mark chain as failed but continue

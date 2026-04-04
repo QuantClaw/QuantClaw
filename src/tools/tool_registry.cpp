@@ -37,9 +37,10 @@ namespace quantclaw {
 
 static std::string url_encode(const std::string& s) {
   std::ostringstream out;
-  for (unsigned char c : s) {
+  for (char raw_ch : s) {
+    const auto c = static_cast<unsigned char>(raw_ch);
     if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-      out << c;
+      out << raw_ch;
     } else {
       out << '%' << std::hex << std::uppercase << ((c >> 4) & 0xF) << (c & 0xF);
     }
@@ -474,10 +475,11 @@ void ToolRegistry::SetSessionManager(std::shared_ptr<SessionManager> mgr) {
     int offset = params.value("offset", 0);
     auto sessions = session_manager_->ListSessions();
     int total = static_cast<int>(sessions.size());
-    int start = std::min(offset, total);
-    int end = std::min(start + limit, total);
+    int start = std::clamp(offset, 0, total);
+    int end = (limit > 0) ? std::min(start + limit, total) : total;
     nlohmann::json rows = nlohmann::json::array();
-    for (int i = start; i < end; ++i) {
+    for (size_t i = static_cast<size_t>(start); i < static_cast<size_t>(end);
+         ++i) {
       nlohmann::json row;
       row["key"] = sessions[i].session_key;
       row["sessionId"] = sessions[i].session_id;
@@ -1256,13 +1258,13 @@ std::string ToolRegistry::web_search_tool(const nlohmann::json& params) {
         snippets.push_back(html_to_text((*it)[1].str()));
       }
 
-      int n = std::min(count, static_cast<int>(links.size()));
-      for (int i = 0; i < n; ++i) {
+      const auto result_count = static_cast<size_t>(
+          std::max(0, std::min(count, static_cast<int>(links.size()))));
+      for (size_t i = 0; i < result_count; ++i) {
         nlohmann::json item;
         item["title"] = links[i].second;
         item["url"] = links[i].first;
-        item["description"] =
-            (i < static_cast<int>(snippets.size())) ? snippets[i] : "";
+        item["description"] = (i < snippets.size()) ? snippets[i] : "";
         results.push_back(item);
       }
       if (!results.empty()) {
@@ -1421,8 +1423,8 @@ std::string ToolRegistry::web_fetch_tool(const nlohmann::json& params) {
 
   // Truncate
   if (static_cast<int>(text.size()) > max_chars) {
-    text = text.substr(0, max_chars) + "\n\n[truncated at " +
-           std::to_string(max_chars) + " chars]";
+    text = text.substr(0, static_cast<size_t>(max_chars)) +
+           "\n\n[truncated at " + std::to_string(max_chars) + " chars]";
   }
 
   return nlohmann::json{
@@ -1472,8 +1474,9 @@ std::string ToolRegistry::memory_get_tool(const nlohmann::json& params) {
   // Security: must remain inside workspace
   auto canonical = std::filesystem::weakly_canonical(full_path);
   auto ws_canon = std::filesystem::weakly_canonical(workspace);
-  if (canonical.string().substr(0, ws_canon.string().size()) !=
-      ws_canon.string()) {
+  auto mismatch = std::mismatch(ws_canon.begin(), ws_canon.end(),
+                                canonical.begin(), canonical.end());
+  if (mismatch.first != ws_canon.end()) {
     throw std::runtime_error("Access denied: path outside workspace");
   }
 

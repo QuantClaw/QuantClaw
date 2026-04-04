@@ -1,0 +1,156 @@
+name: CI Hardening
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-hardening-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  workflow-hygiene:
+    name: Workflow Hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install linters
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y golang-go shellcheck yamllint
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.8
+          echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
+
+      - name: Run actionlint
+        run: actionlint
+
+      - name: Run yamllint
+        run: find .github/workflows -type f \( -name '*.yml' -o -name '*.yaml' \) -print0 | xargs -0 yamllint -d relaxed
+
+      - name: Run shellcheck
+        run: |
+          mapfile -d '' files < <(find . -type f -name '*.sh' -print0)
+          if [ "${#files[@]}" -gt 0 ]; then
+            shellcheck -S error "${files[@]}"
+          fi
+
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request' && vars.ENABLE_DEPENDENCY_REVIEW == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+
+  strict-build-linux:
+    name: Strict Build (Linux/Clang)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld ninja-build pkg-config
+
+      - name: Setup vcpkg
+        run: |
+          git clone  https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+          "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=${RUNNER_TEMP}/vcpkg" >> "${GITHUB_ENV}"
+
+      - name: Configure
+        run: >
+          cmake --preset strict-clang
+          -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build --preset strict-clang --parallel
+
+      - name: Test
+        run: ctest --preset strict-clang
+
+  strict-build-windows:
+    name: Strict Build (Windows/MSVC)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup vcpkg
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP\vcpkg"
+          & "$env:RUNNER_TEMP\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          "VCPKG_ROOT=$env:RUNNER_TEMP\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure
+        shell: pwsh
+        run: >
+          cmake -S . -B out\build\strict-msvc
+          -DBUILD_TESTS=ON
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
+          -DCMAKE_CXX_FLAGS="/WX /permissive-"
+
+      - name: Build
+        run: cmake --build out\build\strict-msvc --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir out\build\strict-msvc -C Release --output-on-failure
+
+  asan-ubsan:
+    name: ASan + UBSan
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld ninja-build pkg-config
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+          "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=${RUNNER_TEMP}/vcpkg" >> "${GITHUB_ENV}"
+
+      - name: Configure
+        run: >
+          cmake --preset asan-ubsan
+          -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build --preset asan-ubsan --parallel
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1:check_initialization_order=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --preset asan-ubsan

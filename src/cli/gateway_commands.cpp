@@ -364,7 +364,7 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   auto command_queue = std::make_unique<gateway::CommandQueue>(
       queue_config,
       // AgentExecutor: runs the agent loop for a queued command
-      [session_manager, agent_loop, prompt_builder, &server, logger = logger_](
+      [session_manager, agent_loop, prompt_builder, logger = logger_](
           const gateway::QueuedCommand& cmd,
           std::function<void(const std::string&, const nlohmann::json&)>
               event_sink) -> nlohmann::json {
@@ -595,6 +595,15 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
 
 int GatewayCommands::InstallCommand(const std::vector<std::string>& args) {
   int port = kDefaultGatewayPort;
+  try {
+    auto config = quantclaw::QuantClawConfig::LoadFromFile(
+        quantclaw::QuantClawConfig::DefaultConfigPath());
+    if (config.gateway.port > 0) {
+      port = config.gateway.port;
+    }
+  } catch (const std::exception&) {
+    // No config yet; keep the default.
+  }
   for (size_t i = 0; i < args.size(); ++i) {
     const auto& arg = args[i];
     if (arg == "--port" && i + 1 < args.size()) {

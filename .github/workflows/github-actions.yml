@@ -162,7 +162,7 @@ jobs:
     - name: Run clang-tidy
       run: |
         find src -name '*.cpp' -not -path '*/ui/*' -print0 \
-          | xargs -0 -P$(nproc) clang-tidy-14 \
+          | xargs -0 -P"$(nproc)" clang-tidy-14 \
               -p build \
               --config-file=.clang-tidy \
               2>&1 | tee /tmp/clang-tidy.log

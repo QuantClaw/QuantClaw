@@ -320,6 +320,14 @@ TEST_F(BM25SearchTest, StatsReportCorrectly) {
   EXPECT_GE(stats["total_documents"].get<int>(), 2);
 }
 
+TEST_F(BM25SearchTest, NegativeMaxResultsReturnsEmpty) {
+  write_file("notes.md", "alpha beta\n\nbeta gamma");
+  search_->IndexDirectory(temp_dir_);
+
+  auto results = search_->Search("alpha", -1);
+  EXPECT_TRUE(results.empty());
+}
+
 // ================================================================
 // Compaction Config Tests
 // ================================================================
@@ -691,6 +699,33 @@ TEST_F(ContextPrunerTest, NoAssistantMessagesNoProtection) {
   for (size_t i = 0; i < history.size(); ++i) {
     EXPECT_EQ(result[i].text(), history[i].text());
   }
+}
+
+TEST_F(ContextPrunerTest, NonPositiveThresholdsStillPruneSafely) {
+  auto history = make_history(6);
+  ContextPruner::Options opts;
+  opts.protect_recent = 0;
+  opts.hard_prune_after = -5;
+  opts.max_tool_result_chars = 10;
+
+  auto result = ContextPruner::Prune(history, opts);
+
+  bool found_pruned_tool_result = false;
+  for (const auto& msg : result) {
+    for (const auto& block : msg.content) {
+      if (block.type == "tool_result" &&
+          (block.content.find("omitted") != std::string::npos ||
+           block.content.find("...") != std::string::npos)) {
+        found_pruned_tool_result = true;
+        break;
+      }
+    }
+    if (found_pruned_tool_result) {
+      break;
+    }
+  }
+
+  EXPECT_TRUE(found_pruned_tool_result);
 }
 
 }  // namespace quantclaw

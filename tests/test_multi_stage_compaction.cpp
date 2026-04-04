@@ -22,7 +22,8 @@ class MultiStageCompactionTest : public ::testing::Test {
   std::vector<Message> make_history(int pairs, int chars_per_msg = 100) {
     std::vector<Message> history;
     for (int i = 0; i < pairs; i++) {
-      std::string text(chars_per_msg, 'a' + (i % 26));
+      std::string text(static_cast<size_t>(chars_per_msg),
+                       static_cast<char>('a' + (i % 26)));
       history.push_back(Message{"user", "Q" + std::to_string(i) + ": " + text});
       history.push_back(
           Message{"assistant", "A" + std::to_string(i) + ": " + text});

@@ -209,7 +209,9 @@ int SessionMaintenance::enforce_max_entries(MaintenanceResult& result) {
   int count = 0;
 
   // Remove oldest first (files are sorted oldest-first)
-  for (int i = 0; i < to_remove && i < static_cast<int>(files.size()); ++i) {
+  const auto remove_count =
+      std::min(static_cast<size_t>(to_remove), files.size());
+  for (size_t i = 0; i < remove_count; ++i) {
     if (config_.mode == MaintenanceMode::kWarn) {
       result.warnings.push_back("Would prune (max entries): " +
                                 files[i].path.filename().string());

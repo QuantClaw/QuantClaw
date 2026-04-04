@@ -53,8 +53,9 @@ VectorIndex::Search(const std::vector<float>& query, int top_k) const {
               return a.score > b.score;
             });
 
-  if (static_cast<int>(results.size()) > top_k) {
-    results.resize(top_k);
+  const auto keep_count = static_cast<size_t>(std::max(top_k, 0));
+  if (results.size() > keep_count) {
+    results.resize(keep_count);
   }
   return results;
 }

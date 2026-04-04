@@ -263,7 +263,7 @@ OnboardCommands::PromptChoice(const std::string& prompt,
     choice = 1;
   }
 
-  return choices[choice - 1];
+  return choices[static_cast<size_t>(choice - 1)];
 }
 
 int OnboardCommands::SetupConfig() {

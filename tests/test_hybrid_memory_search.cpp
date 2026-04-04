@@ -28,11 +28,12 @@ class MockEmbeddingProvider : public EmbeddingProvider {
 
   EmbeddingResponse Embed(const EmbeddingRequest& request) override {
     EmbeddingResponse resp;
+    const size_t dims = static_cast<size_t>(dims_);
     for (const auto& text : request.texts) {
       // Simple deterministic embedding: hash-based
-      std::vector<float> emb(dims_, 0.0f);
+      std::vector<float> emb(dims, 0.0f);
       for (size_t i = 0; i < text.size(); ++i) {
-        emb[i % dims_] += static_cast<float>(text[i]) / 100.0f;
+        emb[i % dims] += static_cast<float>(text[i]) / 100.0f;
       }
       // Normalize
       float norm = 0;

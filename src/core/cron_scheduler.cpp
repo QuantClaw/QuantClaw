@@ -246,7 +246,8 @@ bool CronScheduler::RemoveJob(const std::string& id) {
   for (size_t i = 0; i < jobs_.size(); ++i) {
     if (jobs_[i].id == id) {
       // Exact match found, remove this job immediately
-      jobs_.erase(jobs_.begin() + i);
+      jobs_.erase(jobs_.begin() +
+                  static_cast<std::vector<CronJob>::difference_type>(i));
       if (!storage_path_.empty()) {
         nlohmann::json arr = nlohmann::json::array();
         for (const auto& j : jobs_)
@@ -267,7 +268,8 @@ bool CronScheduler::RemoveJob(const std::string& id) {
   if (matches.size() != 1)
     return false;
 
-  jobs_.erase(jobs_.begin() + matches[0]);
+  jobs_.erase(jobs_.begin() +
+              static_cast<std::vector<CronJob>::difference_type>(matches[0]));
 
   if (!storage_path_.empty()) {
     nlohmann::json arr = nlohmann::json::array();
