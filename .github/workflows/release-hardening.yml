@@ -47,7 +47,7 @@ jobs:
         run: ctest --preset hardened-release
 
       - name: Upload build tree
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hardened-build-tree
           path: out/build/hardened-release
@@ -113,7 +113,7 @@ jobs:
         run: syft dir:. -o spdx-json=sbom.spdx.json
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom
           path: sbom.spdx.json
