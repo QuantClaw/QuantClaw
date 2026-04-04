@@ -68,7 +68,7 @@ jobs:
 
       - name: Setup vcpkg
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+          git clone  https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
           "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=${RUNNER_TEMP}/vcpkg" >> "${GITHUB_ENV}"
 
@@ -96,7 +96,7 @@ jobs:
       - name: Setup vcpkg
         shell: pwsh
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP\vcpkg"
+          git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP\vcpkg"
           & "$env:RUNNER_TEMP\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
           "VCPKG_ROOT=$env:RUNNER_TEMP\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
@@ -131,7 +131,7 @@ jobs:
 
       - name: Setup vcpkg
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+          git clone https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
           "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=${RUNNER_TEMP}/vcpkg" >> "${GITHUB_ENV}"
 
