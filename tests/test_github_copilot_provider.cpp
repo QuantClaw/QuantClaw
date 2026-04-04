@@ -101,4 +101,28 @@ TEST(GitHubCopilotProviderTest, ChatCompletionUsesResolvedTokenAndBaseUrl) {
   EXPECT_EQ(resolver->resolve_calls, 1);
 }
 
+class ExposedGitHubCopilotProvider : public GitHubCopilotProvider {
+ public:
+  using GitHubCopilotProvider::GitHubCopilotProvider;
+  using GitHubCopilotProvider::ResolveApiKey;
+};
+
+TEST(GitHubCopilotProviderTest,
+     ResolveApiKeyRefreshesWhenCachedCredentialIsNotUsable) {
+  auto logger = make_logger("github-copilot-provider-refresh");
+  auto resolver = std::make_shared<FakeRuntimeResolver>();
+  resolver->result.api_token = "expired-token";
+  resolver->result.base_url = "https://example.invalid";
+  resolver->result.expires_at = 0;
+
+  ExposedGitHubCopilotProvider provider(30, logger, resolver);
+  EXPECT_EQ(provider.ResolveApiKey(), "expired-token");
+
+  resolver->result.api_token = "fresh-token";
+  resolver->result.expires_at = 4102444800;
+
+  EXPECT_EQ(provider.ResolveApiKey(), "fresh-token");
+  EXPECT_EQ(resolver->resolve_calls, 2);
+}
+
 }  // namespace quantclaw

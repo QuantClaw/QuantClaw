@@ -3,9 +3,11 @@
 
 #include "quantclaw/auth/provider_auth.hpp"
 
+#include <cerrno>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
+#include <string_view>
 #include <system_error>
 
 #ifndef _WIN32
@@ -21,10 +23,9 @@
 #include "quantclaw/platform/process.hpp"
 
 namespace quantclaw::auth {
-
-#ifdef _WIN32
 namespace {
 
+#ifdef _WIN32
 bool ReplaceFileAtomicallyWindows(const std::filesystem::path& from,
                                   const std::filesystem::path& to,
                                   std::string* error) {
@@ -42,9 +43,31 @@ bool ReplaceFileAtomicallyWindows(const std::filesystem::path& from,
 
 detail::ProviderAuthReplaceFileFn g_provider_auth_replace_file_fn =
     &ReplaceFileAtomicallyWindows;
+#else
+void WriteAllOrThrow(int fd, std::string_view content,
+                     const std::filesystem::path& path) {
+  size_t total_written = 0;
+  while (total_written < content.size()) {
+    const auto* data = content.data() + total_written;
+    const auto remaining = content.size() - total_written;
+    const ssize_t written = ::write(fd, data, remaining);
+    if (written < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      throw std::runtime_error("Failed to write auth store: " + path.string());
+    }
+    if (written == 0) {
+      throw std::runtime_error("Failed to write auth store: " + path.string());
+    }
+    total_written += static_cast<size_t>(written);
+  }
+}
+#endif
 
 }  // namespace
 
+#ifdef _WIN32
 void detail::SetProviderAuthReplaceFileFnForTest(ProviderAuthReplaceFileFn fn) {
   g_provider_auth_replace_file_fn =
       fn != nullptr ? fn : &ReplaceFileAtomicallyWindows;
@@ -129,26 +152,32 @@ void ProviderAuthStore::Save(const ProviderAuthRecord& record) const {
   const auto temp_path =
       path_.parent_path() / (path_.filename().string() + ".tmp");
   const std::string content = j.dump(2) + "\n";
+
 #ifndef _WIN32
-  {
-    // Create with 0600 from the outset to eliminate the window where sensitive
-    // refresh-token bytes could be world-readable before a chmod.
-    const int fd = ::open(temp_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
-                          S_IRUSR | S_IWUSR);
-    if (fd < 0) {
-      throw std::runtime_error("Failed to write auth store: " +
-                               temp_path.string());
-    }
-    const ssize_t written = ::write(fd, content.data(), content.size());
-    ::close(fd);
-    if (written < 0 || static_cast<size_t>(written) != content.size()) {
-      throw std::runtime_error("Failed to write auth store: " +
-                               temp_path.string());
-    }
+  int fd = ::open(temp_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
+                  S_IRUSR | S_IWUSR);
+  if (fd < 0) {
+    throw std::runtime_error("Failed to write auth store: " +
+                             temp_path.string());
   }
-  // On POSIX, rename() atomically replaces the destination; no prior
-  // remove() needed — a failed rename cannot leave old credentials deleted.
-  std::filesystem::rename(temp_path, path_);
+
+  try {
+    WriteAllOrThrow(fd, content, temp_path);
+    if (::close(fd) != 0) {
+      fd = -1;
+      throw std::runtime_error("Failed to write auth store: " +
+                               temp_path.string());
+    }
+    fd = -1;
+    std::filesystem::rename(temp_path, path_);
+  } catch (...) {
+    if (fd >= 0) {
+      ::close(fd);
+    }
+    std::error_code cleanup_ec;
+    std::filesystem::remove(temp_path, cleanup_ec);
+    throw;
+  }
 #else
   {
     std::ofstream out(temp_path, std::ios::trunc);

@@ -91,7 +91,8 @@ int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
       return 1;
     }
 
-    bool stream_to_stdout = !json_output && should_stream_to_stdout();
+    bool stream_to_stdout = force_stream_to_stdout_.value_or(
+        !json_output && should_stream_to_stdout());
     bool saw_stream_output = false;
 
     // Only stream directly to stdout in interactive terminals.
@@ -123,7 +124,7 @@ int AgentCommands::RequestCommand(const std::vector<std::string>& args) {
 
     if (json_output) {
       std::cout << result.dump(2) << std::endl;
-    } else if (!stream_to_stdout) {
+    } else if (!stream_to_stdout || !saw_stream_output) {
       auto response_it = result.find("response");
       if (response_it != result.end() && response_it->is_string()) {
         std::cout << response_it->get<std::string>() << std::endl;

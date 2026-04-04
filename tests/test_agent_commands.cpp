@@ -98,6 +98,7 @@ class AgentCmdMockLLM : public quantclaw::LLMProvider {
  public:
   std::string response_text = "Mock agent response.";
   bool stream_should_fail = false;
+  bool stream_emit_delta = true;
   std::string stream_error_message = "Mock streaming failure.";
 
   quantclaw::ChatCompletionResponse
@@ -116,10 +117,12 @@ class AgentCmdMockLLM : public quantclaw::LLMProvider {
       throw std::runtime_error(stream_error_message);
     }
 
-    quantclaw::ChatCompletionResponse delta;
-    delta.content = response_text;
-    delta.is_stream_end = false;
-    cb(delta);
+    if (stream_emit_delta) {
+      quantclaw::ChatCompletionResponse delta;
+      delta.content = response_text;
+      delta.is_stream_end = false;
+      cb(delta);
+    }
 
     quantclaw::ChatCompletionResponse end;
     end.content = response_text;
@@ -460,4 +463,18 @@ TEST_F(AgentCommandsIntegrationTest, StreamingErrorsReachStderr) {
 
   EXPECT_EQ(ret, 1);
   EXPECT_NE(err.find("Mock streaming exploded"), std::string::npos);
+}
+
+TEST_F(AgentCommandsIntegrationTest,
+       RequestFallsBackToFinalResponseWhenStreamingHasNoDelta) {
+  mock_llm_->response_text = "Final response only";
+  mock_llm_->stream_emit_delta = false;
+  agent_cmds_->SetForceStreamToStdoutForTest(true);
+
+  int ret = -1;
+  auto out = capture_stdout(
+      [&]() { ret = agent_cmds_->RequestCommand({"-m", "fallback test"}); });
+
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(out.find("Final response only"), std::string::npos);
 }

@@ -142,9 +142,10 @@ void ChannelAdapterManager::kill_adapter(AdapterProcess& adapter) {
 }
 
 void ChannelAdapterManager::Start() {
-  if (running_)
+  if (running_.load())
     return;
 
+  std::vector<AdapterProcess> launched_adapters;
   for (const auto& [name, config] : channels_) {
     if (!config.enabled) {
       logger_->debug("Channel '{}' disabled, skipping", name);
@@ -162,28 +163,38 @@ void ChannelAdapterManager::Start() {
     proc.script_path = script;
 
     if (launch_adapter(proc, config)) {
-      adapters_.push_back(std::move(proc));
+      launched_adapters.push_back(std::move(proc));
     }
   }
 
-  if (!adapters_.empty()) {
-    running_ = true;
+  if (!launched_adapters.empty()) {
+    size_t adapter_count = launched_adapters.size();
+    {
+      std::lock_guard<std::mutex> lock(adapters_mu_);
+      adapters_ = std::move(launched_adapters);
+    }
+    running_.store(true);
     monitor_thread_ = std::make_unique<std::thread>(
         &ChannelAdapterManager::monitor_loop, this);
     logger_->info("ChannelAdapterManager started with {} adapter(s)",
-                  adapters_.size());
+                  adapter_count);
   } else {
     logger_->info("No channel adapters to start");
   }
 }
 
 void ChannelAdapterManager::Stop() {
-  running_ = false;
+  running_.store(false);
 
-  for (auto& adapter : adapters_) {
+  std::vector<AdapterProcess> adapters_to_stop;
+  {
+    std::lock_guard<std::mutex> lock(adapters_mu_);
+    adapters_to_stop = std::move(adapters_);
+  }
+
+  for (auto& adapter : adapters_to_stop) {
     kill_adapter(adapter);
   }
-  adapters_.clear();
 
   if (monitor_thread_ && monitor_thread_->joinable()) {
     monitor_thread_->join();
@@ -193,6 +204,7 @@ void ChannelAdapterManager::Stop() {
 
 std::vector<std::string> ChannelAdapterManager::RunningAdapters() const {
   std::vector<std::string> names;
+  std::lock_guard<std::mutex> lock(adapters_mu_);
   for (const auto& adapter : adapters_) {
     if (adapter.running) {
       names.push_back(adapter.name);
@@ -202,28 +214,49 @@ std::vector<std::string> ChannelAdapterManager::RunningAdapters() const {
 }
 
 void ChannelAdapterManager::monitor_loop() {
-  while (running_) {
+  while (running_.load()) {
     std::this_thread::sleep_for(std::chrono::seconds(10));
-    if (!running_)
+    if (!running_.load())
       break;
 
-    for (auto& adapter : adapters_) {
-      if (!adapter.running)
+    std::vector<std::string> restart_names;
+    {
+      std::lock_guard<std::mutex> lock(adapters_mu_);
+      for (auto& adapter : adapters_) {
+        if (!adapter.running) {
+          continue;
+        }
+
+        if (!platform::is_process_alive(adapter.pid)) {
+          logger_->warn("Adapter '{}' exited unexpectedly", adapter.name);
+          adapter.running = false;
+          adapter.pid = platform::kInvalidPid;
+          restart_names.push_back(adapter.name);
+        }
+      }
+    }
+
+    for (const auto& adapter_name : restart_names) {
+      if (!running_.load()) {
+        break;
+      }
+
+      auto config_it = channels_.find(adapter_name);
+      if (config_it == channels_.end()) {
         continue;
+      }
 
-      if (!platform::is_process_alive(adapter.pid)) {
-        logger_->warn("Adapter '{}' exited unexpectedly", adapter.name);
-        adapter.running = false;
-        adapter.pid = platform::kInvalidPid;
+      logger_->info("Restarting adapter '{}'...", adapter_name);
+      std::this_thread::sleep_for(std::chrono::seconds(3));
+      if (!running_.load()) {
+        break;
+      }
 
-        // Auto-restart if manager is still running
-        if (running_) {
-          logger_->info("Restarting adapter '{}'...", adapter.name);
-          auto it = channels_.find(adapter.name);
-          if (it != channels_.end()) {
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-            launch_adapter(adapter, it->second);
-          }
+      std::lock_guard<std::mutex> lock(adapters_mu_);
+      for (auto& adapter : adapters_) {
+        if (adapter.name == adapter_name && !adapter.running) {
+          launch_adapter(adapter, config_it->second);
+          break;
         }
       }
     }

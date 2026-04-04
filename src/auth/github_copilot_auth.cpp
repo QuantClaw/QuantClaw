@@ -3,12 +3,22 @@
 
 #include "quantclaw/auth/github_copilot_auth.hpp"
 
+#include <cerrno>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <thread>
+
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#else
+#include <windows.h>
+#endif
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -114,6 +124,30 @@ std::string trim(std::string value) {
   }
   return value.substr(start);
 }
+
+#ifndef _WIN32
+void WriteAllOrThrow(int fd, std::string_view content,
+                     const std::filesystem::path& path) {
+  size_t total_written = 0;
+  while (total_written < content.size()) {
+    const auto* data = content.data() + total_written;
+    const auto remaining = content.size() - total_written;
+    const ssize_t written = ::write(fd, data, remaining);
+    if (written < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      throw std::runtime_error("Failed to write Copilot token cache: " +
+                               path.string());
+    }
+    if (written == 0) {
+      throw std::runtime_error("Failed to write Copilot token cache: " +
+                               path.string());
+    }
+    total_written += static_cast<size_t>(written);
+  }
+}
+#endif
 
 }  // namespace
 
@@ -247,18 +281,52 @@ void GitHubCopilotTokenCache::Save(
   nlohmann::json j = {{"apiToken", credential.api_token},
                       {"baseUrl", credential.base_url},
                       {"expiresAt", credential.expires_at}};
-  std::ofstream out(path_);
+  const auto temp_path =
+      path_.parent_path() / (path_.filename().string() + ".tmp");
+  const std::string content = j.dump(2) + "\n";
+
+#ifndef _WIN32
+  int fd = ::open(temp_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
+                  S_IRUSR | S_IWUSR);
+  if (fd < 0) {
+    throw std::runtime_error("Failed to write Copilot token cache: " +
+                             temp_path.string());
+  }
+
+  try {
+    WriteAllOrThrow(fd, content, temp_path);
+    if (::close(fd) != 0) {
+      fd = -1;
+      throw std::runtime_error("Failed to write Copilot token cache: " +
+                               temp_path.string());
+    }
+    fd = -1;
+    std::filesystem::rename(temp_path, path_);
+  } catch (...) {
+    if (fd >= 0) {
+      ::close(fd);
+    }
+    std::error_code cleanup_ec;
+    std::filesystem::remove(temp_path, cleanup_ec);
+    throw;
+  }
+#else
+  std::ofstream out(temp_path, std::ios::trunc);
   if (!out) {
     throw std::runtime_error("Failed to write Copilot token cache: " +
-                             path_.string());
+                             temp_path.string());
   }
-  out << j.dump(2) << '\n';
+  out << content;
   out.close();
-#ifndef _WIN32
-  std::filesystem::permissions(path_,
-                               std::filesystem::perms::owner_read |
-                                   std::filesystem::perms::owner_write,
-                               std::filesystem::perm_options::replace);
+  if (!MoveFileExW(temp_path.c_str(), path_.c_str(),
+                   MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    std::error_code cleanup_ec;
+    std::filesystem::remove(temp_path, cleanup_ec);
+    throw std::runtime_error("Failed to replace Copilot token cache: " +
+                             std::error_code(static_cast<int>(GetLastError()),
+                                             std::system_category())
+                                 .message());
+  }
 #endif
 }
 

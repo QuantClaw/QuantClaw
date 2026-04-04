@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -70,6 +71,7 @@ class ChannelAdapterManager {
   std::unordered_map<std::string, ChannelConfig> channels_;
   std::shared_ptr<spdlog::logger> logger_;
 
+  mutable std::mutex adapters_mu_;
   std::vector<AdapterProcess> adapters_;
   std::atomic<bool> running_{false};
   std::unique_ptr<std::thread> monitor_thread_;

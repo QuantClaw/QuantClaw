@@ -4,7 +4,6 @@
 #include "quantclaw/providers/provider_registry.hpp"
 
 #include <algorithm>
-#include <cstdlib>
 
 #include "quantclaw/auth/github_copilot_auth.hpp"
 #include "quantclaw/auth/openai_codex_auth.hpp"
@@ -14,22 +13,6 @@
 #include "quantclaw/providers/openai_provider.hpp"
 
 namespace quantclaw {
-namespace {
-
-std::string resolve_github_token_from_env() {
-  constexpr const char* names[] = {"COPILOT_GITHUB_TOKEN", "GH_TOKEN",
-                                   "GITHUB_TOKEN"};
-  for (const char* name : names) {
-    const char* value = std::getenv(name);
-    if (value != nullptr && *value != '\0') {
-      return value;
-    }
-  }
-  return "";
-}
-
-}  // namespace
-
 // --- ModelRef ---
 
 ModelRef ModelRef::parse(const std::string& raw,
@@ -81,9 +64,13 @@ void ProviderRegistry::RegisterBuiltinFactories() {
                                        std::shared_ptr<spdlog::logger> logger) {
     auto token_client =
         std::make_shared<auth::GitHubCopilotTokenClient>(logger);
+    const auto github_token =
+        entry.extra.is_object()
+            ? entry.extra.value("githubToken", std::string{})
+            : std::string{};
     auto resolver = std::make_shared<auth::GitHubCopilotRuntimeResolver>(
         auth::GitHubCopilotAuthStore(), auth::GitHubCopilotTokenCache(),
-        token_client, logger, resolve_github_token_from_env);
+        token_client, logger, [github_token]() { return github_token; });
     const int timeout = entry.timeout > 0 ? entry.timeout : 30;
     return std::make_shared<GitHubCopilotProvider>(timeout, logger, resolver);
   });
