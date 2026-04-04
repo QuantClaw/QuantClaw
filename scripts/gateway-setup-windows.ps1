@@ -51,7 +51,6 @@ New-Item -ItemType Directory -Path $baseDir, $logsDir -Force | Out-Null
 
 # 创建辅助启动脚本
 $gatewayScript = Join-Path $baseDir "gateway.cmd"
-$quantclawPath = $exePath.Replace('\', '\\')
 
 @'
 @echo off

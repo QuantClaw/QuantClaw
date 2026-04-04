@@ -148,13 +148,15 @@ class DaemonManagerTest : public ::testing::Test {
     script << "  exit 0\n";
     script << "fi\n";
 #else
-    script << "if [ \"$2\" = \"show\" ]; then\n";
-    script << "  echo \"4242\"\n";
-    script << "  exit 0\n";
-    script << "fi\n";
-    script << "if [ \"$2\" = \"is-active\" ]; then\n";
-    script << "  exit 0\n";
-    script << "fi\n";
+    script << "for arg in \"$@\"; do\n";
+    script << "  if [ \"$arg\" = \"show\" ]; then\n";
+    script << "    echo \"4242\"\n";
+    script << "    exit 0\n";
+    script << "  fi\n";
+    script << "  if [ \"$arg\" = \"is-active\" ]; then\n";
+    script << "    exit 0\n";
+    script << "  fi\n";
+    script << "done\n";
 #endif
     script << "exit 0\n";
     script.close();

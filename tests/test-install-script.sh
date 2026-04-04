@@ -66,7 +66,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
         || fail "macOS install should create a launchd plist"
 fi
 
-echo "${OUT}" | grep -qi "success\|installed" \
+echo "${OUT}" | grep -Eqi "success|installed" \
     || fail "installer output should report success"
 
 pass "install.sh user-mode flow"

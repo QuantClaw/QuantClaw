@@ -253,3 +253,9 @@ TEST(OpenAIProviderJsonTest, NullableStringReturnsValueForString) {
       quantclaw::detail::json_nullable_string_or_empty(j, "finish_reason"),
       "stop");
 }
+
+TEST(OpenAIProviderJsonTest, NullableStringReturnsEmptyForMissingField) {
+  nlohmann::json j = nlohmann::json::object();
+  EXPECT_EQ(
+      quantclaw::detail::json_nullable_string_or_empty(j, "finish_reason"), "");
+}

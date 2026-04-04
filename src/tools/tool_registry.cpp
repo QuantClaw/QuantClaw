@@ -1474,8 +1474,9 @@ std::string ToolRegistry::memory_get_tool(const nlohmann::json& params) {
   // Security: must remain inside workspace
   auto canonical = std::filesystem::weakly_canonical(full_path);
   auto ws_canon = std::filesystem::weakly_canonical(workspace);
-  if (canonical.string().substr(0, ws_canon.string().size()) !=
-      ws_canon.string()) {
+  auto mismatch = std::mismatch(ws_canon.begin(), ws_canon.end(),
+                                canonical.begin(), canonical.end());
+  if (mismatch.first != ws_canon.end()) {
     throw std::runtime_error("Access denied: path outside workspace");
   }
 
