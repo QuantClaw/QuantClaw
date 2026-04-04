@@ -1,12 +1,12 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-// TCP loopback IPC — single implementation for Linux, macOS, and Windows.
+// TCP loopback IPC - single implementation for Linux, macOS, and Windows.
 // Replaces ipc_unix.cpp (AF_UNIX) and ipc_win32.cpp (Named Pipes).
 //
 // The C++ parent binds to 127.0.0.1:0 (OS picks a free port), then passes
-// the port to the sidecar child via QUANTCLAW_PORT.  The sidecar connects
-// back with net.createConnection(port, '127.0.0.1').
+// the port to the sidecar child via QUANTCLAW_PORT. The sidecar connects
+// back with net.createConnection(port, "127.0.0.1").
 
 #include <chrono>
 #include <cstring>
@@ -68,7 +68,21 @@ namespace quantclaw::platform {
 
 namespace {
 
-// Unified select() wrapper — waits for readability on `sock` up to `ms`.
+bool parse_ipv4_address(const std::string& host, in_addr& out) {
+#ifdef _WIN32
+  return InetPtonA(AF_INET, host.c_str(), &out) == 1;
+#else
+  return inet_pton(AF_INET, host.c_str(), &out) == 1;
+#endif
+}
+
+#ifdef _WIN32
+using socket_io_len_t = int;
+#else
+using socket_io_len_t = size_t;
+#endif
+
+// Unified select() wrapper - waits for readability on `sock` up to `ms`.
 // Returns true if data is available before the deadline.
 bool wait_readable(socket_t sock, int ms) {
   fd_set fds;
@@ -110,7 +124,10 @@ bool IpcServer::listen() {
 
   struct sockaddr_in addr {};
   addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+  if (!parse_ipv4_address("127.0.0.1", addr.sin_addr)) {
+    close_fd(sock);
+    return false;
+  }
   addr.sin_port = 0;  // OS picks a free port.
 
   if (bind(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
@@ -197,7 +214,10 @@ bool IpcClient::connect() {
 
   struct sockaddr_in addr {};
   addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = inet_addr(host_.c_str());
+  if (!parse_ipv4_address(host_, addr.sin_addr)) {
+    close_fd(sock);
+    return false;
+  }
   addr.sin_port = htons(static_cast<uint16_t>(port_));
 
   if (::connect(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) <
@@ -220,13 +240,19 @@ void IpcClient::close() {
 // Free functions
 
 int ipc_write(IpcHandle h, const void* data, int len) {
-  return static_cast<int>(
-      send(static_cast<socket_t>(h), static_cast<const char*>(data), len, 0));
+  if (len < 0)
+    return -1;
+  return static_cast<int>(send(static_cast<socket_t>(h),
+                               static_cast<const char*>(data),
+                               static_cast<socket_io_len_t>(len), 0));
 }
 
 int ipc_read(IpcHandle h, void* buf, int len) {
-  return static_cast<int>(
-      recv(static_cast<socket_t>(h), static_cast<char*>(buf), len, 0));
+  if (len < 0)
+    return -1;
+  return static_cast<int>(recv(static_cast<socket_t>(h),
+                               static_cast<char*>(buf),
+                               static_cast<socket_io_len_t>(len), 0));
 }
 
 std::string ipc_read_line(IpcHandle h, int timeout_ms) {

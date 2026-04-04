@@ -384,19 +384,20 @@ void register_api_routes(
         }
 
         auto sessions = session_manager->ListSessions();
-        int total = static_cast<int>(sessions.size());
         if (limit < 0)
           limit = 0;
         if (offset < 0)
           offset = 0;
-        if (offset > total)
-          offset = total;
-        // Clamp limit to avoid integer overflow in offset + limit.
-        if (limit > total - offset)
-          limit = total - offset;
+        size_t begin = static_cast<size_t>(offset);
+        if (begin > sessions.size())
+          begin = sessions.size();
+        size_t count = static_cast<size_t>(limit);
+        size_t remaining = sessions.size() - begin;
+        if (count > remaining)
+          count = remaining;
         nlohmann::json result = nlohmann::json::array();
-        int end = offset + limit;
-        for (int i = offset; i < end; ++i) {
+        size_t end = begin + count;
+        for (size_t i = begin; i < end; ++i) {
           result.push_back({{"key", sessions[i].session_key},
                             {"id", sessions[i].session_id},
                             {"updatedAt", sessions[i].updated_at},
