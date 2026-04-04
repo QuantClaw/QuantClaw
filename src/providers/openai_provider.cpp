@@ -520,13 +520,17 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
     if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
       for (const auto& tc_delta : delta["tool_calls"]) {
         int index = tc_delta.value("index", 0);
+        if (index < 0) {
+          continue;
+        }
+        const auto tool_index = static_cast<size_t>(index);
 
         // Ensure vector is large enough
-        while (static_cast<int>(ctx->pending_tool_calls.size()) <= index) {
+        while (ctx->pending_tool_calls.size() <= tool_index) {
           ctx->pending_tool_calls.push_back({});
         }
 
-        auto& ptc = ctx->pending_tool_calls[index];
+        auto& ptc = ctx->pending_tool_calls[tool_index];
         if (tc_delta.contains("id") && !tc_delta["id"].is_null()) {
           ptc.id = tc_delta["id"].get<std::string>();
         }

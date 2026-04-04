@@ -60,7 +60,8 @@ std::int64_t now_epoch_seconds() {
 std::string url_encode(std::string_view value) {
   std::ostringstream out;
   out << std::hex << std::uppercase;
-  for (unsigned char ch : value) {
+  for (char raw_ch : value) {
+    const auto ch = static_cast<unsigned char>(raw_ch);
     if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
         (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '.' ||
         ch == '~') {
