@@ -159,13 +159,14 @@ class CLIManagerTest : public ::testing::Test {
     handler_argc_ = 0;
 
     // Register a test command
-    cli_->AddCommand(
-        {"test", "A test command", {"t"},
-         [this](int argc, char** /*argv*/) -> int {
-           handler_called_ = true;
-           handler_argc_ = argc;
-           return 0;
-         }});
+    cli_->AddCommand({"test",
+                      "A test command",
+                      {"t"},
+                      [this](int argc, char** /*argv*/) -> int {
+                        handler_called_ = true;
+                        handler_argc_ = argc;
+                        return 0;
+                      }});
   }
 
   std::unique_ptr<CLIManager> cli_;
