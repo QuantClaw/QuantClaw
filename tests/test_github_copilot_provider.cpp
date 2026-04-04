@@ -77,6 +77,7 @@ TEST(GitHubCopilotProviderTest, ChatCompletionUsesResolvedTokenAndBaseUrl) {
   auto resolver = std::make_shared<FakeRuntimeResolver>();
   resolver->result.api_token = "copilot-runtime-token";
   resolver->result.base_url = "http://127.0.0.1:" + std::to_string(port);
+  resolver->result.expires_at = 4102444800;
 
   GitHubCopilotProvider provider(30, logger, resolver);
   ChatCompletionRequest request;
