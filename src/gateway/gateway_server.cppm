@@ -183,7 +183,13 @@ class GatewayServer : public quantclaw::Noncopyable {
   std::shared_ptr<RateLimiter> rate_limiter_;
 
   // Active async handler threads (for graceful shutdown)
-  std::vector<std::thread> async_threads_;
+  // Each entry is a (thread, done_flag) pair. The thread sets the flag on exit
+  // so cleanup can safely join only completed threads.
+  struct AsyncTask {
+    std::thread thread;
+    std::shared_ptr<std::atomic<bool>> done;
+  };
+  std::vector<AsyncTask> async_threads_;
   std::mutex async_threads_mutex_;
 };
 

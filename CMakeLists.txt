@@ -356,18 +356,11 @@ set(QUANTCLAW_CORE_MODULE_SOURCES
     src/web/api_routes.cppm
 )
 
-# Platform-specific sources (process + service abstractions)
-if(WIN32)
-    list(APPEND QUANTCLAW_CORE_SOURCES
-        src/platform/process_win32.cpp
-        src/platform/service_win32.cpp
-    )
-else()
-    list(APPEND QUANTCLAW_CORE_SOURCES
-        src/platform/process_unix.cpp
-        src/platform/service_unix.cpp
-    )
-endif()
+# Platform sources (Linux-only; GCC 15+ required)
+list(APPEND QUANTCLAW_CORE_SOURCES
+    src/platform/process_unix.cpp
+    src/platform/service_unix.cpp
+)
 
 # --- Build-time metadata ---
 # Git commit hash (short, 7 chars).  Falls back to "unknown" outside a repo.
@@ -440,10 +433,7 @@ target_link_libraries(quantclaw_core
         ${QC_DUCKDB_TARGET}
 )
 
-# WinSock2 and BCrypt (needed by mbedtls) required on Windows
-if(WIN32)
-    target_link_libraries(quantclaw_core PUBLIC ws2_32 bcrypt)
-endif()
+
 
 add_executable(quantclaw src/main.cpp)
 target_link_libraries(quantclaw PRIVATE quantclaw_core)

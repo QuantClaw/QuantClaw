@@ -70,9 +70,9 @@ void GatewayServer::Stop() {
   // Join all async handler threads for graceful shutdown
   {
     std::lock_guard<std::mutex> lock(async_threads_mutex_);
-    for (auto& t : async_threads_) {
-      if (t.joinable()) {
-        t.join();
+    for (auto& task : async_threads_) {
+      if (task.thread.joinable()) {
+        task.thread.join();
       }
     }
     async_threads_.clear();
@@ -440,8 +440,10 @@ void GatewayServer::handle_rpc_request(const std::string& conn_id,
     std::string req_method = request.method;
     nlohmann::json req_params = request.params;
     ClientConnection client_copy = *client;
+    auto done_flag = std::make_shared<std::atomic<bool>>(false);
     std::thread t([this, req_id, req_method, req_params,
-                   client_copy = std::move(client_copy), handler]() mutable {
+                   client_copy = std::move(client_copy), handler,
+                   done_flag]() mutable {
       try {
         auto result = handler(req_params, client_copy);
         SendResponseTo(client_copy.connection_id, req_id, true, result);
@@ -450,15 +452,24 @@ void GatewayServer::handle_rpc_request(const std::string& conn_id,
         SendResponseTo(client_copy.connection_id, req_id, false,
                        {{"error", e.what()}, {"code", "HANDLER_ERROR"}});
       }
+      done_flag->store(true, std::memory_order_release);
     });
     // Track thread for graceful shutdown
     {
       std::lock_guard<std::mutex> lock(async_threads_mutex_);
-      async_threads_.push_back(std::move(t));
-      // Clean up finished threads periodically
+      async_threads_.push_back({std::move(t), done_flag});
+      // Reap completed threads: join those marked done, then erase
+      for (auto& task : async_threads_) {
+        if (task.done->load(std::memory_order_acquire) &&
+            task.thread.joinable()) {
+          task.thread.join();
+        }
+      }
       async_threads_.erase(
           std::remove_if(async_threads_.begin(), async_threads_.end(),
-                         [](std::thread& th) { return !th.joinable(); }),
+                         [](const AsyncTask& task) {
+                           return !task.thread.joinable();
+                         }),
           async_threads_.end());
     }
     return;

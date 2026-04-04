@@ -36,15 +36,24 @@ double MMRReranker::JaccardSimilarity(const std::string& a,
                                       const std::string& b) {
   auto set_a = tokenize_to_set(a);
   auto set_b = tokenize_to_set(b);
+  return JaccardSimilarity(set_a, set_b);
+}
 
+double MMRReranker::JaccardSimilarity(
+    const std::unordered_set<std::string>& set_a,
+    const std::unordered_set<std::string>& set_b) {
   if (set_a.empty() && set_b.empty())
     return 1.0;
   if (set_a.empty() || set_b.empty())
     return 0.0;
 
+  // Iterate over the smaller set for efficiency
+  const auto& smaller = (set_a.size() <= set_b.size()) ? set_a : set_b;
+  const auto& larger = (set_a.size() <= set_b.size()) ? set_b : set_a;
+
   int intersection = 0;
-  for (const auto& token : set_a) {
-    if (set_b.count(token))
+  for (const auto& token : smaller) {
+    if (larger.count(token))
       intersection++;
   }
 
@@ -62,8 +71,20 @@ MMRReranker::Rerank(const std::vector<RankedItem>& items, int top_k,
   if (static_cast<int>(items.size()) <= top_k)
     return items;
 
+  // Pre-tokenize all candidates once (O(n) tokenizations instead of O(k²))
+  std::vector<TokenizedItem> tokenized;
+  tokenized.reserve(items.size());
+  for (std::size_t i = 0; i < items.size(); ++i) {
+    tokenized.push_back({i, tokenize_to_set(items[i].content)});
+  }
+
   std::vector<RankedItem> selected;
+  selected.reserve(static_cast<std::size_t>(top_k));
   std::vector<bool> picked(items.size(), false);
+
+  // Track token sets of selected items for similarity computation
+  std::vector<const std::unordered_set<std::string>*> selected_tokens;
+  selected_tokens.reserve(static_cast<std::size_t>(top_k));
 
   for (int k = 0; k < top_k && k < static_cast<int>(items.size()); ++k) {
     double best_mmr = -1e9;
@@ -73,10 +94,10 @@ MMRReranker::Rerank(const std::vector<RankedItem>& items, int top_k,
       if (picked[i])
         continue;
 
-      // Compute max similarity to already selected items
+      // Compute max similarity to already selected items using pre-tokenized sets
       double max_sim = 0.0;
-      for (const auto& sel : selected) {
-        double sim = JaccardSimilarity(items[i].content, sel.content);
+      for (const auto* sel_tokens : selected_tokens) {
+        double sim = JaccardSimilarity(tokenized[i].tokens, *sel_tokens);
         if (sim > max_sim)
           max_sim = sim;
       }
@@ -93,6 +114,7 @@ MMRReranker::Rerank(const std::vector<RankedItem>& items, int top_k,
     if (best_idx >= 0) {
       picked[best_idx] = true;
       selected.push_back(items[best_idx]);
+      selected_tokens.push_back(&tokenized[best_idx].tokens);
     }
   }
 
