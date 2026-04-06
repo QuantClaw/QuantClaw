@@ -185,6 +185,8 @@ quantclaw health             # 网关健康状态
 
 - **Discord** — 外部 subprocess 适配器（位于 `src/adapters/` 目录）
 - **Telegram** — 外部 subprocess 适配器（位于 `src/adapters/` 目录）
+- **飞书 / Lark** — 外部 subprocess 适配器（位于 `src/adapters/` 目录）
+- **QQ** — 外部 subprocess 适配器，基于 QQ 官方机器人 API v2（位于 `src/adapters/` 目录）
 - **Web 仪表板** — 内置，端口 18801
 
 ### 频道配置
@@ -200,6 +202,15 @@ quantclaw health             # 网关健康状态
     "telegram": {
       "enabled": false,
       "token": "YOUR_TELEGRAM_BOT_TOKEN",
+      "allowedIds": []
+    },
+    "qq": {
+      "enabled": false,
+      "appId": "YOUR_QQ_BOT_APP_ID",
+      "appSecret": "YOUR_QQ_BOT_APP_SECRET",
+      "sandbox": false,
+      "groupPolicy": "mention",
+      "dmPolicy": "open",
       "allowedIds": []
     }
   }

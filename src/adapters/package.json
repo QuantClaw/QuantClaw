@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "discord": "tsx discord.ts",
-    "telegram": "tsx telegram.ts"
+    "telegram": "tsx telegram.ts",
+    "qq": "tsx qq.ts"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.30.0",
     "discord.js": "^14.16.0",
+    "qq-official-bot": "^1.0.12",
     "telegraf": "^4.16.0",
     "ws": "^8.18.0"
   },

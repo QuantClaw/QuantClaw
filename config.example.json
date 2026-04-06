@@ -42,6 +42,15 @@
       "enabled": false,
       "token": "YOUR_TELEGRAM_BOT_TOKEN",
       "allowedIds": []
+    },
+    "qq": {
+      "enabled": false,
+      "appId": "YOUR_QQ_BOT_APP_ID",
+      "appSecret": "YOUR_QQ_BOT_APP_SECRET",
+      "sandbox": false,
+      "groupPolicy": "mention",
+      "dmPolicy": "open",
+      "allowedIds": []
     }
   },
   "tools": {
