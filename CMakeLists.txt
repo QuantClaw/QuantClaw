@@ -147,6 +147,7 @@ set(QUANTCLAW_CORE_SOURCES
     src/providers/github_copilot_provider.cpp
     src/providers/anthropic_provider.cpp
     src/providers/provider_registry.cpp
+    src/providers/stream_normalization.cpp
     src/providers/provider_error.cpp
     src/providers/cooldown_tracker.cpp
     src/providers/failover_resolver.cpp

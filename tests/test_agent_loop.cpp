@@ -381,6 +381,76 @@ TEST_F(AgentLoopTest, StreamReturnsNewMessages) {
   EXPECT_EQ(new_msgs.back().content[0].text, "Final answer.");
 }
 
+TEST_F(AgentLoopTest, StreamToolCallWithRecoveredNameExecutesTool) {
+  quantclaw::ChatCompletionResponse tool_chunk;
+  tool_chunk.tool_calls.push_back(
+      {"function.read:1", "read", {{"path", "/tmp/file.txt"}}});
+
+  quantclaw::ChatCompletionResponse end_chunk;
+  end_chunk.is_stream_end = true;
+
+  mock_provider_->stream_chunks = {tool_chunk, end_chunk};
+
+  std::vector<quantclaw::AgentEvent> events;
+  auto new_msgs = agent_loop_->ProcessMessageStream(
+      "Hello", {}, "System.", [&events](const quantclaw::AgentEvent& event) {
+        events.push_back(event);
+      });
+
+  ASSERT_GE(new_msgs.size(), 2u);
+  EXPECT_EQ(new_msgs[0].role, "assistant");
+  EXPECT_EQ(new_msgs[0].content[0].type, "tool_use");
+  EXPECT_EQ(new_msgs[0].content[0].name, "read");
+  EXPECT_EQ(new_msgs[1].role, "user");
+  EXPECT_EQ(new_msgs[1].content[0].type, "tool_result");
+}
+
+TEST_F(AgentLoopTest, StreamMixedValidAndInvalidToolCallsStillExecutesRecoveredTool) {
+  quantclaw::ChatCompletionResponse tool_chunk;
+  tool_chunk.tool_calls.push_back(
+      {"function.read:1", "read", {{"path", "/tmp/file.txt"}}});
+  tool_chunk.tool_calls.push_back({"call_invalid", "", {{"command", "ver"}}});
+
+  quantclaw::ChatCompletionResponse end_chunk;
+  end_chunk.is_stream_end = true;
+
+  mock_provider_->stream_chunks = {tool_chunk, end_chunk};
+
+  std::vector<quantclaw::AgentEvent> events;
+  auto new_msgs = agent_loop_->ProcessMessageStream(
+      "Hello", {}, "System.", [&events](const quantclaw::AgentEvent& event) {
+        events.push_back(event);
+      });
+
+  ASSERT_EQ(new_msgs.size(), 2u);
+  EXPECT_EQ(new_msgs[0].role, "assistant");
+  ASSERT_EQ(new_msgs[0].content.size(), 1u);
+  EXPECT_EQ(new_msgs[0].content[0].type, "tool_use");
+  EXPECT_EQ(new_msgs[0].content[0].name, "read");
+  EXPECT_EQ(new_msgs[1].role, "user");
+  ASSERT_EQ(new_msgs[1].content.size(), 1u);
+  EXPECT_EQ(new_msgs[1].content[0].type, "tool_result");
+  EXPECT_TRUE(std::none_of(new_msgs.begin(), new_msgs.end(),
+                           [](const quantclaw::Message& msg) {
+                             return msg.role == "assistant" &&
+                                    !msg.content.empty() &&
+                                    msg.content[0].type == "text" &&
+                                    msg.content[0].text ==
+                                        "I couldn't continue because the model "
+                                        "emitted an invalid tool call. Please "
+                                        "try again.";
+                           }));
+  EXPECT_TRUE(std::none_of(events.begin(), events.end(),
+                           [](const quantclaw::AgentEvent& event) {
+                             return event.type ==
+                                        quantclaw::gateway::events::kMessageEnd &&
+                                    event.data.value("content", "") ==
+                                        "I couldn't continue because the model "
+                                        "emitted an invalid tool call. Please "
+                                        "try again.";
+                           }));
+}
+
 TEST_F(AgentLoopTest, StreamInvalidToolCallReturnsReadableFallback) {
   quantclaw::ChatCompletionResponse tool_chunk;
   tool_chunk.tool_calls.push_back({"call_invalid", "", {{"command", "ver"}}});

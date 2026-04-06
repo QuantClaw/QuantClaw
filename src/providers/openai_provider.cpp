@@ -7,12 +7,14 @@
 #include <cctype>
 #include <sstream>
 #include <string_view>
+#include <unordered_set>
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/providers/provider_error.hpp"
+#include "quantclaw/providers/stream_normalization.hpp"
 
 namespace quantclaw {
 
@@ -214,11 +216,14 @@ std::string SummarizeErrorBodyForLog(std::string_view body) {
 
 OpenAIProvider::OpenAIProvider(const std::string& api_key,
                                const std::string& base_url, int timeout,
-                               std::shared_ptr<spdlog::logger> logger)
+                               std::shared_ptr<spdlog::logger> logger,
+                               std::string provider_id, std::string api)
     : api_key_(api_key),
       base_url_(base_url),
       timeout_(timeout),
-      logger_(logger) {
+      logger_(logger),
+      provider_id_(std::move(provider_id)),
+      api_(std::move(api)) {
   if (base_url_.empty()) {
     base_url_ = "https://api.openai.com/v1";
   }
@@ -235,11 +240,16 @@ std::string OpenAIProvider::ResolveBaseUrl() const {
 }
 
 std::string OpenAIProvider::ProviderId() const {
-  return "openai";
+  return provider_id_;
 }
 
 ChatCompletionResponse
 OpenAIProvider::ChatCompletion(const ChatCompletionRequest& request) {
+  auto normalized_messages = request.messages;
+  const auto normalization_context =
+      BuildStreamNormalizationContext(ProviderId(), api_, request, logger_);
+  SanitizeReplayMessages(&normalized_messages, normalization_context);
+
   // Build JSON payload
   nlohmann::json payload;
   payload["model"] = request.model;
@@ -248,7 +258,7 @@ OpenAIProvider::ChatCompletion(const ChatCompletionRequest& request) {
 
   // Add messages
   payload["messages"] =
-      serialize_messages_to_openai(request.messages, request.thinking != "off");
+      serialize_messages_to_openai(normalized_messages, request.thinking != "off");
 
   // Add tools if provided
   if (!request.tools.empty()) {
@@ -286,12 +296,18 @@ OpenAIProvider::ChatCompletion(const ChatCompletionRequest& request) {
           if (tc.contains("function")) {
             tool_call.name = tc["function"].value("name", "");
             if (tc["function"].contains("arguments")) {
-              auto args_str = tc["function"]["arguments"].get<std::string>();
-              tool_call.arguments = nlohmann::json::parse(args_str);
+              const auto& args = tc["function"]["arguments"];
+              if (args.is_string()) {
+                tool_call.arguments =
+                    nlohmann::json::parse(args.get<std::string>(), nullptr, false);
+              } else {
+                tool_call.arguments = args;
+              }
             }
           }
-          result.tool_calls.push_back(tool_call);
+          result.tool_calls.push_back(std::move(tool_call));
         }
+        NormalizeToolCalls(&result.tool_calls, normalization_context);
       }
     }
     if (choice.contains("finish_reason")) {
@@ -382,53 +398,30 @@ struct StreamContext {
   std::string buffer;  // incomplete line across chunks
   std::string raw_response_body;
   std::shared_ptr<spdlog::logger> logger;
+  StreamNormalizationContext normalization_context;
+  std::unordered_set<std::string> seen_tool_call_ids;
 
-  // Accumulated tool calls (SSE delivers them in fragments)
-  struct PendingToolCall {
-    std::string id;
-    std::string name;
-    std::string arguments;
-  };
-  std::vector<PendingToolCall> pending_tool_calls;
+  std::vector<PendingToolCallFragment> pending_tool_calls;
 };
 
-static bool HasNonWhitespace(const std::string& value) {
-  return std::any_of(value.begin(), value.end(),
-                     [](unsigned char ch) { return !std::isspace(ch); });
-}
-
 static std::vector<ToolCall> TakeCompleteToolCalls(StreamContext* ctx,
-                                                   bool drop_incomplete) {
-  std::vector<ToolCall> complete;
-  std::vector<StreamContext::PendingToolCall> remaining;
+                                                   bool keep_incomplete) {
+  std::vector<PendingToolCallFragment> remaining;
+  auto complete = FinalizePendingToolCalls(ctx->pending_tool_calls,
+                                           ctx->normalization_context,
+                                           &ctx->seen_tool_call_ids,
+                                           &remaining);
 
-  for (const auto& pending : ctx->pending_tool_calls) {
-    nlohmann::json parsed_arguments = nlohmann::json::object();
-    bool invalid_arguments = false;
-    if (HasNonWhitespace(pending.arguments)) {
-      parsed_arguments =
-          nlohmann::json::parse(pending.arguments, nullptr, false);
-      invalid_arguments = parsed_arguments.is_discarded();
-    }
-
-    if (pending.id.empty() || !HasNonWhitespace(pending.name) ||
-        invalid_arguments) {
-      if (!drop_incomplete) {
-        remaining.push_back(pending);
-      } else if (ctx->logger) {
+  if (!keep_incomplete) {
+    for (const auto& pending : remaining) {
+      if (ctx->logger) {
         ctx->logger->warn(
-            "Dropping incomplete streamed tool call: id='{}', name='{}', "
-            "arguments_len={}",
+            "Dropping incomplete streamed tool call: id='{}', name='{}', arguments_len={}",
             pending.id, pending.name, pending.arguments.size());
       }
-      continue;
     }
-
-    ToolCall tc;
-    tc.id = pending.id;
-    tc.name = pending.name;
-    tc.arguments = std::move(parsed_arguments);
-    complete.push_back(std::move(tc));
+    ctx->pending_tool_calls.clear();
+    return complete;
   }
 
   ctx->pending_tool_calls = std::move(remaining);
@@ -463,7 +456,7 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
     if (data == "[DONE]") {
       // Emit any accumulated tool calls before stream end
       if (!ctx->pending_tool_calls.empty()) {
-        auto complete = TakeCompleteToolCalls(ctx, true);
+        auto complete = TakeCompleteToolCalls(ctx, false);
         ChatCompletionResponse tc_resp;
         tc_resp.finish_reason = "tool_calls";
         tc_resp.tool_calls = std::move(complete);
@@ -526,7 +519,8 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
           ctx->pending_tool_calls.push_back({});
         }
 
-        auto& ptc = ctx->pending_tool_calls[index];
+        auto& ptc = ctx->pending_tool_calls[tool_index];
+        ptc.index = tool_index;
         if (tc_delta.contains("id") && !tc_delta["id"].is_null()) {
           ptc.id = tc_delta["id"].get<std::string>();
         }
@@ -544,7 +538,7 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
 
     // If finish_reason is "tool_calls", emit accumulated tool calls now
     if (finish_reason == "tool_calls" && !ctx->pending_tool_calls.empty()) {
-      auto complete = TakeCompleteToolCalls(ctx, false);
+      auto complete = TakeCompleteToolCalls(ctx, true);
       ChatCompletionResponse tc_resp;
       tc_resp.finish_reason = "tool_calls";
       tc_resp.tool_calls = std::move(complete);
@@ -560,6 +554,11 @@ static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb,
 void OpenAIProvider::ChatCompletionStream(
     const ChatCompletionRequest& request,
     std::function<void(const ChatCompletionResponse&)> callback) {
+  auto normalized_messages = request.messages;
+  const auto normalization_context =
+      BuildStreamNormalizationContext(ProviderId(), api_, request, logger_);
+  SanitizeReplayMessages(&normalized_messages, normalization_context);
+
   // Build JSON payload with stream=true
   nlohmann::json payload;
   payload["model"] = request.model;
@@ -568,7 +567,7 @@ void OpenAIProvider::ChatCompletionStream(
   payload["stream"] = true;
 
   payload["messages"] =
-      serialize_messages_to_openai(request.messages, request.thinking != "off");
+      serialize_messages_to_openai(normalized_messages, request.thinking != "off");
 
   if (!request.tools.empty()) {
     payload["tools"] = request.tools;
@@ -583,6 +582,7 @@ void OpenAIProvider::ChatCompletionStream(
   StreamContext stream_ctx;
   stream_ctx.callback = callback;
   stream_ctx.logger = logger_;
+  stream_ctx.normalization_context = normalization_context;
 
   RetryAfterCapture retry_capture;
 

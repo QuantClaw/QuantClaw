@@ -17,7 +17,9 @@ namespace quantclaw {
 class OpenAIProvider : public LLMProvider {
  public:
   OpenAIProvider(const std::string& api_key, const std::string& base_url,
-                 int timeout, std::shared_ptr<spdlog::logger> logger);
+                 int timeout, std::shared_ptr<spdlog::logger> logger,
+                 std::string provider_id = "openai",
+                 std::string api = "openai-completions");
 
   ChatCompletionResponse
   ChatCompletion(const ChatCompletionRequest& request) override;
@@ -39,6 +41,8 @@ class OpenAIProvider : public LLMProvider {
   std::string base_url_;
   int timeout_;
   std::shared_ptr<spdlog::logger> logger_;
+  std::string provider_id_;
+  std::string api_;
 };
 
 }  // namespace quantclaw

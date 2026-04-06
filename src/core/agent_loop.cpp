@@ -311,8 +311,9 @@ std::vector<Message> AgentLoop::ProcessMessage(
         continue;
       }
 
-      if (saw_invalid_tool_call && !has_non_whitespace(response.content)) {
-        logger_->error("LLM returned only invalid tool calls");
+      if (saw_invalid_tool_call && !has_non_whitespace(response.content) &&
+          valid_tool_calls.empty()) {
+        logger_->error("LLM returned only invalid tool calls after normalization");
         Message final_msg;
         final_msg.role = "assistant";
         final_msg.content.push_back(
@@ -506,7 +507,8 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
               auto valid_tool_calls = filter_valid_tool_calls(
                   chunk.tool_calls, logger_, &chunk_has_invalid);
               saw_invalid_tool_call =
-                  saw_invalid_tool_call || chunk_has_invalid;
+                  saw_invalid_tool_call ||
+                  (chunk_has_invalid && valid_tool_calls.empty());
               if (valid_tool_calls.empty()) {
                 return;
               }

@@ -4,6 +4,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+#include "quantclaw/providers/anthropic_provider.hpp"
+#include "quantclaw/providers/openai_provider.hpp"
 #include "quantclaw/providers/provider_registry.hpp"
 
 #include <gtest/gtest.h>
@@ -140,6 +142,50 @@ TEST(ProviderRegistryTest, GetProviderCreatesInstance) {
   // Second call returns same instance
   auto provider2 = reg->GetProvider("openai");
   EXPECT_EQ(provider.get(), provider2.get());
+}
+
+TEST(ProviderRegistryTest, ProviderApiSelectsOpenAICompatibleFactory) {
+  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  reg->RegisterBuiltinFactories();
+
+  ProviderEntry entry;
+  entry.id = "qwen";
+  entry.api = "openai-completions";
+  entry.api_key = "test-key";
+  entry.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+  reg->AddProvider(entry);
+
+  auto provider = reg->GetProvider("qwen");
+  ASSERT_NE(provider, nullptr);
+  EXPECT_NE(dynamic_cast<OpenAIProvider*>(provider.get()), nullptr);
+  EXPECT_EQ(provider->GetProviderName(), "openai");
+}
+
+TEST(ProviderRegistryTest, ProviderApiSelectsOpenAICompatibleFactoryForKeyOverride) {
+  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  reg->RegisterBuiltinFactories();
+
+  ProviderEntry entry;
+  entry.id = "qwen";
+  entry.api = "openai-completions";
+  entry.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+  reg->AddProvider(entry);
+
+  auto provider = reg->GetProviderWithKey("qwen", "override-key");
+  ASSERT_NE(provider, nullptr);
+  EXPECT_NE(dynamic_cast<OpenAIProvider*>(provider.get()), nullptr);
+}
+
+TEST(ProviderRegistryTest, HasProviderUsesApiResolvedFactory) {
+  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  reg->RegisterBuiltinFactories();
+
+  ProviderEntry entry;
+  entry.id = "kimi";
+  entry.api = "anthropic-messages";
+  reg->AddProvider(entry);
+
+  EXPECT_TRUE(reg->HasProvider("kimi"));
 }
 
 TEST(ProviderRegistryTest, OpenAICodexBuiltinFactoryCreatesProvider) {

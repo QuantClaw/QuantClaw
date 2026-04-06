@@ -1,15 +1,21 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include <atomic>
 #include <memory>
+#include <thread>
+#include <unordered_set>
 
+#include <httplib.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
 #include "quantclaw/providers/llm_provider.hpp"
 #include "quantclaw/providers/openai_provider.hpp"
+#include "quantclaw/providers/stream_normalization.hpp"
 
+#include "test_helpers.hpp"
 #include <gtest/gtest.h>
 
 namespace quantclaw::detail {
@@ -245,6 +251,143 @@ TEST(OpenAIProviderJsonTest, NullableStringReturnsEmptyForNull) {
   nlohmann::json j = {{"finish_reason", nullptr}};
   EXPECT_EQ(
       quantclaw::detail::json_nullable_string_or_empty(j, "finish_reason"), "");
+}
+
+TEST(OpenAIProviderNormalizationTest, FinalizePendingToolCallsRepairsNamesIdsAndArguments) {
+  auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
+  auto logger = std::make_shared<spdlog::logger>("normalize", null_sink);
+
+  quantclaw::ChatCompletionRequest request;
+  request.tools.push_back({{"type", "function"},
+                           {"function",
+                            {{"name", "read"},
+                             {"description", "Read file"},
+                             {"parameters",
+                              {{"type", "object"},
+                               {"properties", {{{"path", {{"type", "string"}}}}}}}}}}});
+
+  auto context = quantclaw::BuildStreamNormalizationContext(
+      "qwen", "openai-completions", request, logger);
+  std::unordered_set<std::string> seen_ids;
+  std::vector<quantclaw::PendingToolCallFragment> pending;
+  pending.push_back(quantclaw::PendingToolCallFragment{
+      0, "function.read:1", " functions.read ",
+      "prefix {\"path\":\"/tmp/a.txt\"}x"});
+  pending.push_back(
+      quantclaw::PendingToolCallFragment{1, "", "", "{\"skip\":true"});
+
+  std::vector<quantclaw::PendingToolCallFragment> remaining;
+  auto tool_calls = quantclaw::FinalizePendingToolCalls(pending, context,
+                                                        &seen_ids, &remaining);
+
+  ASSERT_EQ(tool_calls.size(), 1u);
+  EXPECT_EQ(tool_calls[0].name, "read");
+  EXPECT_EQ(tool_calls[0].id, "function.read:1");
+  EXPECT_EQ(tool_calls[0].arguments["path"], "/tmp/a.txt");
+  ASSERT_EQ(remaining.size(), 1u);
+  EXPECT_EQ(remaining[0].index, 1u);
+}
+
+TEST(OpenAIProviderNormalizationTest, NormalizeToolCallsDecodesHtmlEntitiesAndAssignsIds) {
+  auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
+  auto logger = std::make_shared<spdlog::logger>("normalize-html", null_sink);
+
+  quantclaw::ChatCompletionRequest request;
+  request.tools.push_back({{"type", "function"},
+                           {"function",
+                            {{"name", "write_file"},
+                             {"description", "Write file"},
+                             {"parameters",
+                              {{"type", "object"},
+                               {"properties", {{{"text", {{"type", "string"}}}}}}}}}}});
+
+  auto context = quantclaw::BuildStreamNormalizationContext(
+      "xai", "openai-completions", request, logger);
+  std::vector<quantclaw::ToolCall> tool_calls = {{"", " write-file ", {{"text", "a &amp; b"}}}};
+  std::unordered_set<std::string> seen_ids;
+
+  quantclaw::NormalizeToolCalls(&tool_calls, context, &seen_ids);
+
+  ASSERT_EQ(tool_calls.size(), 1u);
+  EXPECT_EQ(tool_calls[0].name, "write_file");
+  EXPECT_EQ(tool_calls[0].id, "call_auto_1");
+  EXPECT_EQ(tool_calls[0].arguments["text"], "a & b");
+}
+
+TEST(OpenAIProviderStreamTest, StreamingRepairsSplitToolCallAcrossChunks) {
+  const int port = quantclaw::test::FindFreePort();
+  ASSERT_GT(port, 0);
+
+  httplib::Server server;
+  std::atomic<bool> saw_request = false;
+  server.Post("/chat/completions", [&](const httplib::Request& req,
+                                        httplib::Response& res) {
+    saw_request = true;
+    auto body = nlohmann::json::parse(req.body);
+    EXPECT_EQ(body.value("model", ""), "qwen3-max");
+    EXPECT_TRUE(body.value("stream", false));
+    ASSERT_TRUE(body.contains("tools"));
+
+    res.set_chunked_content_provider(
+        "text/event-stream", [](size_t /*offset*/, httplib::DataSink& sink) {
+          const char part1[] =
+              "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"function.read:1\",\"function\":{\"name\":\" functions.read \",\"arguments\":\"prefix {\\\"path\\\":";
+          const char part2[] =
+              "\"}}]}}]}\n\n";
+          const char part3[] =
+              "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"/tmp/a.txt\\\"}x\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n";
+          const char part4[] = "data: [DONE]\n\n";
+          sink.write(part1, sizeof(part1) - 1);
+          sink.write(part2, sizeof(part2) - 1);
+          sink.write(part3, sizeof(part3) - 1);
+          sink.write(part4, sizeof(part4) - 1);
+          sink.done();
+          return true;
+        });
+  });
+
+  std::thread server_thread([&]() {
+    quantclaw::test::ReleaseHeldPort(port);
+    server.listen("127.0.0.1", port);
+  });
+  ASSERT_TRUE(quantclaw::test::WaitForServerReady(port, 5000));
+
+  auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
+  auto logger = std::make_shared<spdlog::logger>("openai-stream-test", null_sink);
+  quantclaw::OpenAIProvider provider(
+      "test-key", "http://127.0.0.1:" + std::to_string(port), 30, logger,
+      "qwen", "openai-completions");
+
+  quantclaw::ChatCompletionRequest request;
+  request.model = "qwen3-max";
+  request.stream = true;
+  request.messages.push_back({"user", "Read a file"});
+  request.tools.push_back({{"type", "function"},
+                           {"function",
+                            {{"name", "read"},
+                             {"description", "Read file"},
+                             {"parameters",
+                              {{"type", "object"},
+                               {"properties",
+                                {{{"path", {{"type", "string"}}}}}}}}}}});
+
+  std::vector<quantclaw::ChatCompletionResponse> chunks;
+  provider.ChatCompletionStream(
+      request, [&](const quantclaw::ChatCompletionResponse& chunk) {
+        chunks.push_back(chunk);
+      });
+
+  ASSERT_TRUE(saw_request.load());
+  ASSERT_EQ(chunks.size(), 2u);
+  EXPECT_EQ(chunks[0].finish_reason, "tool_calls");
+  ASSERT_EQ(chunks[0].tool_calls.size(), 1u);
+  EXPECT_EQ(chunks[0].tool_calls[0].id, "function.read:1");
+  EXPECT_EQ(chunks[0].tool_calls[0].name, "read");
+  EXPECT_EQ(chunks[0].tool_calls[0].arguments["path"], "/tmp/a.txt");
+  EXPECT_TRUE(chunks[1].is_stream_end);
+
+  server.stop();
+  server_thread.join();
 }
 
 TEST(OpenAIProviderJsonTest, NullableStringReturnsValueForString) {
