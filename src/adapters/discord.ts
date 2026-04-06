@@ -15,8 +15,14 @@
  *   npx tsx discord.ts
  */
 
+import "dotenv/config";
 import { Client, GatewayIntentBits, Message } from "discord.js";
 import { ChannelAdapter, runAdapter } from "./base.js";
+
+// Ensure gateway URL defaults correctly for local dev if not set
+if (!process.env.QUANTCLAW_GATEWAY_URL) {
+  process.env.QUANTCLAW_GATEWAY_URL = "ws://127.0.0.1:18800";
+}
 
 class DiscordAdapter extends ChannelAdapter {
   private client: Client;
