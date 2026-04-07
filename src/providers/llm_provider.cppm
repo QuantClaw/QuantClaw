@@ -57,6 +57,7 @@ struct TokenUsage {
 
 struct ChatCompletionResponse {
   std::string content;
+  std::string reasoning_content;
   std::vector<ToolCall> tool_calls;
   std::string finish_reason;
   bool is_stream_end = false;

@@ -13,8 +13,10 @@ import quantclaw.core.cron_scheduler;
 import quantclaw.core.subagent;
 import quantclaw.mcp.mcp_tool_manager;
 import quantclaw.security.exec_approval;
+import quantclaw.security.scope_validator;
 import quantclaw.security.tool_permissions;
 import quantclaw.session.session_manager;
+import quantclaw.core.recon_runtime;
 
 export namespace quantclaw {
 
@@ -63,6 +65,10 @@ class ToolRegistry {
 	// Workspace root for file-tool path validation
 	std::string workspace_path_ = "~/.quantclaw/workspace";
 
+	// Recon mode: scope enforcement and findings graph
+	std::shared_ptr<ScopeValidator> scope_validator_;
+	ReconRuntime* recon_runtime_ = nullptr;
+
  public:
 	explicit ToolRegistry(std::shared_ptr<spdlog::logger> logger);
 
@@ -99,6 +105,15 @@ class ToolRegistry {
 
 	// Set workspace root used for file-tool path validation
 	void SetWorkspace(const std::string& path);
+
+	// Set scope validator (recon mode: validates targets before execution)
+	void SetScopeValidator(std::shared_ptr<ScopeValidator> validator);
+
+	// Set recon runtime (for recording findings/probes in DuckDB)
+	void SetReconRuntime(ReconRuntime* runtime);
+
+	// Register recon tools (subdomain_enum, port_scan, etc.)
+	void RegisterReconTools();
 
 	// Execute a tool by name (with permission check)
 	std::string ExecuteTool(const std::string& tool_name,

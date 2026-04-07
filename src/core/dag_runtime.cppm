@@ -57,6 +57,11 @@ class DagRuntime : public Noncopyable {
 
   std::string LatestRunIdForSession(const std::string& session_key) const;
 
+  // Expose internals for ReconRuntime to share the same DuckDB connection.
+  void* GetDatabase() const { return db_; }
+  void* GetConnection() const { return con_; }
+  std::mutex& GetMutex() { return db_mu_; }
+
  private:
   void init_schema();
   void prepare_statements();

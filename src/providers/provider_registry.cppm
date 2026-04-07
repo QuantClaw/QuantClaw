@@ -128,6 +128,14 @@ void ProviderRegistry::RegisterBuiltinFactories() {
     return std::make_shared<AnthropicProvider>(api_key, url, entry.timeout,
                                                logger);
   });
+
+  RegisterFactory("anthropic", [](const ProviderEntry& entry,
+                                   std::shared_ptr<spdlog::logger> logger) {
+    std::string url =
+        entry.base_url.empty() ? "https://api.anthropic.com" : entry.base_url;
+    return std::make_shared<AnthropicProvider>(entry.api_key, url,
+                                               entry.timeout, logger);
+  });
 }
 
 void ProviderRegistry::AddProvider(const ProviderEntry& entry) {

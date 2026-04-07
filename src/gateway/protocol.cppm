@@ -92,6 +92,7 @@ inline constexpr const char* kMemorySearch = "memory.search";
 namespace events {
 inline constexpr const char* kConnectChallenge = "connect.challenge";
 inline constexpr const char* kTextDelta = "agent.text_delta";
+inline constexpr const char* kThinkingDelta = "agent.thinking_delta";
 inline constexpr const char* kToolUse = "agent.tool_use";
 inline constexpr const char* kToolResult = "agent.tool_result";
 inline constexpr const char* kMessageEnd = "agent.message_end";

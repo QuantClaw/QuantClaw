@@ -49,7 +49,7 @@ void ProviderRegistry::RegisterBuiltinFactories() {
   RegisterFactory("local", [](const ProviderEntry& entry,
                                std::shared_ptr<spdlog::logger> logger) {
     std::string url =
-        entry.base_url.empty() ? "http://127.0.0.1:8080" : entry.base_url;
+        entry.base_url.empty() ? "http://127.0.0.1:8081" : entry.base_url;
     return std::make_shared<LlamaProvider>(url, entry.timeout, logger);
   });
 

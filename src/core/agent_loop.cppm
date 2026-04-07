@@ -127,7 +127,7 @@ class AgentLoop : public Noncopyable {
   std::string session_key_;
   std::shared_ptr<UsageAccumulator> usage_accumulator_;
   std::shared_ptr<DagRuntime> dag_runtime_;
-  bool stop_requested_ = false;
+  std::atomic<bool> stop_requested_ = false;
   std::string last_provider_id_;
   std::string last_profile_id_;
 };

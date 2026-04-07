@@ -27,9 +27,36 @@ PromptBuilder::PromptBuilder(std::shared_ptr<MemoryManager> memory_manager,
 std::string PromptBuilder::BuildFull(const std::string& /*agent_id*/) const {
   std::ostringstream prompt;
 
-  // 1. SOUL.md - identity
+  // 1. SOUL.md - identity (with recon template substitution)
   auto soul = get_section("SOUL.md");
   if (!soul.empty()) {
+    // Replace {{accepted_targets}} and {{restricted_targets}} if recon config
+    // is present.  Avoids importing scope_validator — just does string replace.
+    if (config_ && config_->recon_config.contains("accepted_targets")) {
+      std::string accepted;
+      for (const auto& t : config_->recon_config["accepted_targets"]) {
+        accepted += "- " + t.get<std::string>() + "\n";
+      }
+      std::string restricted;
+      if (config_->recon_config.contains("restricted_targets")) {
+        for (const auto& t : config_->recon_config["restricted_targets"]) {
+          restricted += "- " + t.get<std::string>() + "\n";
+        }
+      }
+      if (accepted.empty()) accepted = "(none)\n";
+      if (restricted.empty()) restricted = "(none)\n";
+
+      auto replace_all = [](std::string& s, const std::string& from,
+                            const std::string& to) {
+        std::string::size_type pos = 0;
+        while ((pos = s.find(from, pos)) != std::string::npos) {
+          s.replace(pos, from.size(), to);
+          pos += to.size();
+        }
+      };
+      replace_all(soul, "{{accepted_targets}}", accepted);
+      replace_all(soul, "{{restricted_targets}}", restricted);
+    }
     prompt << "## Your Identity\n" << soul << "\n\n";
   }
 

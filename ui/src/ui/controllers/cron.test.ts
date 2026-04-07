@@ -158,7 +158,9 @@ describe("cron controller", () => {
       name: "main job",
     });
     expect((addCall?.[1] as { delivery?: unknown } | undefined)?.delivery).toBeUndefined();
-    expect(state.cronForm.deliveryMode).toBe("none");
+    // After successful add, form resets to defaults (which support announce
+    // via sessionTarget:"isolated" + payloadKind:"agentTurn").
+    expect(state.cronForm.deliveryMode).toBe("announce");
   });
 
   it("submits cron.update when editing an existing job", async () => {

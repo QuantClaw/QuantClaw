@@ -35,7 +35,7 @@ void MemorySearch::IndexDirectory(const std::filesystem::path& dir) {
     }
   }
 
-  // Recompute average document length for BM25
+  // Recompute average document length and inverted DF index for BM25
   if (!entries_.empty()) {
     double total_len = 0;
     for (const auto& e : entries_) {
@@ -43,6 +43,7 @@ void MemorySearch::IndexDirectory(const std::filesystem::path& dir) {
     }
     avg_doc_length_ = total_len / entries_.size();
   }
+  rebuild_df_index();
 
   logger_->info("Indexed {} entries from {}", entries_.size(), dir.string());
 }
@@ -92,7 +93,7 @@ void MemorySearch::IndexFile(const std::filesystem::path& file) {
   }
   flush_paragraph();
 
-  // Update average document length for BM25
+  // Update average document length and DF index for BM25
   if (!entries_.empty()) {
     double total_len = 0;
     for (const auto& e : entries_) {
@@ -100,6 +101,7 @@ void MemorySearch::IndexFile(const std::filesystem::path& file) {
     }
     avg_doc_length_ = total_len / entries_.size();
   }
+  rebuild_df_index();
 }
 
 std::vector<MemorySearchResult> MemorySearch::Search(const std::string& query,
@@ -341,7 +343,21 @@ void MemorySearch::Clear() {
   entries_.clear();
   total_documents_ = 0;
   avg_doc_length_ = 0;
+  df_index_.clear();
   vector_index_.Clear();
+}
+
+void MemorySearch::rebuild_df_index() {
+  df_index_.clear();
+  for (const auto& entry : entries_) {
+    // Count each unique term once per document
+    std::unordered_set<std::string> seen;
+    for (const auto& t : entry.tokens) {
+      if (seen.insert(t).second) {
+        df_index_[t]++;
+      }
+    }
+  }
 }
 
 std::vector<std::string> MemorySearch::tokenize(const std::string& text) {
@@ -362,19 +378,6 @@ std::vector<std::string> MemorySearch::tokenize(const std::string& text) {
     tokens.push_back(word);
   }
   return tokens;
-}
-
-int MemorySearch::document_frequency(const std::string& term) const {
-  int count = 0;
-  for (const auto& entry : entries_) {
-    for (const auto& t : entry.tokens) {
-      if (t == term) {
-        count++;
-        break;  // Count each document once
-      }
-    }
-  }
-  return count;
 }
 
 double
@@ -403,7 +406,12 @@ MemorySearch::score_entry(const IndexEntry& entry,
       continue;
 
     double f = static_cast<double>(it->second);  // term frequency in doc
-    int df = document_frequency(qt);             // document frequency
+
+    // O(1) lookup from precomputed inverted index (was O(N*T) per call)
+    int df = 0;
+    auto df_it = df_index_.find(qt);
+    if (df_it != df_index_.end())
+      df = df_it->second;
 
     // IDF component: log((N - df + 0.5) / (df + 0.5) + 1)
     double idf = std::log((N - df + 0.5) / (df + 0.5) + 1.0);

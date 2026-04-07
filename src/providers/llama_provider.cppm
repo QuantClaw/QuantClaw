@@ -113,6 +113,12 @@ quantclaw::ChatCompletionResponse ParseResponse(const std::string& body) {
 
     result.finish_reason = choice.value("finish_reason", std::string{"stop"});
 
+    if (msg.contains("reasoning_content") &&
+        !msg["reasoning_content"].is_null()) {
+      result.reasoning_content =
+          msg["reasoning_content"].get<std::string>();
+    }
+
     if (msg.contains("content") && !msg["content"].is_null()) {
       result.content = msg["content"].get<std::string>();
     }
@@ -220,6 +226,15 @@ struct StreamContext {
         return;
       }
 
+      if (delta.contains("reasoning_content") &&
+          !delta["reasoning_content"].is_null()) {
+        quantclaw::ChatCompletionResponse resp;
+        resp.reasoning_content =
+            delta["reasoning_content"].get<std::string>();
+        if (!resp.reasoning_content.empty())
+          callback(resp);
+      }
+
       if (delta.contains("content") && !delta["content"].is_null()) {
         quantclaw::ChatCompletionResponse resp;
         resp.content = delta["content"].get<std::string>();
@@ -234,13 +249,19 @@ struct StreamContext {
 
   void push(const char* data, size_t len) {
     buffer.append(data, len);
+    // Use offset tracking instead of erase(0, pos+1) to avoid O(N) shifts
+    // per line which creates O(N²) behavior over long streams.
+    std::string::size_type offset = 0;
     std::string::size_type pos;
-    while ((pos = buffer.find('\n')) != std::string::npos) {
-      std::string line = buffer.substr(0, pos);
+    while ((pos = buffer.find('\n', offset)) != std::string::npos) {
+      std::string line = buffer.substr(offset, pos - offset);
       if (!line.empty() && line.back() == '\r')
         line.pop_back();
-      buffer.erase(0, pos + 1);
+      offset = pos + 1;
       process_line(line);
+    }
+    if (offset > 0) {
+      buffer.erase(0, offset);
     }
   }
 };
@@ -285,14 +306,27 @@ class LlamaProvider : public LLMProvider {
     return {};
   }
 
+  // Check if the local llama-server is reachable.  Hits GET /health
+  // with a short timeout.  Returns true if the server responds with 200.
+  bool CheckHealth() const;
+
  private:
   nlohmann::json BuildPayload(const ChatCompletionRequest& request,
                               bool stream) const;
   CurlSlist BuildHeaders() const;
+  void ensure_server_reachable() const;
 
   std::string base_url_;
   int timeout_;
   std::shared_ptr<spdlog::logger> logger_;
+  mutable bool health_checked_ = false;
+
+  // Persistent CURL handle for connection reuse (TCP keep-alive to localhost).
+  // Avoids per-request TCP handshake overhead for local inference.
+  // Protected by mutex since the agent loop is single-threaded per request
+  // but multiple sessions may share the provider.
+  mutable std::mutex curl_mutex_;
+  mutable std::unique_ptr<CurlHandle> persistent_curl_;
 };
 
 // ── Implementation ───────────────────────────────────────────────────────────
@@ -320,15 +354,65 @@ CurlSlist LlamaProvider::BuildHeaders() const {
   return headers;
 }
 
+bool LlamaProvider::CheckHealth() const {
+  const std::string url = base_url_ + "/health";
+  std::string read_buffer;
+  try {
+    CurlHandle curl;
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 3L);
+    CURLcode res = curl_easy_perform(curl);
+    if (res != CURLE_OK)
+      return false;
+    long http_code = 0;
+    curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &http_code);
+    return http_code == 200;
+  } catch (...) {
+    return false;
+  }
+}
+
+void LlamaProvider::ensure_server_reachable() const {
+  if (health_checked_)
+    return;
+  health_checked_ = true;
+  if (!CheckHealth()) {
+    if (logger_)
+      logger_->error(
+          "Local llama-server is not reachable at {}. "
+          "Start it with: llama-server -m <model.gguf> --port <port>",
+          base_url_);
+    throw ProviderError(
+        ProviderErrorKind::kTransient, 0,
+        "Local llama-server is not reachable at " + base_url_ +
+            ". Ensure llama-server is running.",
+        "local");
+  }
+  if (logger_)
+    logger_->info("Local llama-server health check passed at {}", base_url_);
+}
+
 ChatCompletionResponse
 LlamaProvider::ChatCompletion(const ChatCompletionRequest& request) {
+  ensure_server_reachable();
   const std::string json_payload = BuildPayload(request, false).dump();
   const std::string url = base_url_ + "/v1/chat/completions";
   if (logger_)
     logger_->debug("LlamaProvider: POST {}", url);
 
   std::string read_buffer;
-  CurlHandle curl;
+  std::lock_guard<std::mutex> lock(curl_mutex_);
+  if (!persistent_curl_) {
+    persistent_curl_ = std::make_unique<CurlHandle>();
+    // Enable TCP keep-alive for connection reuse to localhost
+    curl_easy_setopt(persistent_curl_->get(), CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(persistent_curl_->get(), CURLOPT_TCP_KEEPIDLE, 30L);
+    curl_easy_setopt(persistent_curl_->get(), CURLOPT_TCP_KEEPINTVL, 15L);
+  }
+  CURL* curl = persistent_curl_->get();
   CurlSlist headers = BuildHeaders();
 
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -352,7 +436,7 @@ LlamaProvider::ChatCompletion(const ChatCompletionRequest& request) {
   }
 
   long http_code = 0;
-  curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &http_code);
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
   if (http_code >= 400) {
     auto kind = ClassifyHttpError(static_cast<int>(http_code), read_buffer);
     throw ProviderError(kind, static_cast<int>(http_code),
@@ -367,10 +451,17 @@ LlamaProvider::ChatCompletion(const ChatCompletionRequest& request) {
 void LlamaProvider::ChatCompletionStream(
     const ChatCompletionRequest& request,
     std::function<void(const ChatCompletionResponse&)> callback) {
+  ensure_server_reachable();
   const std::string json_payload = BuildPayload(request, true).dump();
   const std::string url = base_url_ + "/v1/chat/completions";
   if (logger_)
     logger_->debug("LlamaProvider: streaming POST {}", url);
+
+  // For error responses, the server sends a plain JSON body (not SSE).
+  // We use a two-phase approach: first check the HTTP status via the header
+  // callback, and capture the raw body for error classification.
+  std::string error_body;
+  long http_code_header = 0;
 
   StreamContext stream_ctx;
   stream_ctx.callback = std::move(callback);
@@ -403,10 +494,14 @@ void LlamaProvider::ChatCompletionStream(
   long http_code = 0;
   curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &http_code);
   if (http_code >= 400) {
-    auto kind = ClassifyHttpError(static_cast<int>(http_code), "");
+    // The stream buffer contains the error body from the server
+    std::string body = std::move(stream_ctx.buffer);
+    auto kind = ClassifyHttpError(static_cast<int>(http_code), body);
     throw ProviderError(
         kind, static_cast<int>(http_code),
-        "llama-server streaming HTTP " + std::to_string(http_code), "local");
+        "llama-server streaming HTTP " + std::to_string(http_code) +
+            ": " + body,
+        "local");
   }
 }
 

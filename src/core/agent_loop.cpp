@@ -149,26 +149,38 @@ static void emit_memory_management_node(DagRuntime* dag_runtime,
   dag_runtime->EmitNode(dag_turn, DagNodeType::kMemoryManagement, payload);
 }
 
-// Get context window size for a model name
+// Get context window size for a model name.
+// Model names may come from GGUF filenames (e.g. "Qwen3.5-9B.Q5_K_M.gguf")
+// so matching must be case-insensitive.
 static int get_context_window(const std::string& model) {
+  std::string lower;
+  lower.reserve(model.size());
+  for (char c : model)
+    lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
   // Anthropic models
-  if (model.find("claude") != std::string::npos)
+  if (lower.find("claude") != std::string::npos)
     return kContextWindow200K;
   // OpenAI models
-  if (model.find("gpt-4o") != std::string::npos)
+  if (lower.find("gpt-4o") != std::string::npos)
     return kContextWindow128K;
-  if (model.find("gpt-4-turbo") != std::string::npos)
+  if (lower.find("gpt-4-turbo") != std::string::npos)
     return kContextWindow128K;
-  if (model.find("gpt-4") != std::string::npos)
+  if (lower.find("gpt-4") != std::string::npos)
     return kContextWindow8K;
-  if (model.find("gpt-3.5") != std::string::npos)
+  if (lower.find("gpt-3.5") != std::string::npos)
     return kContextWindow16K;
   // Qwen
-  if (model.find("qwen") != std::string::npos)
+  if (lower.find("qwen") != std::string::npos)
     return kContextWindow128K;
   // DeepSeek
-  if (model.find("deepseek") != std::string::npos)
+  if (lower.find("deepseek") != std::string::npos)
     return kContextWindow128K;
+  // Llama / Mistral
+  if (lower.find("llama") != std::string::npos)
+    return kContextWindow128K;
+  if (lower.find("mistral") != std::string::npos)
+    return kContextWindow32K;
   return kDefaultContextWindow;
 }
 
@@ -620,6 +632,13 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
 
       provider->ChatCompletionStream(
           request, [&](const ChatCompletionResponse& chunk) {
+            if (!chunk.reasoning_content.empty()) {
+              if (callback) {
+                callback({events::kThinkingDelta,
+                          {{"text", chunk.reasoning_content}}});
+              }
+            }
+
             if (!chunk.content.empty()) {
               full_response += chunk.content;
               if (callback) {

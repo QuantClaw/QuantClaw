@@ -31,8 +31,10 @@ import quantclaw.providers.provider_registry;
 import quantclaw.security.exec_approval;
 import quantclaw.security.rate_limiter;
 import quantclaw.security.rbac;
+import quantclaw.security.scope_validator;
 import quantclaw.security.tool_permissions;
 import quantclaw.session.session_manager;
+import quantclaw.core.recon_runtime;
 import quantclaw.core.memory_manager;
 import quantclaw.core.dag_runtime;
 import quantclaw.core.cron_scheduler;
@@ -316,6 +318,41 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   // Connect subagent manager to tool registry and agent loop
   tool_registry->SetSubagentManager(subagent_manager.get(), "main");
   agent_loop->SetSubagentManager(subagent_manager.get());
+
+  // Initialize recon subsystem if configured
+  if (!config.recon_config.is_null() &&
+      config.recon_config.value("enabled", false)) {
+    logger_->info("Recon mode enabled — configuring scope validator and "
+                  "recon runtime");
+
+    // Scope enforcement gate
+    auto scope_validator = std::shared_ptr<quantclaw::ScopeValidator>(
+        new quantclaw::ScopeValidator(logger_));
+    scope_validator->Configure(config.recon_config);
+    tool_registry->SetScopeValidator(scope_validator);
+
+    // DuckDB recon graph (shares DagRuntime connection)
+    auto recon_runtime = std::shared_ptr<quantclaw::ReconRuntime>(
+        new quantclaw::ReconRuntime(dag_runtime.get(), logger_));
+    tool_registry->SetReconRuntime(recon_runtime.get());
+
+    // Register the 9 recon tools
+    tool_registry->RegisterReconTools();
+
+    // Wire auto-escalation via subagent manager
+    if (recon_runtime->IsEnabled()) {
+      recon_runtime->SetSubagentManager(subagent_manager.get(), "recon");
+      if (config.recon_config.contains("auto_escalation")) {
+        recon_runtime->ConfigureAutoEscalation(
+            config.recon_config["auto_escalation"]);
+      }
+    }
+
+    logger_->info("Recon subsystem ready — {} accepted targets, "
+                  "{} restricted targets",
+                  scope_validator->AcceptedTargets().size(),
+                  scope_validator->RestrictedTargets().size());
+  }
 
   // Wire cron scheduler and session manager to tool registry
   tool_registry->SetCronScheduler(cron_scheduler);

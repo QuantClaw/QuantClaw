@@ -19,6 +19,7 @@ import quantclaw.tools.tool_chain;
 import quantclaw.platform.process;
 import quantclaw.security.exec_approval;
 import quantclaw.security.sandbox;
+import quantclaw.security.scope_validator;
 import quantclaw.security.tool_permissions;
 import quantclaw.session.session_manager;
 
@@ -262,6 +263,334 @@ void ToolRegistry::RegisterChainTool() {
                            chain_params.dump()});
 
   logger_->info("Registered chain tool");
+}
+
+// ---------------------------------------------------------------------------
+// RegisterReconTools — bug bounty reconnaissance tools
+// ---------------------------------------------------------------------------
+
+void ToolRegistry::RegisterReconTools() {
+  logger_->info("Registering recon tools");
+
+  // Helper: run a command and return {output, exit_code} JSON.
+  auto run_recon_cmd = [this](const std::string& cmd,
+                              int timeout = 120) -> nlohmann::json {
+    auto result = platform::exec_capture(cmd, timeout);
+    return {{"output", result.output}, {"exit_code", result.exit_code}};
+  };
+
+  // Helper: check if a binary is available on PATH.
+  auto has_binary = [](const std::string& name) -> bool {
+    auto r = platform::exec_capture("which " + name + " 2>/dev/null", 5);
+    return r.exit_code == 0 && !r.output.empty();
+  };
+
+  // --- 1. subdomain_enum ---
+  if (has_binary("subfinder") || has_binary("amass")) {
+    register_tool(
+        "subdomain_enum",
+        "Enumerate subdomains for a target domain using subfinder or amass.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"target",
+               {{"type", "string"},
+                {"description", "Target domain (e.g., example.com)"}}},
+              {"timeout",
+               {{"type", "integer"},
+                {"description", "Timeout in seconds (default 120)"}}}}},
+            {"required", {"target"}}},
+        [this, run_recon_cmd, has_binary](
+            const nlohmann::json& params) -> std::string {
+          auto target = params["target"].get<std::string>();
+          int timeout = params.value("timeout", 120);
+          std::string cmd;
+          if (has_binary("subfinder")) {
+            cmd = "subfinder -d " + target + " -silent 2>/dev/null";
+          } else {
+            cmd = "amass enum -passive -d " + target + " 2>/dev/null";
+          }
+          auto result = run_recon_cmd(cmd, timeout);
+          return result.dump();
+        });
+  }
+
+  // --- 2. port_scan ---
+  if (has_binary("naabu") || has_binary("nmap")) {
+    register_tool(
+        "port_scan",
+        "Scan open ports on a target host using naabu or nmap.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"target",
+               {{"type", "string"},
+                {"description", "Target host or IP"}}},
+              {"ports",
+               {{"type", "string"},
+                {"description",
+                 "Port specification (e.g., '80,443', '1-1000', default "
+                 "top-100)"}}},
+              {"timeout",
+               {{"type", "integer"},
+                {"description", "Timeout in seconds (default 120)"}}}}},
+            {"required", {"target"}}},
+        [this, run_recon_cmd, has_binary](
+            const nlohmann::json& params) -> std::string {
+          auto target = params["target"].get<std::string>();
+          auto ports = params.value("ports", "");
+          int timeout = params.value("timeout", 120);
+          std::string cmd;
+          if (has_binary("naabu")) {
+            cmd = "naabu -host " + target + " -json -silent";
+            if (!ports.empty())
+              cmd += " -p " + ports;
+          } else {
+            cmd = "nmap -sT -T4 --open -oX -";
+            if (!ports.empty())
+              cmd += " -p " + ports;
+            cmd += " " + target;
+          }
+          cmd += " 2>/dev/null";
+          auto result = run_recon_cmd(cmd, timeout);
+          return result.dump();
+        });
+  }
+
+  // --- 3. header_analysis ---
+  if (has_binary("httpx") || has_binary("curl")) {
+    register_tool(
+        "header_analysis",
+        "Analyze HTTP headers for security issues (HSTS, CSP, etc.).",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"target",
+               {{"type", "string"},
+                {"description", "Target URL or domain"}}},
+              {"follow_redirects",
+               {{"type", "boolean"},
+                {"description", "Follow redirects (default true)"}}}}},
+            {"required", {"target"}}},
+        [this, run_recon_cmd, has_binary](
+            const nlohmann::json& params) -> std::string {
+          auto target = params["target"].get<std::string>();
+          bool follow = params.value("follow_redirects", true);
+          std::string cmd;
+          if (has_binary("httpx")) {
+            cmd = "echo '" + target +
+                  "' | httpx -json -silent -title -tech-detect -status-code "
+                  "-content-length";
+            if (follow) cmd += " -follow-redirects";
+          } else {
+            cmd = "curl -sI";
+            if (follow) cmd += " -L";
+            cmd += " '" + target + "'";
+          }
+          cmd += " 2>/dev/null";
+          auto result = run_recon_cmd(cmd, 30);
+          return result.dump();
+        });
+  }
+
+  // --- 4. dns_lookup ---
+  if (has_binary("dig")) {
+    register_tool(
+        "dns_lookup",
+        "Perform DNS lookups for a target domain.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"target",
+               {{"type", "string"},
+                {"description", "Target domain"}}},
+              {"record_type",
+               {{"type", "string"},
+                {"description",
+                 "DNS record type (A, AAAA, MX, NS, TXT, CNAME, ANY). "
+                 "Default: A"}}},
+              {"nameserver",
+               {{"type", "string"},
+                {"description",
+                 "Nameserver to query (default: system resolver)"}}}}},
+            {"required", {"target"}}},
+        [this, run_recon_cmd](const nlohmann::json& params) -> std::string {
+          auto target = params["target"].get<std::string>();
+          auto rtype = params.value("record_type", "A");
+          auto ns = params.value("nameserver", "");
+          std::string cmd = "dig " + target + " " + rtype + " +short";
+          if (!ns.empty())
+            cmd += " @" + ns;
+          cmd += " 2>/dev/null";
+          auto result = run_recon_cmd(cmd, 15);
+          return result.dump();
+        });
+  }
+
+  // --- 5. whois_lookup ---
+  if (has_binary("whois")) {
+    register_tool(
+        "whois_lookup",
+        "WHOIS lookup for domain registration data.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"target",
+               {{"type", "string"},
+                {"description", "Domain or IP to look up"}}}}},
+            {"required", {"target"}}},
+        [this, run_recon_cmd](const nlohmann::json& params) -> std::string {
+          auto target = params["target"].get<std::string>();
+          std::string cmd = "whois " + target + " 2>/dev/null";
+          auto result = run_recon_cmd(cmd, 30);
+          return result.dump();
+        });
+  }
+
+  // --- 6. cert_transparency ---
+  register_tool(
+      "cert_transparency",
+      "Search Certificate Transparency logs (crt.sh) for subdomains.",
+      nlohmann::json{
+          {"type", "object"},
+          {"properties",
+           {{"target",
+             {{"type", "string"},
+              {"description", "Domain to search CT logs for"}}},
+            {"include_expired",
+             {{"type", "boolean"},
+              {"description", "Include expired certs (default false)"}}}}},
+          {"required", {"target"}}},
+      [this, run_recon_cmd](const nlohmann::json& params) -> std::string {
+        auto target = params["target"].get<std::string>();
+        bool expired = params.value("include_expired", false);
+        std::string url = "https://crt.sh/?q=%25." + target + "&output=json";
+        if (!expired) url += "&exclude=expired";
+        std::string cmd =
+            "curl -s '" + url + "' 2>/dev/null | head -c 65536";
+        auto result = run_recon_cmd(cmd, 30);
+        return result.dump();
+      });
+
+  // --- 7. wayback_fetch ---
+  if (has_binary("waybackurls") || has_binary("curl")) {
+    register_tool(
+        "wayback_fetch",
+        "Fetch historical URLs from the Wayback Machine.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"target",
+               {{"type", "string"},
+                {"description", "Domain to query Wayback Machine for"}}},
+              {"filter",
+               {{"type", "string"},
+                {"description",
+                 "Grep filter pattern for URLs (optional)"}}}}},
+            {"required", {"target"}}},
+        [this, run_recon_cmd, has_binary](
+            const nlohmann::json& params) -> std::string {
+          auto target = params["target"].get<std::string>();
+          auto filter = params.value("filter", "");
+          std::string cmd;
+          if (has_binary("waybackurls")) {
+            cmd = "echo '" + target + "' | waybackurls 2>/dev/null";
+          } else {
+            cmd = "curl -s 'https://web.archive.org/cdx/search/cdx?url=*." +
+                  target +
+                  "&output=text&fl=original&collapse=urlkey' 2>/dev/null";
+          }
+          if (!filter.empty()) {
+            cmd += " | grep -i '" + filter + "'";
+          }
+          cmd += " | sort -u | head -500";
+          auto result = run_recon_cmd(cmd, 60);
+          return result.dump();
+        });
+  }
+
+  // --- 8. nuclei_scan ---
+  if (has_binary("nuclei")) {
+    register_tool(
+        "nuclei_scan",
+        "Run Nuclei vulnerability scanner with template-based detection.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"target",
+               {{"type", "string"},
+                {"description", "Target URL or host"}}},
+              {"templates",
+               {{"type", "array"},
+                {"items", {{"type", "string"}}},
+                {"description",
+                 "Specific template IDs to run (optional)"}}},
+              {"severity",
+               {{"type", "string"},
+                {"description",
+                 "Severity filter: info, low, medium, high (default: "
+                 "medium,high)"}}},
+              {"timeout",
+               {{"type", "integer"},
+                {"description", "Timeout in seconds (default 300)"}}}}},
+            {"required", {"target"}}},
+        [this, run_recon_cmd](const nlohmann::json& params) -> std::string {
+          auto target = params["target"].get<std::string>();
+          auto severity = params.value("severity", "medium,high");
+          int timeout = params.value("timeout", 300);
+          std::string cmd = "nuclei -u " + target + " -json -silent";
+          cmd += " -severity " + severity;
+          if (params.contains("templates") && params["templates"].is_array()) {
+            for (const auto& t : params["templates"]) {
+              if (t.is_string())
+                cmd += " -t " + t.get<std::string>();
+            }
+          }
+          cmd += " 2>/dev/null";
+          auto result = run_recon_cmd(cmd, timeout);
+          return result.dump();
+        });
+  }
+
+  // --- 9. screenshot ---
+  if (has_binary("gowitness") || has_binary("chromium") ||
+      has_binary("chromium-browser")) {
+    register_tool(
+        "screenshot",
+        "Take a screenshot of a web page for visual fingerprinting.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"target",
+               {{"type", "string"},
+                {"description", "Target URL to screenshot"}}},
+              {"full_page",
+               {{"type", "boolean"},
+                {"description", "Capture full page (default false)"}}}}},
+            {"required", {"target"}}},
+        [this, run_recon_cmd, has_binary](
+            const nlohmann::json& params) -> std::string {
+          auto target = params["target"].get<std::string>();
+          std::string cmd;
+          if (has_binary("gowitness")) {
+            cmd = "gowitness single '" + target +
+                  "' --screenshot-path /tmp/recon-screenshots/ "
+                  "--screenshot-format png 2>/dev/null";
+          } else {
+            std::string chrome =
+                has_binary("chromium") ? "chromium" : "chromium-browser";
+            cmd = chrome +
+                  " --headless --disable-gpu --screenshot=/tmp/recon-"
+                  "screenshots/screenshot.png --window-size=1280,1024 '" +
+                  target + "' 2>/dev/null";
+          }
+          auto result = run_recon_cmd(cmd, 30);
+          result["screenshot_dir"] = "/tmp/recon-screenshots/";
+          return result.dump();
+        });
+  }
+
+  logger_->info("Recon tools registered");
 }
 
 // ---------------------------------------------------------------------------
@@ -557,6 +886,15 @@ void ToolRegistry::SetWorkspace(const std::string& path) {
   workspace_path_ = path;
 }
 
+void ToolRegistry::SetScopeValidator(
+    std::shared_ptr<ScopeValidator> validator) {
+  scope_validator_ = std::move(validator);
+}
+
+void ToolRegistry::SetReconRuntime(ReconRuntime* runtime) {
+  recon_runtime_ = runtime;
+}
+
 // ---------------------------------------------------------------------------
 // RegisterExternalTool
 // ---------------------------------------------------------------------------
@@ -597,6 +935,16 @@ std::string ToolRegistry::ExecuteTool(const std::string& tool_name,
   if (!check_permission(tool_name))
     throw std::runtime_error("Permission denied: tool '" + tool_name +
                              "' is not allowed");
+  // Scope enforcement gate — validates targets before execution.
+  if (scope_validator_ && scope_validator_->IsEnabled()) {
+    auto scope_error = scope_validator_->ValidateToolCall(tool_name, parameters);
+    if (!scope_error.empty()) {
+      logger_->error("Scope violation for tool '{}': {}", tool_name,
+                     scope_error);
+      throw std::runtime_error("Scope violation: " + scope_error);
+    }
+  }
+
   if (should_request_mutation_approval(tool_name, parameters)) {
     auto decision =
         approval_manager_->RequestApproval(approval_summary(tool_name, parameters));

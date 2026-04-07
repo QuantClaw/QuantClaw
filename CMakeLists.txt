@@ -272,6 +272,9 @@ set(QUANTCLAW_CORE_SOURCES
     src/security/exec_approval.cpp
     src/security/rbac.cpp
     src/security/rate_limiter.cpp
+    src/security/scope_validator.cpp
+    # Recon
+    src/core/recon_runtime.cpp
     # Web
     src/web/web_server.cpp
     src/web/api_routes.cpp
@@ -352,6 +355,8 @@ set(QUANTCLAW_CORE_MODULE_SOURCES
     src/security/exec_approval.cppm
     src/tools/browser_tool.cppm
     src/security/sandbox.cppm
+    src/security/scope_validator.cppm
+    src/core/recon_runtime.cppm
     src/web/web_server.cppm
     src/web/api_routes.cppm
 )
@@ -535,8 +540,10 @@ if(QC_PRECOMPILE_GCC_STDLIB_MODULES)
 endif()
 
 # Compiler flags (GCC-only)
-target_compile_options(quantclaw_core PRIVATE -Wall -Wextra -Wpedantic -O2)
-target_compile_options(quantclaw PRIVATE -Wall -Wextra -Wpedantic -O2)
+# -march=native enables SIMD (AVX2/SSE2/NEON) for local HW acceleration
+# of vector similarity, embedding operations, etc.
+target_compile_options(quantclaw_core PRIVATE -Wall -Wextra -Wpedantic -O2 -march=native)
+target_compile_options(quantclaw PRIVATE -Wall -Wextra -Wpedantic -O2 -march=native)
 
 install(TARGETS quantclaw DESTINATION bin)
 
@@ -597,6 +604,8 @@ if(BUILD_TESTS)
         tests/test_multi_stage_compaction.cpp
         tests/test_hybrid_memory_search.cpp
         tests/test_dag_runtime.cpp
+        tests/test_scope_validator.cpp
+        tests/test_recon_runtime.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})

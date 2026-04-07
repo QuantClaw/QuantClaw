@@ -264,6 +264,9 @@ export struct QuantClawConfig {
   // Queue config (raw JSON, consumed by CommandQueue)
   nlohmann::json queue_config;
 
+  // Recon config (raw JSON, consumed by ScopeValidator and ReconRuntime)
+  nlohmann::json recon_config;
+
   // Models section (OpenClaw format: models.providers)
   std::unordered_map<std::string, ProviderConfig> model_providers;
 

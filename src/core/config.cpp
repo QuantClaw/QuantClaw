@@ -549,6 +549,13 @@ QuantClawConfig QuantClawConfig::FromJsonExpanded(const nlohmann::json& json) {
   }
 
   // ================================================================
+  // Recon (scope enforcement + recon runtime config)
+  // ================================================================
+  if (json.contains("recon") && json["recon"].is_object()) {
+    config.recon_config = json["recon"];
+  }
+
+  // ================================================================
   // Tools (permission allow/deny or legacy named configs)
   // ================================================================
   if (json.contains("tools") && json["tools"].is_object()) {

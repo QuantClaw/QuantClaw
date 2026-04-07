@@ -59,7 +59,7 @@ class MemorySearch {
   static std::vector<std::string> tokenize(const std::string& text);
   double score_entry(const IndexEntry& entry,
                      const std::vector<std::string>& query_tokens) const;
-  int document_frequency(const std::string& term) const;
+  void rebuild_df_index();
 
   std::shared_ptr<spdlog::logger> logger_;
   std::vector<IndexEntry> entries_;
@@ -67,6 +67,9 @@ class MemorySearch {
   double avg_doc_length_ = 0;
   static constexpr double kBM25_k1 = 1.2;
   static constexpr double kBM25_b = 0.75;
+  // Precomputed inverted index: term → number of documents containing it.
+  // Rebuilt after indexing to make BM25 scoring O(Q) instead of O(Q*N*T).
+  std::unordered_map<std::string, int> df_index_;
   std::shared_ptr<EmbeddingProvider> embedding_provider_;
   VectorIndex vector_index_;
   TemporalDecay temporal_decay_;
