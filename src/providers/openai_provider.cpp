@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <fstream>
 #include <sstream>
 #include <string_view>
 
@@ -356,6 +357,15 @@ OpenAIProvider::MakeApiRequest(const std::string& json_payload) const {
       logger_->error("OpenAI API HTTP {}: {}", http_code,
                      SummarizeErrorBodyForLog(read_buffer));
     }
+    if (http_code == 400) {
+      logger_->error(
+          ">>> Payload total size: {} bytes", json_payload.size());
+      std::ofstream dump("/tmp/quantclaw_400_payload.json");
+      if (dump.is_open()) {
+        dump << json_payload;
+        logger_->error(">>> Full payload dumped to /tmp/quantclaw_400_payload.json");
+      }
+    }
     ProviderError err(error_kind, static_cast<int>(http_code),
                       "OpenAI API error (HTTP " + std::to_string(http_code) +
                           "): " + read_buffer,
@@ -644,6 +654,20 @@ void OpenAIProvider::ChatCompletionStream(
     } else {
       logger_->error("OpenAI streaming HTTP {}: {}", http_code,
                      SummarizeErrorBodyForLog(stream_ctx.raw_response_body));
+    }
+    if (http_code == 400) {
+      logger_->error(
+          ">>> Payload total size: {} bytes, messages: {}, tools: {}",
+          json_payload.size(), payload["messages"].size(),
+          payload.contains("tools") ? payload["tools"].size() : 0);
+      // Dump full payload to file for offline analysis
+      {
+        std::ofstream dump("/tmp/quantclaw_400_payload.json");
+        if (dump.is_open()) {
+          dump << json_payload;
+          logger_->error(">>> Full payload dumped to /tmp/quantclaw_400_payload.json");
+        }
+      }
     }
     ProviderError err(error_kind, static_cast<int>(http_code),
                       "OpenAI streaming API error (HTTP " +

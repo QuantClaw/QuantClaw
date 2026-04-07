@@ -17,6 +17,7 @@ enum class ProviderErrorKind {
   kModelNotFound,    // 404 Not Found
   kTimeout,          // CURL timeout or network error
   kContextOverflow,  // Context window exceeded (400 + "context_length" in body)
+  kBadRequest,       // 400 Bad Request (permanent client error, do NOT retry)
   kUnknown,          // Unclassified error
 };
 
