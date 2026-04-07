@@ -15,9 +15,15 @@
  *   npx tsx discord.ts
  */
 
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client, GatewayIntentBits, Message } from "discord.js";
 import { ChannelAdapter, runAdapter } from "./base.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 class DiscordAdapter extends ChannelAdapter {
   private client: Client;
