@@ -5,7 +5,7 @@
  * Runs as a subprocess managed by ChannelAdapterManager.
  *
  * Environment variables (set by adapter manager):
- *   QUANTCLAW_GATEWAY_URL    — ws://127.0.0.1:18789
+ *   QUANTCLAW_GATEWAY_URL    — ws://127.0.0.1:18800
  *   QUANTCLAW_AUTH_TOKEN     — gateway auth token
  *   QUANTCLAW_CHANNEL_NAME   — "discord"
  *   QUANTCLAW_CHANNEL_CONFIG — JSON: {"token":"...","allowedChannels":[...]}
@@ -18,11 +18,6 @@
 import "dotenv/config";
 import { Client, GatewayIntentBits, Message } from "discord.js";
 import { ChannelAdapter, runAdapter } from "./base.js";
-
-// Ensure gateway URL defaults correctly for local dev if not set
-if (!process.env.QUANTCLAW_GATEWAY_URL) {
-  process.env.QUANTCLAW_GATEWAY_URL = "ws://127.0.0.1:18800";
-}
 
 class DiscordAdapter extends ChannelAdapter {
   private client: Client;
