@@ -4,7 +4,7 @@
  * Bridges Telegram messages to the QuantClaw agent via the gateway WebSocket RPC.
  *
  * Environment variables (set by adapter manager):
- *   QUANTCLAW_GATEWAY_URL    — ws://127.0.0.1:18789
+ *   QUANTCLAW_GATEWAY_URL    — ws://127.0.0.1:18800
  *   QUANTCLAW_AUTH_TOKEN     — gateway auth token
  *   QUANTCLAW_CHANNEL_NAME   — "telegram"
  *   QUANTCLAW_CHANNEL_CONFIG — JSON: {"token":"...","allowedUsers":[...]}
@@ -17,11 +17,6 @@
 import "dotenv/config";
 import { Telegraf } from "telegraf";
 import { ChannelAdapter, runAdapter } from "./base.js";
-
-// Ensure gateway URL defaults correctly for local dev if not set
-if (!process.env.QUANTCLAW_GATEWAY_URL) {
-  process.env.QUANTCLAW_GATEWAY_URL = "ws://127.0.0.1:18800";
-}
 
 class TelegramAdapter extends ChannelAdapter {
   private bot: Telegraf;
@@ -42,9 +37,16 @@ class TelegramAdapter extends ChannelAdapter {
 
     this.bot.on("text", async (ctx) => {
       const msg = ctx.message;
-      console.log(`[telegram] Received message from ${msg.from.id}: ${msg.text}`);
 
-      // Show typing
+      if (!msg.from) {
+        console.warn("[telegram] Skipping message without sender info");
+        return;
+      }
+
+      console.log(
+        `[telegram] Message from ${msg.from.id} in chat ${msg.chat.id}: "${msg.text.slice(0, 80)}"`
+      );
+
       try {
         await ctx.sendChatAction("typing");
       } catch (e) {
@@ -58,26 +60,6 @@ class TelegramAdapter extends ChannelAdapter {
         String(msg.message_id)
       );
     });
-  }
-
-  protected async handlePlatformMessage(
-    senderId: string,
-    channelId: string,
-    text: string,
-    replyTo?: string
-  ): Promise<void> {
-    const sessionKey = `agent:main:telegram:direct:${senderId}`;
-    console.log(`[telegram] Handling message: sender=${senderId}, text="${text}"`);
-
-    try {
-      const response = await this.agentRequest(text, sessionKey);
-      if (response) {
-        await this.sendToPlatform(channelId, response, replyTo);
-      }
-    } catch (err) {
-      console.error("[telegram] Error handling message:", err);
-      await this.sendToPlatform(channelId, "Sorry, I encountered an error processing your request.", replyTo);
-    }
   }
 
   protected async startPlatform(): Promise<void> {
