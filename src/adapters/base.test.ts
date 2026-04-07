@@ -90,8 +90,8 @@ test("allowedIds blocks messages when neither sender nor channel matches", async
 
 test("messages from different channels use separate session keys", async () => {
   await withChannelConfig({ token: "t" }, async () => {
-    const adapter = new TestAdapter();
     process.env.QUANTCLAW_CHANNEL_NAME = "telegram";
+    const adapter = new TestAdapter();
     await adapter.handlePlatformMessage("user-1", "chat-100", "msg1");
     await adapter.handlePlatformMessage("user-1", "chat-200", "msg2");
 
