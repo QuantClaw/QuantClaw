@@ -53,7 +53,7 @@ TEST(ProviderErrorTest, ClassifyTransient) {
 }
 
 TEST(ProviderErrorTest, ClassifyUnknown4xx) {
-  EXPECT_EQ(ClassifyHttpError(400), ProviderErrorKind::kUnknown);
+  EXPECT_EQ(ClassifyHttpError(400), ProviderErrorKind::kBadRequest);
   EXPECT_EQ(ClassifyHttpError(422), ProviderErrorKind::kUnknown);
 }
 
@@ -69,6 +69,8 @@ TEST(ProviderErrorTest, ErrorKindToString) {
   EXPECT_EQ(ProviderErrorKindToString(ProviderErrorKind::kModelNotFound),
             "model_not_found");
   EXPECT_EQ(ProviderErrorKindToString(ProviderErrorKind::kTimeout), "timeout");
+  EXPECT_EQ(ProviderErrorKindToString(ProviderErrorKind::kBadRequest),
+            "bad_request");
   EXPECT_EQ(ProviderErrorKindToString(ProviderErrorKind::kUnknown), "unknown");
 }
 
@@ -491,8 +493,8 @@ TEST(ProviderErrorTest, HttpErrorClassification_ServerError503) {
   EXPECT_EQ(ClassifyHttpError(503), ProviderErrorKind::kTransient);
 }
 
-TEST(ProviderErrorTest, HttpErrorClassification_Unknown400) {
-  EXPECT_EQ(ClassifyHttpError(400), ProviderErrorKind::kUnknown);
+TEST(ProviderErrorTest, HttpErrorClassification_BadRequest400) {
+  EXPECT_EQ(ClassifyHttpError(400), ProviderErrorKind::kBadRequest);
 }
 
 // ================================================================

@@ -31,6 +31,12 @@ Thumbs.db
 *.log
 *.pid
 
+# Adapter secrets
+src/adapters/.env
+.env
+.env.*
+!.env.example
+
 # Node dependencies and build output
 node_modules/
 adapters/node_modules/

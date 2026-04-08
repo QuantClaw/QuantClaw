@@ -354,6 +354,12 @@ std::vector<Message> AgentLoop::ProcessMessage(
         throw;
       }
 
+      // 400 Bad Request — permanent client error, never retry
+      if (pe.Kind() == ProviderErrorKind::kBadRequest) {
+        logger_->error("Bad request (HTTP 400), not retrying: {}", pe.what());
+        throw;
+      }
+
       // Record failure for failover tracking (with Retry-After if provided)
       if (failover_resolver_ && !last_provider_id_.empty()) {
         failover_resolver_->RecordFailure(last_provider_id_, last_profile_id_,
@@ -368,17 +374,15 @@ std::vector<Message> AgentLoop::ProcessMessage(
         auto new_provider = resolve_provider();
         if (new_provider && new_provider != provider) {
           provider = new_provider;
-          // Update the request model to the newly resolved model
           request.model = resolved_request_model_;
           iterations++;
           continue;
         }
       }
 
-      // No failover available or failover also failed
       logger_->error("Provider error with no failover available: {}",
                      pe.what());
-      if (iterations < max_iterations_ - 1) {
+      if (iterations < kMaxTransientRetries) {
         std::this_thread::sleep_for(
             std::chrono::seconds(1 << std::min(iterations, 4)));
         iterations++;
@@ -388,7 +392,7 @@ std::vector<Message> AgentLoop::ProcessMessage(
 
     } catch (const std::exception& e) {
       logger_->error("Error in LLM processing: {}", e.what());
-      if (iterations < max_iterations_ - 1) {
+      if (iterations < kMaxTransientRetries) {
         std::this_thread::sleep_for(
             std::chrono::seconds(1 << std::min(iterations, 4)));
         iterations++;
@@ -659,6 +663,15 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
         return new_messages;
       }
 
+      // 400 Bad Request — permanent client error, never retry
+      if (pe.Kind() == ProviderErrorKind::kBadRequest) {
+        logger_->error("Bad request (HTTP 400), not retrying: {}", pe.what());
+        if (callback) {
+          callback({events::kMessageEnd, {{"error", pe.what()}}});
+        }
+        return new_messages;
+      }
+
       // Record failure and attempt failover (with Retry-After if provided)
       if (failover_resolver_ && !last_provider_id_.empty()) {
         failover_resolver_->RecordFailure(last_provider_id_, last_profile_id_,
@@ -677,7 +690,15 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
         }
       }
 
-      logger_->error("Error in streaming: {}", pe.what());
+      logger_->error("Provider error in streaming: {}", pe.what());
+      if (iterations < kMaxTransientRetries) {
+        int backoff = 1 << std::min(iterations, 4);
+        logger_->info("Retrying streaming request in {}s (attempt {}/{})",
+                      backoff, iterations + 1, kMaxTransientRetries);
+        std::this_thread::sleep_for(std::chrono::seconds(backoff));
+        iterations++;
+        continue;
+      }
       if (callback) {
         callback({events::kMessageEnd, {{"error", pe.what()}}});
       }
@@ -685,6 +706,14 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
 
     } catch (const std::exception& e) {
       logger_->error("Error in streaming: {}", e.what());
+      if (iterations < kMaxTransientRetries) {
+        int backoff = 1 << std::min(iterations, 4);
+        logger_->info("Retrying streaming request in {}s (attempt {}/{})",
+                      backoff, iterations + 1, kMaxTransientRetries);
+        std::this_thread::sleep_for(std::chrono::seconds(backoff));
+        iterations++;
+        continue;
+      }
       if (callback) {
         callback({events::kMessageEnd, {{"error", e.what()}}});
       }

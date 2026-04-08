@@ -576,7 +576,8 @@ bool OnboardCommands::CreateConfigFile(const std::string& model, int port,
     }
     if (!config.contains("channels") || config["channels"].is_null()) {
       config["channels"] = {{"discord", {{"enabled", false}}},
-                            {"telegram", {{"enabled", false}}}};
+                            {"telegram", {{"enabled", false}}},
+                            {"qq", {{"enabled", false}}}};
     }
     if (!config.contains("tools") || config["tools"].is_null()) {
       config["tools"] = {{"allow", nlohmann::json::array()},

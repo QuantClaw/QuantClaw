@@ -4,7 +4,7 @@
  * Bridges Telegram messages to the QuantClaw agent via the gateway WebSocket RPC.
  *
  * Environment variables (set by adapter manager):
- *   QUANTCLAW_GATEWAY_URL    — ws://127.0.0.1:18789
+ *   QUANTCLAW_GATEWAY_URL    — ws://127.0.0.1:18800
  *   QUANTCLAW_AUTH_TOKEN     — gateway auth token
  *   QUANTCLAW_CHANNEL_NAME   — "telegram"
  *   QUANTCLAW_CHANNEL_CONFIG — JSON: {"token":"...","allowedUsers":[...]}
@@ -14,6 +14,7 @@
  *   npx tsx telegram.ts
  */
 
+import "dotenv/config";
 import { Telegraf } from "telegraf";
 import { ChannelAdapter, runAdapter } from "./base.js";
 
@@ -32,12 +33,25 @@ class TelegramAdapter extends ChannelAdapter {
     }
 
     this.bot = new Telegraf(token);
+    this.channelName = "telegram";
 
     this.bot.on("text", async (ctx) => {
       const msg = ctx.message;
 
-      // Show typing
-      await ctx.sendChatAction("typing");
+      if (!msg.from) {
+        console.warn("[telegram] Skipping message without sender info");
+        return;
+      }
+
+      console.log(
+        `[telegram] Message from ${msg.from.id} in chat ${msg.chat.id}: "${msg.text.slice(0, 80)}"`
+      );
+
+      try {
+        await ctx.sendChatAction("typing");
+      } catch (e) {
+        console.error("[telegram] Failed to send typing action:", e);
+      }
 
       await this.handlePlatformMessage(
         String(msg.from.id),

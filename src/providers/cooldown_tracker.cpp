@@ -140,6 +140,10 @@ std::chrono::seconds CooldownTracker::ComputeCooldown(ProviderErrorKind kind,
       // instead of putting the current one into cooldown.
       return std::chrono::seconds(0);
 
+    case ProviderErrorKind::kBadRequest:
+      // Bad request is a permanent client error — no cooldown, just fail.
+      return std::chrono::seconds(0);
+
     case ProviderErrorKind::kUnknown:
       base_s = 60;
       cap_s = 600;

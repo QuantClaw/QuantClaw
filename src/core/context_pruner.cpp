@@ -112,10 +112,38 @@ std::vector<Message> ContextPruner::Prune(const std::vector<Message>& history,
       }
     }
 
-    if (!has_tool_result || protect_threshold < 0 ||
-        message_index >= protect_threshold || message_index <= bootstrap_end) {
-      // No tool results to prune, within protected range,
-      // or within bootstrap region (before first user message)
+    if (!has_tool_result) {
+      result.push_back(msg);
+      continue;
+    }
+
+    // Neutralize stale permission/denial errors in ALL tool_result blocks
+    // (regardless of recency) so the LLM retries tools whose permissions
+    // may have changed since the error was recorded.
+    Message sanitized_msg;
+    sanitized_msg.role = msg.role;
+    bool any_rewritten = false;
+
+    for (const auto& block : msg.content) {
+      if (block.type == "tool_result" && is_stale_tool_error(block.content)) {
+        sanitized_msg.content.push_back(ContentBlock::MakeToolResult(
+            block.tool_use_id,
+            "[Tool was unavailable at the time. Retry — permissions may have "
+            "changed.]"));
+        any_rewritten = true;
+      } else {
+        sanitized_msg.content.push_back(block);
+      }
+    }
+
+    if (any_rewritten) {
+      result.push_back(std::move(sanitized_msg));
+      continue;
+    }
+
+    // Normal pruning logic for non-error tool results
+    if (protect_threshold < 0 || message_index >= protect_threshold ||
+        message_index <= bootstrap_end) {
       result.push_back(msg);
       continue;
     }
@@ -182,6 +210,27 @@ std::string ContextPruner::soft_prune(const std::string& content,
   }
 
   return result;
+}
+
+bool ContextPruner::is_stale_tool_error(const std::string& content) {
+  if (content.size() > 300)
+    return false;
+
+  // Only neutralize environmental/configuration permission errors that may
+  // have been resolved by a config change. Do NOT rewrite explicit user
+  // rejections ("Command execution denied", "Approval timed out") —
+  // those reflect the user's active decision and rewriting them would
+  // cause the LLM to retry the same command in a loop.
+  static const std::vector<std::string> markers = {
+      "Permission denied",
+      "is not allowed",
+      "tool is not permitted",
+  };
+  for (const auto& marker : markers) {
+    if (content.find(marker) != std::string::npos)
+      return true;
+  }
+  return false;
 }
 
 }  // namespace quantclaw
