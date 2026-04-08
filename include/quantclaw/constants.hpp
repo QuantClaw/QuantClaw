@@ -104,6 +104,9 @@ inline constexpr int kToolResultKeepLines = 20;
 /// Overflow compaction: max retry attempts
 inline constexpr int kOverflowCompactionMaxRetries = 3;
 
+/// Max retries for transient provider errors (500, timeout, etc.)
+inline constexpr int kMaxTransientRetries = 3;
+
 // ------------------------------------------------------------
 // Session compaction defaults
 // ------------------------------------------------------------

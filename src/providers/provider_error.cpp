@@ -21,6 +21,8 @@ std::string ProviderErrorKindToString(ProviderErrorKind kind) {
       return "timeout";
     case ProviderErrorKind::kContextOverflow:
       return "context_overflow";
+    case ProviderErrorKind::kBadRequest:
+      return "bad_request";
     case ProviderErrorKind::kUnknown:
       return "unknown";
   }
@@ -80,6 +82,9 @@ ProviderErrorKind ClassifyHttpError(int http_status,
     }
   }
 
+  if (http_status == 400) {
+    return ProviderErrorKind::kBadRequest;
+  }
   if (http_status >= 400 && http_status < 500) {
     return ProviderErrorKind::kUnknown;
   }

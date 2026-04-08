@@ -261,10 +261,20 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   // Start file watcher
   memory_manager->StartFileWatcher();
 
+  // Initialize exec approval manager (before reload_fn so it can be captured)
+  auto exec_approval_mgr =
+      std::make_shared<quantclaw::ExecApprovalManager>(logger_);
+  if (!config.exec_approval_config.is_null()) {
+    auto approval_cfg =
+        quantclaw::ExecApprovalConfig::FromJson(config.exec_approval_config);
+    exec_approval_mgr->Configure(approval_cfg);
+  }
+
   // Build reusable reload function
   std::string config_path = quantclaw::QuantClawConfig::DefaultConfigPath();
   std::function<void()> reload_fn = [&config, agent_loop, tool_registry,
-                                     mcp_tool_manager, memory_manager, this]() {
+                                     mcp_tool_manager, memory_manager,
+                                     exec_approval_mgr, this]() {
     logger_->info("Reload signal received");
     try {
       config = quantclaw::QuantClawConfig::LoadFromFile(
@@ -277,6 +287,13 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       auto new_checker = std::make_shared<quantclaw::ToolPermissionChecker>(
           config.tools_permission);
       tool_registry->SetPermissionChecker(new_checker);
+
+      // Reconfigure exec approval
+      if (exec_approval_mgr && !config.exec_approval_config.is_null()) {
+        auto approval_cfg = quantclaw::ExecApprovalConfig::FromJson(
+            config.exec_approval_config);
+        exec_approval_mgr->Configure(approval_cfg);
+      }
 
       // Re-discover MCP tools if server list changed
       if (!config.mcp.servers.empty()) {
@@ -298,15 +315,6 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   std::string cron_file = (base_dir / "cron.json").string();
   if (std::filesystem::exists(cron_file)) {
     cron_scheduler->Load(cron_file);
-  }
-
-  // Initialize exec approval manager
-  auto exec_approval_mgr =
-      std::make_shared<quantclaw::ExecApprovalManager>(logger_);
-  if (!config.exec_approval_config.is_null()) {
-    auto approval_cfg =
-        quantclaw::ExecApprovalConfig::FromJson(config.exec_approval_config);
-    exec_approval_mgr->Configure(approval_cfg);
   }
 
   // Connect approval manager to tool registry

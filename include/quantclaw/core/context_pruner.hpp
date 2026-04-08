@@ -48,6 +48,10 @@ class ContextPruner {
  private:
   // Soft-prune a tool result: keep first/last N lines with ellipsis
   static std::string soft_prune(const std::string& content, int keep_lines);
+
+  // Returns true if content is a stale tool permission/denial error that
+  // should be neutralized so the LLM retries the tool.
+  static bool is_stale_tool_error(const std::string& content);
 };
 
 }  // namespace quantclaw
