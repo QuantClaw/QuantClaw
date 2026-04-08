@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60" viewBox="0 0 200 60">
+<style>
+  @media (prefers-color-scheme: dark) {
+    .claw { stroke: #00e5ff; }
+    .title { fill: #e0e0ec; }
+    .sub { fill: #5a5a78; }
+    .slash { stroke: #ff3366; opacity: 0.5; }
+  }
+  @media (prefers-color-scheme: light) {
+    .claw { stroke: #0066aa; }
+    .title { fill: #1a1a2e; }
+    .sub { fill: #777790; }
+    .slash { stroke: #cc1144; opacity: 0.35; }
+  }
+</style>
+
+<g transform="translate(24, 28)">
+  <path d="M-10,-16 Q-8,-4 -4,10 Q-3,13 -4,9" class="claw" fill="none" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M-1,-17 Q0,-5 1,10 Q1.5,13 1,8" class="claw" fill="none" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M8,-14 Q8,-3 6,11 Q5,14 6,9" class="claw" fill="none" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M-12,-10 L-5,-7" class="slash" fill="none" stroke-width="0.8" stroke-linecap="round"/>
+  <path d="M1,-11 L6,-8" class="slash" fill="none" stroke-width="0.6" stroke-linecap="round"/>
+</g>
+
+<text x="50" y="32" font-family="'SF Mono', 'Cascadia Code', monospace" font-size="18" font-weight="600" letter-spacing="2" class="title">QWENCLAW</text>
+
+<text x="50" y="46" font-family="'SF Mono', 'Cascadia Code', monospace" font-size="8" letter-spacing="2" class="sub">LOCAL INFERENCE</text>
+
+</svg>

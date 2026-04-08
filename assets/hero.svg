@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320">
+<style>
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #08081a; }
+    .grid { stroke: #ffffff; opacity: 0.025; }
+    .claw { stroke: #00e5ff; }
+    .claw-bg { stroke: #00e5ff; opacity: 0.08; }
+    .slash { stroke: #ff3366; opacity: 0.5; }
+    .title { fill: #f0f0f4; }
+    .sub { fill: #5a5a78; }
+    .accent { fill: #00e5ff; }
+    .rule { stroke: #00e5ff; opacity: 0.2; }
+    .dot { fill: #00e5ff; opacity: 0.06; }
+    .tag-b { stroke: #00e5ff; opacity: 0.4; }
+    .tag-f { fill: #0a1420; }
+    .tag-t { fill: #00e5ff; }
+    .tag2-b { stroke: #4ade80; opacity: 0.4; }
+    .tag2-f { fill: #0a1a10; }
+    .tag2-t { fill: #4ade80; }
+    .tag3-b { stroke: #c084fc; opacity: 0.4; }
+    .tag3-f { fill: #140a20; }
+    .tag3-t { fill: #c084fc; }
+    .tag4-b { stroke: #fbbf24; opacity: 0.4; }
+    .tag4-f { fill: #1a1408; }
+    .tag4-t { fill: #fbbf24; }
+  }
+  @media (prefers-color-scheme: light) {
+    .bg { fill: #f8f8fc; }
+    .grid { stroke: #000000; opacity: 0.02; }
+    .claw { stroke: #0066aa; }
+    .claw-bg { stroke: #0066aa; opacity: 0.06; }
+    .slash { stroke: #cc1144; opacity: 0.35; }
+    .title { fill: #0d0d1a; }
+    .sub { fill: #666680; }
+    .accent { fill: #0066aa; }
+    .rule { stroke: #0066aa; opacity: 0.15; }
+    .dot { fill: #0066aa; opacity: 0.04; }
+    .tag-b { stroke: #0066aa; opacity: 0.3; }
+    .tag-f { fill: #eef4ff; }
+    .tag-t { fill: #0066aa; }
+    .tag2-b { stroke: #16a34a; opacity: 0.3; }
+    .tag2-f { fill: #ecfdf5; }
+    .tag2-t { fill: #16a34a; }
+    .tag3-b { stroke: #7c3aed; opacity: 0.3; }
+    .tag3-f { fill: #f5f0ff; }
+    .tag3-t { fill: #7c3aed; }
+    .tag4-b { stroke: #d97706; opacity: 0.3; }
+    .tag4-f { fill: #fffbeb; }
+    .tag4-t { fill: #d97706; }
+  }
+</style>
+
+<rect width="900" height="320" class="bg"/>
+
+<g>
+  <line x1="0" y1="40" x2="900" y2="40" class="grid" stroke-width="0.5"/>
+  <line x1="0" y1="80" x2="900" y2="80" class="grid" stroke-width="0.5"/>
+  <line x1="0" y1="120" x2="900" y2="120" class="grid" stroke-width="0.5"/>
+  <line x1="0" y1="160" x2="900" y2="160" class="grid" stroke-width="0.5"/>
+  <line x1="0" y1="200" x2="900" y2="200" class="grid" stroke-width="0.5"/>
+  <line x1="0" y1="240" x2="900" y2="240" class="grid" stroke-width="0.5"/>
+  <line x1="0" y1="280" x2="900" y2="280" class="grid" stroke-width="0.5"/>
+  <line x1="100" y1="0" x2="100" y2="320" class="grid" stroke-width="0.5"/>
+  <line x1="200" y1="0" x2="200" y2="320" class="grid" stroke-width="0.5"/>
+  <line x1="300" y1="0" x2="300" y2="320" class="grid" stroke-width="0.5"/>
+  <line x1="400" y1="0" x2="400" y2="320" class="grid" stroke-width="0.5"/>
+  <line x1="500" y1="0" x2="500" y2="320" class="grid" stroke-width="0.5"/>
+  <line x1="600" y1="0" x2="600" y2="320" class="grid" stroke-width="0.5"/>
+  <line x1="700" y1="0" x2="700" y2="320" class="grid" stroke-width="0.5"/>
+  <line x1="800" y1="0" x2="800" y2="320" class="grid" stroke-width="0.5"/>
+</g>
+
+<circle cx="750" cy="80" r="120" class="dot"/>
+<circle cx="150" cy="260" r="80" class="dot"/>
+
+<g transform="translate(450, 115)">
+  <path d="M-52,-72 Q-44,-16 -16,46 Q-12,60 -15,40" class="claw-bg" fill="none" stroke-width="22" stroke-linecap="round"/>
+  <path d="M-8,-76 Q-3,-20 5,44 Q7,60 6,38" class="claw-bg" fill="none" stroke-width="22" stroke-linecap="round"/>
+  <path d="M36,-68 Q38,-14 26,48 Q24,62 26,39" class="claw-bg" fill="none" stroke-width="22" stroke-linecap="round"/>
+
+  <path d="M-52,-72 Q-44,-16 -16,46 Q-12,60 -15,40" class="claw" fill="none" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M-8,-76 Q-3,-20 5,44 Q7,60 6,38" class="claw" fill="none" stroke-width="5" stroke-linecap="round"/>
+  <path d="M36,-68 Q38,-14 26,48 Q24,62 26,39" class="claw" fill="none" stroke-width="4.5" stroke-linecap="round"/>
+
+  <path d="M-60,-46 L-26,-34" class="slash" fill="none" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M-5,-50 L20,-37" class="slash" fill="none" stroke-width="1" stroke-linecap="round"/>
+  <path d="M30,-42 L52,-32" class="slash" fill="none" stroke-width="1.5" stroke-linecap="round"/>
+</g>
+
+<text x="450" y="225" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="48" font-weight="600" letter-spacing="6" class="title">QWENCLAW</text>
+
+<line x1="250" y1="242" x2="650" y2="242" class="rule" stroke-width="0.5"/>
+
+<text x="450" y="264" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="13" letter-spacing="6" class="sub">LOCAL INFERENCE HARNESS</text>
+
+<rect x="218" y="280" width="80" height="24" rx="12" class="tag-f tag-b" stroke-width="0.8"/>
+<text x="258" y="296" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', monospace" font-size="10" font-weight="500" class="tag-t">C++23</text>
+
+<rect x="310" y="280" width="110" height="24" rx="12" class="tag2-f tag2-b" stroke-width="0.8"/>
+<text x="365" y="296" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', monospace" font-size="10" font-weight="500" class="tag2-t">Qwen3.5-9B</text>
+
+<rect x="432" y="280" width="78" height="24" rx="12" class="tag3-f tag3-b" stroke-width="0.8"/>
+<text x="471" y="296" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', monospace" font-size="10" font-weight="500" class="tag3-t">DuckDB</text>
+
+<rect x="522" y="280" width="118" height="24" rx="12" class="tag4-f tag4-b" stroke-width="0.8"/>
+<text x="581" y="296" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', monospace" font-size="10" font-weight="500" class="tag4-t">Opus distilled</text>
+
+</svg>

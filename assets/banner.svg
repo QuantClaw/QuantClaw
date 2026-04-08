@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="200" viewBox="0 0 900 200">
+<style>
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d0d1a; }
+    .claw { stroke: #00e5ff; }
+    .claw-bg { stroke: #00e5ff; opacity: 0.12; }
+    .title { fill: #e8e8ec; }
+    .sub { fill: #6e6e88; }
+    .accent { fill: #00e5ff; }
+    .rule { stroke: #00e5ff; opacity: 0.25; }
+    .slash { stroke: #ff3366; opacity: 0.6; }
+    .tag-border { stroke: #00e5ff; }
+    .tag-fill { fill: #0d1a2a; }
+    .tag-t { fill: #00e5ff; }
+    .tag2-border { stroke: #4ade80; }
+    .tag2-fill { fill: #0d1a14; }
+    .tag2-t { fill: #4ade80; }
+    .tag3-border { stroke: #c084fc; }
+    .tag3-fill { fill: #1a0d2a; }
+    .tag3-t { fill: #c084fc; }
+    .scan { stroke: #ffffff; opacity: 0.02; }
+  }
+  @media (prefers-color-scheme: light) {
+    .bg { fill: #f4f4fa; }
+    .claw { stroke: #0066aa; }
+    .claw-bg { stroke: #0066aa; opacity: 0.08; }
+    .title { fill: #12122a; }
+    .sub { fill: #555570; }
+    .accent { fill: #0066aa; }
+    .rule { stroke: #0066aa; opacity: 0.2; }
+    .slash { stroke: #cc1144; opacity: 0.4; }
+    .tag-border { stroke: #0066aa; }
+    .tag-fill { fill: #eef6ff; }
+    .tag-t { fill: #0066aa; }
+    .tag2-border { stroke: #16a34a; }
+    .tag2-fill { fill: #ecfdf5; }
+    .tag2-t { fill: #16a34a; }
+    .tag3-border { stroke: #7c3aed; }
+    .tag3-fill { fill: #f5f0ff; }
+    .tag3-t { fill: #7c3aed; }
+    .scan { stroke: #000000; opacity: 0.02; }
+  }
+</style>
+
+<rect width="900" height="200" rx="12" class="bg"/>
+
+<line x1="0" y1="50" x2="900" y2="50" class="scan" stroke-width="0.5"/>
+<line x1="0" y1="90" x2="900" y2="90" class="scan" stroke-width="0.5"/>
+<line x1="0" y1="130" x2="900" y2="130" class="scan" stroke-width="0.5"/>
+<line x1="0" y1="170" x2="900" y2="170" class="scan" stroke-width="0.5"/>
+
+<g transform="translate(100, 100)">
+  <path d="M-38,-52 Q-32,-12 -12,34 Q-9,44 -11,30" class="claw-bg" fill="none" stroke-width="14" stroke-linecap="round"/>
+  <path d="M-6,-56 Q-2,-16 4,32 Q6,44 5,28" class="claw-bg" fill="none" stroke-width="14" stroke-linecap="round"/>
+  <path d="M28,-48 Q30,-10 20,35 Q18,46 20,29" class="claw-bg" fill="none" stroke-width="14" stroke-linecap="round"/>
+
+  <path d="M-38,-52 Q-32,-12 -12,34 Q-9,44 -11,30" class="claw" fill="none" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M-6,-56 Q-2,-16 4,32 Q6,44 5,28" class="claw" fill="none" stroke-width="4" stroke-linecap="round"/>
+  <path d="M28,-48 Q30,-10 20,35 Q18,46 20,29" class="claw" fill="none" stroke-width="3.5" stroke-linecap="round"/>
+
+  <path d="M-44,-34 L-18,-24" class="slash" fill="none" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M-3,-38 L16,-27" class="slash" fill="none" stroke-width="0.8" stroke-linecap="round"/>
+  <path d="M24,-31 L40,-22" class="slash" fill="none" stroke-width="1.2" stroke-linecap="round"/>
+</g>
+
+<text x="200" y="85" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="42" font-weight="600" letter-spacing="3" class="title">QWENCLAW</text>
+
+<line x1="200" y1="98" x2="520" y2="98" class="rule" stroke-width="0.5"/>
+
+<text x="200" y="120" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="12" letter-spacing="4" class="sub">LOCAL INFERENCE HARNESS</text>
+
+<rect x="200" y="140" width="75" height="22" rx="11" class="tag-fill tag-border" stroke-width="0.8"/>
+<text x="237" y="155" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="10" font-weight="500" class="tag-t">C++23</text>
+
+<rect x="284" y="140" width="100" height="22" rx="11" class="tag2-fill tag2-border" stroke-width="0.8"/>
+<text x="334" y="155" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="10" font-weight="500" class="tag2-t">QWEN3.5-9B</text>
+
+<rect x="393" y="140" width="72" height="22" rx="11" class="tag3-fill tag3-border" stroke-width="0.8"/>
+<text x="429" y="155" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="10" font-weight="500" class="tag3-t">DuckDB</text>
+
+<text x="698" y="82" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="9" letter-spacing="1" class="sub">OPUS DISTILLED</text>
+<rect x="645" y="90" width="106" height="18" rx="9" fill="none" class="tag-border" stroke-width="0.5" opacity="0.5"/>
+<text x="698" y="103" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="9" class="accent">v0.1.0</text>
+
+<text x="698" y="155" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace" font-size="9" letter-spacing="0.5" class="sub">J-mazz/QwenClaw</text>
+
+</svg>
