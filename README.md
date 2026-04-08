@@ -176,40 +176,6 @@ ctest --test-dir build-cmake43 --output-on-failure
 
 Fork of the [OpenClaw](https://github.com/openclaw/openclaw)/QuantClaw lineage. Maintains practical ecosystem compatibility (plugin manifests, workspace model, SKILL.md loading, RPC workflows, `llm` config mapping) while diverging on C++23 modules, GCC+Ninja build profile, and local-inference-first defaults.
 
----
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/hero.svg">
-    <source media="(prefers-color-scheme: light)" srcset="assets/hero.svg">
-    <img src="assets/hero.svg" alt="QwenClaw — Local Inference Harness" width="100%" />
-  </picture>
-</p>
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/banner.svg">
-    <source media="(prefers-color-scheme: light)" srcset="assets/banner.svg">
-    <img src="assets/banner.svg" alt="QwenClaw banner" width="100%" />
-  </picture>
-</p>
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-compact.svg">
-    <source media="(prefers-color-scheme: light)" srcset="assets/logo-compact.svg">
-    <img src="assets/logo-compact.svg" alt="QwenClaw" width="200" />
-  </picture>
-  &ensp;
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/icon.svg">
-    <source media="(prefers-color-scheme: light)" srcset="assets/icon.svg">
-    <img src="assets/icon.svg" alt="QwenClaw icon" width="48" />
-  </picture>
-</p>
-
----
-
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
