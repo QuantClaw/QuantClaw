@@ -12,6 +12,7 @@ import nlohmann.json;
 import quantclaw.config;
 import quantclaw.providers.curl_raii;
 import quantclaw.providers.anthropic_provider;
+import quantclaw.providers.llama_provider;
 import quantclaw.providers.llm_provider;
 
 export namespace quantclaw {
@@ -124,9 +125,7 @@ void ProviderRegistry::RegisterBuiltinFactories() {
                                std::shared_ptr<spdlog::logger> logger) {
     std::string url =
         entry.base_url.empty() ? "http://127.0.0.1:8081" : entry.base_url;
-    std::string api_key = entry.api_key.empty() ? "local" : entry.api_key;
-    return std::make_shared<AnthropicProvider>(api_key, url, entry.timeout,
-                                               logger);
+    return std::make_shared<LlamaProvider>(url, entry.timeout, logger);
   });
 
   RegisterFactory("anthropic", [](const ProviderEntry& entry,
