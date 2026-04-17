@@ -63,6 +63,10 @@ EvolveRuntime::EvolveRuntime(DagRuntime* dag_runtime,
 }
 
 EvolveRuntime::~EvolveRuntime() {
+  // Stop sidecar + events thread BEFORE destroying DuckDB prepared statements
+  // so any in-flight event routing finishes before the connection goes away.
+  StopSidecar();
+
   if (!dag_runtime_) return;
   std::lock_guard<std::mutex> lock(dag_runtime_->GetMutex());
 
@@ -739,6 +743,287 @@ nlohmann::json EvolveRuntime::ExportRun(const std::string& run_id) const {
   }
 
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// M3: Sidecar lifecycle + events routing
+// ---------------------------------------------------------------------------
+
+bool EvolveRuntime::StartSidecar(const nlohmann::json& evolve_config) {
+  const std::string bridge_script = evolve_config.value("bridge_script", "");
+  if (bridge_script.empty()) {
+    logger_->error("EvolveRuntime sidecar start failed: missing bridge_script");
+    return false;
+  }
+
+  const std::string python_exe = evolve_config.value("python_exe", "python3");
+
+  // Idempotent restart semantics.
+  StopSidecar();
+
+  SidecarManager::Options opts;
+  opts.node_binary = python_exe;
+  opts.sidecar_script = bridge_script;
+  opts.heartbeat_interval_ms =
+      evolve_config.value("heartbeat_interval_ms", 5000);
+  opts.heartbeat_timeout_count =
+      evolve_config.value("heartbeat_timeout_count", 3);
+  opts.graceful_stop_timeout_ms =
+      evolve_config.value("graceful_stop_timeout_ms", 30000);
+  opts.max_restarts = evolve_config.value("max_restarts", 3);
+  opts.pid_file = evolve_config.value("pid_file", "");
+  if (evolve_config.contains("plugin_config")) {
+    opts.plugin_config = evolve_config["plugin_config"];
+  }
+
+  // Python bridge uses health() rather than ping().
+  opts.heartbeat_method = "health";
+
+  events_poll_interval_ms_ = evolve_config.value("events_poll_interval_ms", 500);
+  if (events_poll_interval_ms_ <= 0) {
+    events_poll_interval_ms_ = 500;
+  }
+
+  auto sidecar = std::make_unique<SidecarManager>(logger_);
+  if (!sidecar->Start(opts)) {
+    logger_->error("EvolveRuntime sidecar failed to start");
+    return false;
+  }
+
+  sidecar_ = std::move(sidecar);
+  events_stop_ = false;
+  events_thread_ = std::thread([this] { events_loop_(); });
+  logger_->info("EvolveRuntime sidecar started (poll={}ms)",
+                events_poll_interval_ms_);
+  return true;
+}
+
+void EvolveRuntime::StopSidecar() {
+  events_stop_ = true;
+
+  if (events_thread_.joinable()) {
+    if (events_thread_.get_id() == std::this_thread::get_id()) {
+      events_thread_.detach();
+    } else {
+      events_thread_.join();
+    }
+  }
+
+  if (sidecar_) {
+    sidecar_->Stop();
+    sidecar_.reset();
+  }
+}
+
+bool EvolveRuntime::IsSidecarRunning() const {
+  return sidecar_ && sidecar_->IsRunning();
+}
+
+SidecarResponse EvolveRuntime::SidecarCall(const std::string& method,
+                                           const nlohmann::json& params,
+                                           int timeout_ms) {
+  if (!sidecar_) {
+    SidecarResponse resp;
+    resp.ok = false;
+    resp.error = "Evolve sidecar unavailable";
+    return resp;
+  }
+
+  try {
+    return sidecar_->Call(method, params, timeout_ms);
+  } catch (const std::exception& e) {
+    SidecarResponse resp;
+    resp.ok = false;
+    resp.error = std::string("Evolve sidecar call failed: ") + e.what();
+    return resp;
+  }
+}
+
+void EvolveRuntime::PollEvents() {
+  if (!sidecar_) {
+    return;
+  }
+
+  auto resp = sidecar_->Call("events.drain", nlohmann::json::object(), 5000);
+  if (!resp.ok) {
+    logger_->debug("Evolve events.drain failed: {}", resp.error);
+    return;
+  }
+
+  if (!resp.result.is_object()) {
+    return;
+  }
+
+  auto it = resp.result.find("events");
+  if (it == resp.result.end() || !it->is_array()) {
+    return;
+  }
+
+  for (const auto& event : *it) {
+    if (!event.is_object()) {
+      continue;
+    }
+    route_event_(event);
+  }
+}
+
+void EvolveRuntime::route_event_(const nlohmann::json& event) {
+  if (!dag_runtime_ || !dag_runtime_->IsEnabled() || !event.is_object()) {
+    return;
+  }
+
+  auto normalize = [](std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+    std::replace_if(s.begin(), s.end(),
+                    [](char c) { return c == '.' || c == '-' || c == ' '; },
+                    '_');
+    return s;
+  };
+
+  std::string type = normalize(event.value("type", ""));
+  if (type.empty()) {
+    type = normalize(event.value("event", ""));
+  }
+  if (type.empty()) {
+    return;
+  }
+
+  DagNodeType node_type;
+  if (type == "run_started" || type == "evolve_run_started" ||
+      type == "run_start") {
+    node_type = DagNodeType::kEvolveRunStarted;
+  } else if (type == "round_started" || type == "evolve_round_started") {
+    node_type = DagNodeType::kEvolveRoundStarted;
+  } else if (type == "candidate_generated" ||
+             type == "evolve_candidate_generated") {
+    node_type = DagNodeType::kEvolveCandidateGenerated;
+  } else if (type == "candidate_evaluated" ||
+             type == "evolve_candidate_evaluated") {
+    node_type = DagNodeType::kEvolveCandidateEvaluated;
+  } else if (type == "lesson_recorded" || type == "evolve_lesson_recorded") {
+    node_type = DagNodeType::kEvolveLessonRecorded;
+  } else if (type == "run_completed" || type == "evolve_run_completed") {
+    node_type = DagNodeType::kEvolveRunCompleted;
+  } else if (type == "run_error" || type == "evolve_run_error") {
+    node_type = DagNodeType::kEvolveRunError;
+  } else {
+    logger_->debug("EvolveRuntime ignoring unknown event type: {}", type);
+    return;
+  }
+
+  std::string run_id = event.value("run_id", "");
+  if (run_id.empty() && event.contains("runId") && event["runId"].is_string()) {
+    run_id = event["runId"].get<std::string>();
+  }
+  if (run_id.empty() && event.contains("payload") &&
+      event["payload"].is_object()) {
+    const auto& payload_obj = event["payload"];
+    run_id = payload_obj.value("run_id", payload_obj.value("runId", ""));
+  }
+  if (run_id.empty()) {
+    logger_->debug("EvolveRuntime event missing run_id for type={}", type);
+    return;
+  }
+
+  nlohmann::json payload =
+      event.contains("payload") ? event["payload"] : event;
+
+  std::lock_guard<std::mutex> lock(turn_map_mu_);
+  auto it = run_turn_states_.find(run_id);
+  if (it == run_turn_states_.end()) {
+    logger_->debug("EvolveRuntime event for unattached run_id={}", run_id);
+    return;
+  }
+
+  dag_runtime_->EmitNode(&it->second, node_type, payload);
+}
+
+void EvolveRuntime::events_loop_() {
+  while (!events_stop_) {
+    try {
+      PollEvents();
+    } catch (const std::exception& e) {
+      if (!events_stop_) {
+        logger_->warn("EvolveRuntime events loop error: {}", e.what());
+      }
+    } catch (...) {
+      if (!events_stop_) {
+        logger_->warn("EvolveRuntime events loop error: unknown exception");
+      }
+    }
+
+    if (events_stop_) {
+      break;
+    }
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(events_poll_interval_ms_));
+  }
+}
+
+bool EvolveRuntime::AttachRun(const std::string& run_id,
+                              const std::string& experiment_name) {
+  if (run_id.empty() || !dag_runtime_ || !dag_runtime_->IsEnabled()) {
+    return false;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(turn_map_mu_);
+    if (run_turn_states_.contains(run_id)) {
+      return false;
+    }
+  }
+
+  // Use experiment_name as the DAG session key so long-lived evolve runs
+  // appear grouped by experiment in run views.
+  DagTurnState state = dag_runtime_->BeginTurn(
+      experiment_name.empty() ? "evolve" : experiment_name,
+      "evolve run " + run_id);
+  if (state.run_id.empty()) {
+    return false;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(turn_map_mu_);
+    auto [_, inserted] = run_turn_states_.emplace(run_id, state);
+    if (!inserted) {
+      dag_runtime_->EndTurn(&state, "stopped", "duplicate attach");
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void EvolveRuntime::DetachRun(const std::string& run_id,
+                              const std::string& status,
+                              const std::string& error_message) {
+  DagTurnState state;
+  bool found = false;
+
+  {
+    std::lock_guard<std::mutex> lock(turn_map_mu_);
+    auto it = run_turn_states_.find(run_id);
+    if (it != run_turn_states_.end()) {
+      state = it->second;
+      run_turn_states_.erase(it);
+      found = true;
+    }
+  }
+
+  if (!found) {
+    return;
+  }
+
+  if (dag_runtime_ && dag_runtime_->IsEnabled()) {
+    dag_runtime_->EndTurn(&state, status, error_message);
+  }
+}
+
+std::size_t EvolveRuntime::AttachedRunCount() const {
+  std::lock_guard<std::mutex> lock(turn_map_mu_);
+  return run_turn_states_.size();
 }
 
 }  // namespace quantclaw

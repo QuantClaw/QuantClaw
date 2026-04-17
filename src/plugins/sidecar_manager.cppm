@@ -45,6 +45,7 @@ class SidecarManager {
     std::string pid_file;
     int heartbeat_interval_ms = 5000;
     int heartbeat_timeout_count = 3;
+    std::string heartbeat_method = "ping";
     int graceful_stop_timeout_ms = 10000;
     int max_restarts = 10;
     std::vector<std::string> env_whitelist;

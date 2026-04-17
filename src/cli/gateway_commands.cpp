@@ -367,6 +367,18 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       logger_->info("Evolve subsystem ready ({} orphaned run(s) from prior "
                     "gateway lifetime)",
                     orphaned);
+
+      if (config.evolve_config.value("sidecar_enabled", true)) {
+        if (!evolve_runtime->StartSidecar(config.evolve_config)) {
+          logger_->error(
+              "Evolve sidecar failed to start; evolve tools will return "
+              "sidecar unavailable");
+        } else {
+          logger_->info("Evolve sidecar started");
+        }
+      } else {
+        logger_->info("Evolve sidecar disabled by config");
+      }
     }
   }
 

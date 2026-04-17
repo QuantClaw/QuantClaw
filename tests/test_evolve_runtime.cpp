@@ -171,3 +171,36 @@ TEST_F(EvolveRuntimeTest, ExportRunReturnsFullGraph) {
   EXPECT_EQ(exported["lessons"].size(), 1);
   EXPECT_EQ(exported["edges"].size(), 1);
 }
+
+TEST_F(EvolveRuntimeTest, StartSidecarFailsWithoutBridgeScript) {
+  nlohmann::json cfg = nlohmann::json::object();
+  cfg["python_exe"] = "python3";
+  EXPECT_FALSE(evolve_->StartSidecar(cfg));
+}
+
+TEST_F(EvolveRuntimeTest, IsSidecarRunningFalseByDefault) {
+  EXPECT_FALSE(evolve_->IsSidecarRunning());
+}
+
+TEST_F(EvolveRuntimeTest, SidecarCallReturnsErrorWhenNotStarted) {
+  auto resp = evolve_->SidecarCall("run.init", nlohmann::json::object());
+  EXPECT_FALSE(resp.ok);
+  EXPECT_FALSE(resp.error.empty());
+}
+
+TEST_F(EvolveRuntimeTest, AttachRunAndDetachRunManageTurnStateMap) {
+  const std::string run_id = "run_m3_attach";
+  EXPECT_TRUE(evolve_->AttachRun(run_id, "qc_smoke"));
+  EXPECT_EQ(evolve_->AttachedRunCount(), 1u);
+
+  // Idempotent guard.
+  EXPECT_FALSE(evolve_->AttachRun(run_id, "qc_smoke"));
+  EXPECT_EQ(evolve_->AttachedRunCount(), 1u);
+
+  evolve_->DetachRun(run_id, "completed", "");
+  EXPECT_EQ(evolve_->AttachedRunCount(), 0u);
+}
+
+TEST_F(EvolveRuntimeTest, PollEventsIsNoOpWithoutSidecar) {
+  EXPECT_NO_THROW(evolve_->PollEvents());
+}

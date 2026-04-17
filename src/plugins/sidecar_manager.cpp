@@ -227,10 +227,11 @@ void SidecarManager::monitor_loop() {
       continue;
     }
 
-    // Heartbeat check via RPC ping
-    auto resp = Call("ping", {}, 5000);
+    // Heartbeat check via configured RPC method (default "ping").
+    auto resp = Call(opts_.heartbeat_method, {}, 5000);
     if (!resp.ok) {
-      logger_->warn("Sidecar heartbeat failed: {}", resp.error);
+      logger_->warn("Sidecar heartbeat ({}) failed: {}", opts_.heartbeat_method,
+                    resp.error);
     }
   }
 }
