@@ -556,6 +556,13 @@ QuantClawConfig QuantClawConfig::FromJsonExpanded(const nlohmann::json& json) {
   }
 
   // ================================================================
+  // Evolve (ASI-Evolve integration config)
+  // ================================================================
+  if (json.contains("evolve") && json["evolve"].is_object()) {
+    config.evolve_config = json["evolve"];
+  }
+
+  // ================================================================
   // Tools (permission allow/deny or legacy named configs)
   // ================================================================
   if (json.contains("tools") && json["tools"].is_object()) {

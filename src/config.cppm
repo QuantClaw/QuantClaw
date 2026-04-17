@@ -267,6 +267,9 @@ export struct QuantClawConfig {
   // Recon config (raw JSON, consumed by ScopeValidator and ReconRuntime)
   nlohmann::json recon_config;
 
+  // Evolve config (raw JSON, consumed by EvolveRuntime and its sidecar).
+  nlohmann::json evolve_config;
+
   // Models section (OpenClaw format: models.providers)
   std::unordered_map<std::string, ProviderConfig> model_providers;
 

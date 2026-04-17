@@ -35,6 +35,7 @@ import quantclaw.security.scope_validator;
 import quantclaw.security.tool_permissions;
 import quantclaw.session.session_manager;
 import quantclaw.core.recon_runtime;
+import quantclaw.core.evolve_runtime;
 import quantclaw.core.memory_manager;
 import quantclaw.core.dag_runtime;
 import quantclaw.core.cron_scheduler;
@@ -352,6 +353,21 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
                   "{} restricted targets",
                   scope_validator->AcceptedTargets().size(),
                   scope_validator->RestrictedTargets().size());
+  }
+
+  // Initialize evolve subsystem if configured
+  std::shared_ptr<quantclaw::EvolveRuntime> evolve_runtime;
+  if (!config.evolve_config.is_null() &&
+      config.evolve_config.value("enabled", false)) {
+    logger_->info("Evolve mode enabled — initializing evolve runtime");
+    evolve_runtime = std::shared_ptr<quantclaw::EvolveRuntime>(
+        new quantclaw::EvolveRuntime(dag_runtime.get(), logger_));
+    if (evolve_runtime->IsEnabled()) {
+      int orphaned = evolve_runtime->MarkOrphanedRuns();
+      logger_->info("Evolve subsystem ready ({} orphaned run(s) from prior "
+                    "gateway lifetime)",
+                    orphaned);
+    }
   }
 
   // Wire cron scheduler and session manager to tool registry

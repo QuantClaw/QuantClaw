@@ -60,6 +60,20 @@ std::string DagNodeTypeToString(DagNodeType type) {
       return "turn_error";
     case DagNodeType::kTurnStopped:
       return "turn_stopped";
+    case DagNodeType::kEvolveRunStarted:
+      return "evolve_run_started";
+    case DagNodeType::kEvolveRoundStarted:
+      return "evolve_round_started";
+    case DagNodeType::kEvolveCandidateGenerated:
+      return "evolve_candidate_generated";
+    case DagNodeType::kEvolveCandidateEvaluated:
+      return "evolve_candidate_evaluated";
+    case DagNodeType::kEvolveLessonRecorded:
+      return "evolve_lesson_recorded";
+    case DagNodeType::kEvolveRunCompleted:
+      return "evolve_run_completed";
+    case DagNodeType::kEvolveRunError:
+      return "evolve_run_error";
   }
   return "unknown";
 }

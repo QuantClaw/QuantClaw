@@ -27,6 +27,14 @@ enum class DagNodeType {
   kTurnFinal,
   kTurnError,
   kTurnStopped,
+  // Evolution events (emitted by EvolveRuntime).
+  kEvolveRunStarted,
+  kEvolveRoundStarted,
+  kEvolveCandidateGenerated,
+  kEvolveCandidateEvaluated,
+  kEvolveLessonRecorded,
+  kEvolveRunCompleted,
+  kEvolveRunError,
 };
 
 std::string DagNodeTypeToString(DagNodeType type);

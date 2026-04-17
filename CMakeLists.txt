@@ -275,6 +275,8 @@ set(QUANTCLAW_CORE_SOURCES
     src/security/scope_validator.cpp
     # Recon
     src/core/recon_runtime.cpp
+    # Evolve
+    src/core/evolve_runtime.cpp
     # Web
     src/web/web_server.cpp
     src/web/api_routes.cpp
@@ -357,6 +359,7 @@ set(QUANTCLAW_CORE_MODULE_SOURCES
     src/security/sandbox.cppm
     src/security/scope_validator.cppm
     src/core/recon_runtime.cppm
+    src/core/evolve_runtime.cppm
     src/web/web_server.cppm
     src/web/api_routes.cppm
 )
@@ -606,6 +609,7 @@ if(BUILD_TESTS)
         tests/test_dag_runtime.cpp
         tests/test_scope_validator.cpp
         tests/test_recon_runtime.cpp
+        tests/test_evolve_runtime.cpp
     )
 
     add_executable(quantclaw_tests ${TEST_SOURCES})
