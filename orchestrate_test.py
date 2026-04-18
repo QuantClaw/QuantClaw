@@ -1,10 +1,10 @@
 import os
 import struct
 import subprocess
+import sys
 import time
 import json
 import requests
-import signal
 import math
 
 MODEL_PATH = "/home/jmazz/Projects/QuantClaw/providers.local/qwen3.5-9B-claude4.6-distillation/Qwen3.5-9B.Q5_K_M.gguf"
@@ -14,17 +14,57 @@ TMP_DIR = "/home/jmazz/Projects/QuantClaw/tmp"
 
 os.makedirs(TMP_DIR, exist_ok=True)
 
-def cleanup_llama():
-    subprocess.run(["pkill", "-f", "llama-server"], stderr=subprocess.DEVNULL)
+
+def cleanup_port(port):
+    subprocess.run(
+        ["fuser", "-k", f"{port}/tcp"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def build_prefix(target_chars=12000):
+    base = (
+        "Consider the following reasoning trace. Goldbach's conjecture claims "
+        "every even integer greater than two is the sum of two primes; while "
+        "unproved, numerical verification holds to extraordinary bounds. The "
+        "twin prime conjecture, in contrast, asserts infinitely many pairs "
+        "(p, p+2) with both prime; Zhang's 2013 bound of seventy million, "
+        "subsequently sharpened by Maynard and the Polymath project, showed "
+        "infinitely many pairs within a finite gap, but the exact gap of two "
+        "remains open. Moving to complexity theory, P versus NP asks whether "
+        "efficient verification implies efficient search; most researchers "
+        "believe the separation holds, yet natural proofs, relativization, "
+        "and algebrization barriers rule out vast families of attacks. In "
+        "measure theory, Lebesgue integration generalizes Riemann by first "
+        "approximating the codomain rather than the domain, which handles "
+        "pathological functions that Riemann cannot. The dominated "
+        "convergence theorem, Fatou's lemma, and the monotone convergence "
+        "theorem together furnish the core limit-exchange tools. In "
+        "topology, the fundamental group of a space encodes loops up to "
+        "homotopy, and van Kampen's theorem expresses the fundamental "
+        "group of a union in terms of the groups of the parts. Simply "
+        "connected spaces have trivial fundamental group; spheres of "
+        "dimension two and higher qualify, while the circle does not. "
+    )
+    chunks = []
+    total = 0
+    while total < target_chars:
+        chunks.append(base)
+        total += len(base)
+    return "".join(chunks)
+
+
+PROMPT_PREFIX = build_prefix()
+
 
 def create_sidecar():
-    # Schema per docs/BRIDGE.md §2.2 and ui/llama.cpp/llama.cpp/src/turboquant.cpp loader.
-    # Minimal valid fixture: hooks are pass-through scaffolding, so values are unused.
+    # Qwen3.5-9B geometry; payload is zero-filled since loader hooks are pass-through scaffolding.
     version = 1
-    num_layers = 1
-    head_dim = 4
-    num_heads = 1
-    num_kv_heads = 1
+    num_layers = 24
+    head_dim = 256
+    num_heads = 32
+    num_kv_heads = 4
     bits_k = 8
     bits_v = 8
 
@@ -49,83 +89,116 @@ def create_sidecar():
         f.write(header)
         f.write(payload)
 
-def run_case(name, port, extra_args=[]):
-    cleanup_llama()
-    cmd = [LLAMA_SERVER, "-m", MODEL_PATH, "--host", "127.0.0.1", "--port", str(port), "--parallel", "1", "--ctx-size", "4096"] + extra_args
+
+def _terminate(proc, timeout=5):
+    proc.terminate()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+
+
+def run_case(name, port, extra_args=None):
+    extra_args = extra_args or []
+    cleanup_port(port)
+    cmd = [
+        LLAMA_SERVER,
+        "-m", MODEL_PATH,
+        "--host", "127.0.0.1",
+        "--port", str(port),
+        "--parallel", "1",
+        "--ctx-size", "16384",
+    ] + extra_args
     print(f"Starting {name} server on port {port}...")
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
+
+    stderr_path = os.path.join(TMP_DIR, f"{name}.stderr.log")
+    stderr_file = open(stderr_path, "wb")
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=stderr_file)
+
     url = f"http://127.0.0.1:{port}"
     ready = False
     start_time = time.time()
-    while time.time() - start_time < 60:
+    while time.time() - start_time < 120:
         try:
             resp = requests.get(f"{url}/health", timeout=1)
             if resp.status_code == 200:
                 ready = True
                 break
-        except:
+        except Exception:
             pass
-    
+        time.sleep(0.5)
+
     if not ready:
         print(f"Server {name} failed to become ready.")
-        proc.terminate()
+        _terminate(proc, timeout=5)
+        stderr_file.close()
         return None
 
     payload = {
         "model": "local/Qwen3.5-9B.Q5_K_M.gguf",
-        "messages": [{"role": "user", "content": "Continue this sentence with around 20 plain words: The quick brown fox"}],
+        "messages": [{
+            "role": "user",
+            "content": PROMPT_PREFIX + "\n\nContinue this sentence with around 20 plain words: The quick brown fox",
+        }],
         "temperature": 0,
         "max_tokens": 24,
         "seed": 42,
         "logprobs": True,
-        "top_logprobs": 5
+        "top_logprobs": 5,
     }
-    
+
+    data = None
     try:
-        resp = requests.post(f"{url}/v1/chat/completions", json=payload, timeout=60)
+        resp = requests.post(f"{url}/v1/chat/completions", json=payload, timeout=300)
         data = resp.json()
         with open(os.path.join(TMP_DIR, f"{name}.resp.json"), "w") as f:
             json.dump(data, f)
-        return data
     except Exception as e:
         print(f"Error during request for {name}: {e}")
-        return None
     finally:
-        proc.terminate()
-        proc.wait()
+        _terminate(proc, timeout=10)
+        stderr_file.close()
+
+    with open(stderr_path, "r", errors="replace") as f:
+        stderr_text = f.read()
+
+    if data is None:
+        return None
+    return data, stderr_text
+
+
+def get_metrics(data):
+    if not data or "choices" not in data:
+        return None
+    choice = data["choices"][0]
+    text = choice["message"]["content"]
+    logprobs_data = choice.get("logprobs", {}).get("content", [])
+
+    assert logprobs_data, "logprobs.content is empty; llama-server build lacks logprobs support"
+
+    first_token = logprobs_data[0].get("token")
+    first_logprob = logprobs_data[0].get("logprob")
+    sum_lp = sum(lp.get("logprob", 0) for lp in logprobs_data)
+    avg_lp = sum_lp / len(logprobs_data)
+    ppl = math.exp(-avg_lp)
+
+    return {
+        "text": text,
+        "first_token": first_token,
+        "first_logprob": first_logprob,
+        "avg_logprob": avg_lp,
+        "ppl": ppl,
+    }
+
 
 def analyze(ref_data, tq_data):
-    def get_metrics(data):
-        if not data or "choices" not in data:
-            return None
-        choice = data["choices"][0]
-        text = choice["message"]["content"]
-        logprobs_data = choice.get("logprobs", {}).get("content", [])
-        
-        if not logprobs_data:
-            return {"text": text, "first_token": None, "first_logprob": None, "avg_logprob": None, "ppl": None}
-        
-        first_token = logprobs_data[0].get("token")
-        first_logprob = logprobs_data[0].get("logprob")
-        sum_lp = sum(lp.get("logprob", 0) for lp in logprobs_data)
-        avg_lp = sum_lp / len(logprobs_data)
-        ppl = math.exp(-avg_lp)
-        
-        return {
-            "text": text,
-            "first_token": first_token,
-            "first_logprob": first_logprob,
-            "avg_logprob": avg_lp,
-            "ppl": ppl
-        }
-
     ref_m = get_metrics(ref_data)
     tq_m = get_metrics(tq_data)
-    
+
     print("\nMetrics Report:")
-    for name, m in [("Reference", ref_m), ("TurboQuant", tq_m)]:
-        print(f"--- {name} ---")
+    for label, m in [("Reference", ref_m), ("TurboQuant", tq_m)]:
+        print(f"--- {label} ---")
         if m:
             print(f"First Token: {m['first_token']}")
             print(f"First Logprob: {m['first_logprob']}")
@@ -134,12 +207,50 @@ def analyze(ref_data, tq_data):
         else:
             print("No data available.")
 
-    if ref_m and tq_m:
-        print(f"\nText Equality: {ref_m['text'] == tq_m['text']}")
-        if "error" in ref_data: print(f"Ref Error: {ref_data['error']}")
-        if "error" in tq_data: print(f"TQ Error: {tq_data['error']}")
+    if ref_m is None or tq_m is None:
+        print("FAIL: missing metrics.")
+        sys.exit(1)
+
+    if ref_m["text"] != tq_m["text"]:
+        print("FAIL: pass-through divergence in generated text.")
+        print(f"  ref: {ref_m['text']!r}")
+        print(f"  tq : {tq_m['text']!r}")
+        sys.exit(1)
+
+    if ref_m["first_logprob"] != tq_m["first_logprob"]:
+        print(
+            f"FAIL: pass-through divergence in first_logprob "
+            f"({ref_m['first_logprob']} vs {tq_m['first_logprob']})."
+        )
+        sys.exit(1)
+
+    if ref_m["avg_logprob"] != tq_m["avg_logprob"]:
+        print(
+            f"FAIL: pass-through divergence in avg_logprob "
+            f"({ref_m['avg_logprob']} vs {tq_m['avg_logprob']})."
+        )
+        sys.exit(1)
+
+    print("\nPASS: reference and turboquant match bit-for-bit in pass-through mode.")
+
 
 create_sidecar()
-ref = run_case("reference", 39101)
-tq = run_case("turboquant", 39102, ["--turboquant", SIDECAR_PATH, "--turboquant-bits-k", "8", "--turboquant-bits-v", "8"])
-analyze(ref, tq)
+ref_result = run_case("reference", 39101)
+tq_result = run_case(
+    "turboquant", 39102,
+    ["--turboquant", SIDECAR_PATH, "--turboquant-bits-k", "8", "--turboquant-bits-v", "8"],
+)
+
+if ref_result is None or tq_result is None:
+    print("FAIL: one or both servers failed to produce a response.")
+    sys.exit(1)
+
+ref_data, _ = ref_result
+tq_data, tq_stderr = tq_result
+
+if "turboquant: engaged" not in tq_stderr:
+    print("FAIL: 'turboquant: engaged' not found in TurboQuant server stderr.")
+    print("      Sidecar did not load, or the loader silently fell back.")
+    sys.exit(1)
+
+analyze(ref_data, tq_data)
