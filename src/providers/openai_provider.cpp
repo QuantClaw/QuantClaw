@@ -84,6 +84,7 @@ nlohmann::json
 serialize_messages_to_openai(const std::vector<Message>& messages,
                              bool thinking_enabled) {
   nlohmann::json arr = nlohmann::json::array();
+  std::unordered_set<std::string> pending_tool_result_ids;
 
   for (const auto& msg : messages) {
     std::string text_content = message_text_content(msg);
@@ -100,9 +101,13 @@ serialize_messages_to_openai(const std::vector<Message>& messages,
     }
 
     if (has_tool_result) {
-      // Expand into separate OpenAI "tool" role messages
+      // OpenAI requires tool result messages to immediately answer the
+      // previous assistant tool_calls turn. Session truncation can leave stale
+      // tool_result blocks behind, so skip unmatched results instead of
+      // sending an invalid replay payload.
       for (const auto& b : msg.content) {
-        if (b.type == "tool_result") {
+        if (b.type == "tool_result" &&
+            pending_tool_result_ids.erase(b.tool_use_id) > 0) {
           arr.push_back({{"role", "tool"},
                          {"tool_call_id", b.tool_use_id},
                          {"content", b.content}});
@@ -135,7 +140,14 @@ serialize_messages_to_openai(const std::vector<Message>& messages,
       }
       j["tool_calls"] = tool_calls;
       arr.push_back(j);
+      pending_tool_result_ids.clear();
+      for (const auto& b : msg.content) {
+        if (b.type == "tool_use" && !b.id.empty()) {
+          pending_tool_result_ids.insert(b.id);
+        }
+      }
     } else {
+      pending_tool_result_ids.clear();
       // Plain text message (system, user, or assistant)
       nlohmann::json j = {{"role", msg.role}, {"content", text_content}};
       if (msg.role == "assistant" && !reasoning_content.empty()) {
