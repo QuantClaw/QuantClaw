@@ -46,11 +46,11 @@ std::string ResolveFactoryIdForEntry(const ProviderEntry& entry) {
 std::shared_ptr<LLMProvider> CreateOpenAICompatibleProvider(
     const ProviderEntry& entry, std::shared_ptr<spdlog::logger> logger,
     std::string_view default_base_url, std::string_view default_api) {
-  std::string url = entry.base_url.empty() ? std::string(default_base_url)
-                                           : entry.base_url;
-  return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                          std::move(logger), entry.id,
-                                          NormalizeProviderApi(entry, default_api));
+  std::string url =
+      entry.base_url.empty() ? std::string(default_base_url) : entry.base_url;
+  return std::make_shared<OpenAIProvider>(
+      entry.api_key, url, entry.timeout, std::move(logger), entry.id,
+      NormalizeProviderApi(entry, default_api));
 }
 
 }  // namespace

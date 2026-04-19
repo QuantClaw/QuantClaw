@@ -260,8 +260,8 @@ OpenAIProvider::ChatCompletion(const ChatCompletionRequest& request) {
   payload["max_tokens"] = request.max_tokens;
 
   // Add messages
-  payload["messages"] =
-      serialize_messages_to_openai(normalized_messages, request.thinking != "off");
+  payload["messages"] = serialize_messages_to_openai(normalized_messages,
+                                                     request.thinking != "off");
 
   // Add tools if provided
   if (!request.tools.empty()) {
@@ -412,16 +412,16 @@ struct StreamContext {
 static std::vector<ToolCall> TakeCompleteToolCalls(StreamContext* ctx,
                                                    bool keep_incomplete) {
   std::vector<PendingToolCallFragment> remaining;
-  auto complete = FinalizePendingToolCalls(ctx->pending_tool_calls,
-                                           ctx->normalization_context,
-                                           &ctx->seen_tool_call_ids,
-                                           &remaining);
+  auto complete = FinalizePendingToolCalls(
+      ctx->pending_tool_calls, ctx->normalization_context,
+      &ctx->seen_tool_call_ids, &remaining);
 
   if (!keep_incomplete) {
     for (const auto& pending : remaining) {
       if (ctx->logger) {
         ctx->logger->warn(
-            "Dropping incomplete streamed tool call: id='{}', name='{}', arguments_len={}",
+            "Dropping incomplete streamed tool call: id='{}', name='{}', "
+            "arguments_len={}",
             pending.id, pending.name, pending.arguments.size());
       }
     }
@@ -583,8 +583,8 @@ void OpenAIProvider::ChatCompletionStream(
   payload["max_tokens"] = request.max_tokens;
   payload["stream"] = true;
 
-  payload["messages"] =
-      serialize_messages_to_openai(normalized_messages, request.thinking != "off");
+  payload["messages"] = serialize_messages_to_openai(normalized_messages,
+                                                     request.thinking != "off");
 
   if (!request.tools.empty()) {
     payload["tools"] = request.tools;

@@ -36,10 +36,11 @@ struct PendingToolCallFragment {
 std::vector<std::string>
 ExtractAllowedToolNames(const ChatCompletionRequest& request);
 
-StreamNormalizationContext BuildStreamNormalizationContext(
-    const std::string& provider_id, const std::string& api,
-    const ChatCompletionRequest& request,
-    const std::shared_ptr<spdlog::logger>& logger);
+StreamNormalizationContext
+BuildStreamNormalizationContext(const std::string& provider_id,
+                                const std::string& api,
+                                const ChatCompletionRequest& request,
+                                const std::shared_ptr<spdlog::logger>& logger);
 
 void SanitizeReplayMessages(std::vector<Message>* messages,
                             const StreamNormalizationContext& context);

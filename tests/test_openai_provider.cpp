@@ -252,31 +252,31 @@ TEST(OpenAIProviderCompatibilityTest,
 
   httplib::Server server;
   std::atomic<bool> saw_request = false;
-  server.Post("/chat/completions", [&](const httplib::Request& req,
-                                        httplib::Response& res) {
-    saw_request = true;
-    const auto body = nlohmann::json::parse(req.body);
-    EXPECT_EQ(body.value("model", ""), "qwen3-max");
-    ASSERT_TRUE(body.contains("tools"));
+  server.Post("/chat/completions",
+              [&](const httplib::Request& req, httplib::Response& res) {
+                saw_request = true;
+                const auto body = nlohmann::json::parse(req.body);
+                EXPECT_EQ(body.value("model", ""), "qwen3-max");
+                ASSERT_TRUE(body.contains("tools"));
 
-    nlohmann::json tool_call = {
-        {"id", "function.read:1"},
-        {"type", "function"},
-        {"function",
-         {{"name", " functions.read "},
-          {"arguments", "prefix {\"path\":\"/tmp/a.txt\"}x"}}},
-    };
-    nlohmann::json choice = {
-        {"message",
-         {{"content", nullptr},
-          {"tool_calls", nlohmann::json::array({tool_call})}}},
-        {"finish_reason", "tool_calls"},
-    };
-    nlohmann::json response = {
-        {"choices", nlohmann::json::array({choice})},
-    };
-    res.set_content(response.dump(), "application/json");
-  });
+                nlohmann::json tool_call = {
+                    {"id", "function.read:1"},
+                    {"type", "function"},
+                    {"function",
+                     {{"name", " functions.read "},
+                      {"arguments", "prefix {\"path\":\"/tmp/a.txt\"}x"}}},
+                };
+                nlohmann::json choice = {
+                    {"message",
+                     {{"content", nullptr},
+                      {"tool_calls", nlohmann::json::array({tool_call})}}},
+                    {"finish_reason", "tool_calls"},
+                };
+                nlohmann::json response = {
+                    {"choices", nlohmann::json::array({choice})},
+                };
+                res.set_content(response.dump(), "application/json");
+              });
 
   std::thread server_thread([&]() {
     quantclaw::test::ReleaseHeldPort(port);
@@ -293,14 +293,14 @@ TEST(OpenAIProviderCompatibilityTest,
   quantclaw::ChatCompletionRequest request;
   request.model = "qwen3-max";
   request.messages.push_back({"user", "Read a file"});
-  request.tools.push_back({{"type", "function"},
-                           {"function",
-                            {{"name", "read"},
-                             {"description", "Read file"},
-                             {"parameters",
-                              {{"type", "object"},
-                               {"properties",
-                                {{{"path", {{"type", "string"}}}}}}}}}}});
+  request.tools.push_back(
+      {{"type", "function"},
+       {"function",
+        {{"name", "read"},
+         {"description", "Read file"},
+         {"parameters",
+          {{"type", "object"},
+           {"properties", {{{"path", {{"type", "string"}}}}}}}}}}});
 
   quantclaw::ChatCompletionResponse response;
   try {
@@ -320,14 +320,15 @@ TEST(OpenAIProviderCompatibilityTest,
   EXPECT_EQ(response.tool_calls[0].arguments["path"], "/tmp/a.txt");
 }
 
-TEST(OpenAIProviderCompatibilityTest, StreamingRepairsSplitToolCallAcrossChunks) {
+TEST(OpenAIProviderCompatibilityTest,
+     StreamingRepairsSplitToolCallAcrossChunks) {
   const int port = quantclaw::test::FindFreePort();
   ASSERT_GT(port, 0);
 
   httplib::Server server;
   std::atomic<bool> saw_request = false;
   server.Post("/chat/completions", [&](const httplib::Request& req,
-                                        httplib::Response& res) {
+                                       httplib::Response& res) {
     saw_request = true;
     const auto body = nlohmann::json::parse(req.body);
     EXPECT_EQ(body.value("model", ""), "qwen3-max");
@@ -370,14 +371,14 @@ TEST(OpenAIProviderCompatibilityTest, StreamingRepairsSplitToolCallAcrossChunks)
   request.model = "qwen3-max";
   request.stream = true;
   request.messages.push_back({"user", "Read a file"});
-  request.tools.push_back({{"type", "function"},
-                           {"function",
-                            {{"name", "read"},
-                             {"description", "Read file"},
-                             {"parameters",
-                              {{"type", "object"},
-                               {"properties",
-                                {{{"path", {{"type", "string"}}}}}}}}}}});
+  request.tools.push_back(
+      {{"type", "function"},
+       {"function",
+        {{"name", "read"},
+         {"description", "Read file"},
+         {"parameters",
+          {{"type", "object"},
+           {"properties", {{{"path", {{"type", "string"}}}}}}}}}}});
 
   std::vector<quantclaw::ChatCompletionResponse> chunks;
   try {

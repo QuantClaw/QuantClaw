@@ -20,9 +20,8 @@ namespace {
 constexpr size_t kReplayToolCallNameMaxChars = 64;
 
 bool HasNonWhitespace(std::string_view value) {
-  return std::any_of(value.begin(), value.end(), [](unsigned char ch) {
-    return !std::isspace(ch);
-  });
+  return std::any_of(value.begin(), value.end(),
+                     [](unsigned char ch) { return !std::isspace(ch); });
 }
 
 std::string NormalizeToolNameToken(std::string_view raw) {
@@ -50,12 +49,9 @@ std::string NormalizeToolNameToken(std::string_view raw) {
 
 const std::unordered_map<std::string, std::string>& HtmlEntityMap() {
   static const auto* entities =
-      new std::unordered_map<std::string, std::string>{{"amp", "&"},
-                                                       {"quot", "\""},
-                                                       {"apos", "'"},
-                                                       {"#39", "'"},
-                                                       {"lt", "<"},
-                                                       {"gt", ">"}};  // NOLINT
+      new std::unordered_map<std::string, std::string>{
+          {"amp", "&"}, {"quot", "\""}, {"apos", "'"},
+          {"#39", "'"}, {"lt", "<"},    {"gt", ">"}};  // NOLINT
   return *entities;
 }
 
@@ -179,8 +175,8 @@ std::string ResolveCaseInsensitiveAllowedToolName(
   return it != folded_allowed.end() ? it->second : std::string{};
 }
 
-std::vector<std::string> BuildStructuredToolNameCandidates(
-    std::string_view raw_name) {
+std::vector<std::string>
+BuildStructuredToolNameCandidates(std::string_view raw_name) {
   const std::string trimmed = Trim(raw_name);
   if (trimmed.empty()) {
     return {};
@@ -330,16 +326,15 @@ std::string InferToolNameFromToolCallId(
 bool LooksLikeMalformedToolNameCounter(std::string_view raw_name) {
   std::string normalized = Trim(raw_name);
   std::replace(normalized.begin(), normalized.end(), '/', '.');
-  return std::regex_search(normalized,
-                           std::regex("^(?:functions?|tools?)[._-]?",
-                                      std::regex::icase)) &&
-         std::regex_search(normalized,
-                           std::regex("(?:[:._-]\\d+|\\d+)$"));
+  return std::regex_search(
+             normalized,
+             std::regex("^(?:functions?|tools?)[._-]?", std::regex::icase)) &&
+         std::regex_search(normalized, std::regex("(?:[:._-]\\d+|\\d+)$"));
 }
 
-std::string ResolveAllowedToolName(
-    std::string_view raw_name, const StreamNormalizationContext& context,
-    std::string_view raw_tool_call_id = {}) {
+std::string ResolveAllowedToolName(std::string_view raw_name,
+                                   const StreamNormalizationContext& context,
+                                   std::string_view raw_tool_call_id = {}) {
   const std::string trimmed = Trim(raw_name);
   if (trimmed.empty()) {
     return InferToolNameFromToolCallId(raw_tool_call_id,
@@ -375,8 +370,8 @@ std::string ResolveAllowedToolName(
   }
 
   auto inferred_from_name = InferToolNameFromToolCallId(
-      trimmed, context.allowed_tool_names, context.normalized_allowed_tool_names,
-      context.folded_allowed_tool_names);
+      trimmed, context.allowed_tool_names,
+      context.normalized_allowed_tool_names, context.folded_allowed_tool_names);
   if (!inferred_from_name.empty()) {
     return inferred_from_name;
   }
@@ -386,13 +381,13 @@ std::string ResolveAllowedToolName(
   }
 
   auto structured = ResolveStructuredAllowedToolName(
-      trimmed, context.allowed_tool_names, context.normalized_allowed_tool_names,
-      context.folded_allowed_tool_names);
+      trimmed, context.allowed_tool_names,
+      context.normalized_allowed_tool_names, context.folded_allowed_tool_names);
   return structured.empty() ? trimmed : structured;
 }
 
 nlohmann::json ParseArgumentsWithRepair(std::string_view raw_arguments,
-                                       bool decode_html_entities) {
+                                        bool decode_html_entities) {
   std::string candidate = Trim(raw_arguments);
   if (decode_html_entities) {
     candidate = DecodeHtmlEntities(candidate);
@@ -479,7 +474,8 @@ bool NormalizeToolCall(ToolCall* tool_call,
   if (!tool_call->arguments.is_object() && !tool_call->arguments.is_array()) {
     if (context.logger) {
       context.logger->warn(
-          "Dropping malformed tool call '{}' because arguments are not structured",
+          "Dropping malformed tool call '{}' because arguments are not "
+          "structured",
           tool_call->name);
     }
     return false;
@@ -515,8 +511,8 @@ void NormalizeToolUseBlock(ContentBlock* block,
 
 }  // namespace
 
-std::vector<std::string> ExtractAllowedToolNames(
-    const ChatCompletionRequest& request) {
+std::vector<std::string>
+ExtractAllowedToolNames(const ChatCompletionRequest& request) {
   std::vector<std::string> names;
   names.reserve(request.tools.size());
   for (const auto& tool : request.tools) {
@@ -537,10 +533,11 @@ std::vector<std::string> ExtractAllowedToolNames(
   return names;
 }
 
-StreamNormalizationContext BuildStreamNormalizationContext(
-    const std::string& provider_id, const std::string& api,
-    const ChatCompletionRequest& request,
-    const std::shared_ptr<spdlog::logger>& logger) {
+StreamNormalizationContext
+BuildStreamNormalizationContext(const std::string& provider_id,
+                                const std::string& api,
+                                const ChatCompletionRequest& request,
+                                const std::shared_ptr<spdlog::logger>& logger) {
   StreamNormalizationContext context;
   context.provider_id = provider_id;
   context.api = api;
@@ -549,10 +546,9 @@ StreamNormalizationContext BuildStreamNormalizationContext(
 
   const auto folded_provider = ToLower(provider_id);
   const auto folded_api = ToLower(api);
-  context.decode_html_entities = folded_provider == "xai" ||
-                                 folded_provider == "grok" ||
-                                 folded_api.find("html-entities") !=
-                                     std::string::npos;
+  context.decode_html_entities =
+      folded_provider == "xai" || folded_provider == "grok" ||
+      folded_api.find("html-entities") != std::string::npos;
 
   for (const auto& name : context.allowed_tool_names) {
     context.normalized_allowed_tool_names.emplace(NormalizeToolNameToken(name),
@@ -615,11 +611,11 @@ void NormalizeToolCalls(std::vector<ToolCall>* tool_calls,
   *tool_calls = std::move(normalized);
 }
 
-std::vector<ToolCall> FinalizePendingToolCalls(
-    const std::vector<PendingToolCallFragment>& pending,
-    const StreamNormalizationContext& context,
-    std::unordered_set<std::string>* seen_ids,
-    std::vector<PendingToolCallFragment>* remaining) {
+std::vector<ToolCall>
+FinalizePendingToolCalls(const std::vector<PendingToolCallFragment>& pending,
+                         const StreamNormalizationContext& context,
+                         std::unordered_set<std::string>* seen_ids,
+                         std::vector<PendingToolCallFragment>* remaining) {
   std::vector<ToolCall> normalized;
   std::vector<PendingToolCallFragment> unresolved;
   normalized.reserve(pending.size());
@@ -629,8 +625,8 @@ std::vector<ToolCall> FinalizePendingToolCalls(
     ToolCall tool_call;
     tool_call.id = fragment.id;
     tool_call.name = fragment.name;
-    tool_call.arguments =
-        ParseArgumentsWithRepair(fragment.arguments, context.decode_html_entities);
+    tool_call.arguments = ParseArgumentsWithRepair(
+        fragment.arguments, context.decode_html_entities);
 
     if (HasNonWhitespace(fragment.arguments) && tool_call.arguments.is_null()) {
       unresolved.push_back(fragment);
