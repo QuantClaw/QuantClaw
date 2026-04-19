@@ -41,7 +41,7 @@ interface RpcResponse {
   id: string;
   ok: boolean;
   payload?: unknown;
-  error?: string;
+  error?: unknown;
 }
 
 interface RpcEvent {
@@ -51,6 +51,23 @@ interface RpcEvent {
 }
 
 type GatewayFrame = RpcResponse | RpcEvent;
+
+function errorSummary(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    const maybeMessage = (err as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage) {
+      return maybeMessage;
+    }
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err || "unknown error");
+}
 
 // ---- Base Adapter ----
 
@@ -163,7 +180,7 @@ export abstract class ChannelAdapter {
             if (resp.ok) {
               p.resolve(resp.payload);
             } else {
-              p.reject(new Error(resp.error ?? "RPC error"));
+              p.reject(new Error(errorSummary(resp.error ?? "RPC error")));
             }
           }
         }
@@ -371,7 +388,7 @@ export abstract class ChannelAdapter {
       console.error("[adapter] Failed to process message:", err);
       await this.sendToPlatform(
         channelId,
-        "Error processing your message.",
+        `Error processing your message: ${errorSummary(err)}`,
         replyTo
       );
     }
