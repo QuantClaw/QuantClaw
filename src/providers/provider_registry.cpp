@@ -4,6 +4,7 @@
 #include "quantclaw/providers/provider_registry.hpp"
 
 #include <algorithm>
+#include <string_view>
 
 #include "quantclaw/auth/github_copilot_auth.hpp"
 #include "quantclaw/auth/openai_codex_auth.hpp"
@@ -13,6 +14,47 @@
 #include "quantclaw/providers/openai_provider.hpp"
 
 namespace quantclaw {
+namespace {
+
+std::string NormalizeProviderApi(const ProviderEntry& entry,
+                                 std::string_view fallback_api) {
+  if (!entry.api.empty()) {
+    return entry.api;
+  }
+  return std::string(fallback_api);
+}
+
+std::string ResolveFactoryIdForEntry(const ProviderEntry& entry) {
+  if (!entry.api.empty()) {
+    if (entry.api == "anthropic-messages") {
+      return "anthropic";
+    }
+    if (entry.api == "google-generative-ai") {
+      return "gemini";
+    }
+    if (entry.api == "openai-codex-responses") {
+      return "openai-codex";
+    }
+    if (entry.api == "openai-completions" || entry.api == "openai-responses" ||
+        entry.api == "azure-openai-responses") {
+      return "openai";
+    }
+  }
+  return entry.id;
+}
+
+std::shared_ptr<LLMProvider> CreateOpenAICompatibleProvider(
+    const ProviderEntry& entry, std::shared_ptr<spdlog::logger> logger,
+    std::string_view default_base_url, std::string_view default_api) {
+  std::string url =
+      entry.base_url.empty() ? std::string(default_base_url) : entry.base_url;
+  return std::make_shared<OpenAIProvider>(
+      entry.api_key, url, entry.timeout, std::move(logger), entry.id,
+      NormalizeProviderApi(entry, default_api));
+}
+
+}  // namespace
+
 // --- ModelRef ---
 
 ModelRef ModelRef::parse(const std::string& raw,
@@ -43,10 +85,9 @@ void ProviderRegistry::RegisterBuiltinFactories() {
   // OpenAI-compatible factory (also works for Ollama, Together, etc.)
   RegisterFactory("openai", [](const ProviderEntry& entry,
                                std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty() ? "https://api.openai.com/v1" : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
+    return CreateOpenAICompatibleProvider(entry, std::move(logger),
+                                          "https://api.openai.com/v1",
+                                          "openai-completions");
   });
 
   RegisterFactory("openai-codex", [](const ProviderEntry& entry,
@@ -87,21 +128,18 @@ void ProviderRegistry::RegisterBuiltinFactories() {
   // Ollama (uses OpenAI-compatible API)
   RegisterFactory("ollama", [](const ProviderEntry& entry,
                                std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty() ? "http://localhost:11434/v1" : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
+    return CreateOpenAICompatibleProvider(entry, std::move(logger),
+                                          "http://localhost:11434/v1",
+                                          "openai-completions");
   });
 
   // Gemini / Google (uses OpenAI-compatible API via base_url override)
   RegisterFactory("gemini", [](const ProviderEntry& entry,
                                std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty()
-            ? "https://generativelanguage.googleapis.com/v1beta/openai"
-            : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
+    return CreateOpenAICompatibleProvider(
+        entry, std::move(logger),
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+        "google-generative-ai");
   });
 
   // Google alias
@@ -110,28 +148,25 @@ void ProviderRegistry::RegisterBuiltinFactories() {
   // Bedrock (uses OpenAI-compatible gateway)
   RegisterFactory("bedrock", [](const ProviderEntry& entry,
                                 std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty() ? "http://localhost:8080/v1" : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
+    return CreateOpenAICompatibleProvider(entry, std::move(logger),
+                                          "http://localhost:8080/v1",
+                                          "openai-completions");
   });
 
   // OpenRouter
   RegisterFactory("openrouter", [](const ProviderEntry& entry,
                                    std::shared_ptr<spdlog::logger> logger) {
-    std::string url = entry.base_url.empty() ? "https://openrouter.ai/api/v1"
-                                             : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
+    return CreateOpenAICompatibleProvider(entry, std::move(logger),
+                                          "https://openrouter.ai/api/v1",
+                                          "openai-completions");
   });
 
   // Together
   RegisterFactory("together", [](const ProviderEntry& entry,
                                  std::shared_ptr<spdlog::logger> logger) {
-    std::string url =
-        entry.base_url.empty() ? "https://api.together.xyz/v1" : entry.base_url;
-    return std::make_shared<OpenAIProvider>(entry.api_key, url, entry.timeout,
-                                            logger);
+    return CreateOpenAICompatibleProvider(entry, std::move(logger),
+                                          "https://api.together.xyz/v1",
+                                          "openai-completions");
   });
 }
 
@@ -164,6 +199,7 @@ void ProviderRegistry::LoadFromConfig(const nlohmann::json& providers_json) {
     if (entry.api_key_env.empty()) {
       entry.api_key_env = val.value("api_key_env", std::string{});
     }
+    entry.api = val.value("api", std::string{});
     entry.timeout = val.value("timeout", 30);
     if (val.contains("extra")) {
       entry.extra = val["extra"];
@@ -210,13 +246,6 @@ ProviderRegistry::GetProvider(const std::string& provider_id) {
   if (it != instances_.end())
     return it->second;
 
-  // Find factory
-  auto fit = factories_.find(provider_id);
-  if (fit == factories_.end()) {
-    logger_->error("No factory registered for provider: {}", provider_id);
-    return nullptr;
-  }
-
   // Find entry
   auto eit = entries_.find(provider_id);
   if (eit == entries_.end()) {
@@ -226,6 +255,15 @@ ProviderRegistry::GetProvider(const std::string& provider_id) {
     entry.api_key = resolve_api_key(entry);
     entries_[provider_id] = entry;
     eit = entries_.find(provider_id);
+  }
+
+  auto factory_id = ResolveFactoryIdForEntry(eit->second);
+  auto fit = factories_.find(factory_id);
+  if (fit == factories_.end()) {
+    logger_->error(
+        "No factory registered for provider: {} (resolved from {} with api={})",
+        factory_id, provider_id, eit->second.api);
+    return nullptr;
   }
 
   auto provider = fit->second(eit->second, logger_);
@@ -241,12 +279,6 @@ ProviderRegistry::GetProviderForModel(const ModelRef& ref) {
 std::shared_ptr<LLMProvider>
 ProviderRegistry::GetProviderWithKey(const std::string& provider_id,
                                      const std::string& api_key) {
-  auto fit = factories_.find(provider_id);
-  if (fit == factories_.end()) {
-    logger_->error("No factory for provider: {}", provider_id);
-    return nullptr;
-  }
-
   // Build a temporary entry with the given API key
   ProviderEntry entry;
   auto eit = entries_.find(provider_id);
@@ -256,6 +288,14 @@ ProviderRegistry::GetProviderWithKey(const std::string& provider_id,
     entry.id = provider_id;
   }
   entry.api_key = api_key;
+
+  auto factory_id = ResolveFactoryIdForEntry(entry);
+  auto fit = factories_.find(factory_id);
+  if (fit == factories_.end()) {
+    logger_->error("No factory for provider: {} (resolved from {} with api={})",
+                   factory_id, provider_id, entry.api);
+    return nullptr;
+  }
 
   return fit->second(entry, logger_);
 }
@@ -278,7 +318,11 @@ std::vector<ModelAlias> ProviderRegistry::Aliases() const {
 }
 
 bool ProviderRegistry::HasProvider(const std::string& provider_id) const {
-  return factories_.count(provider_id) > 0 || entries_.count(provider_id) > 0;
+  if (entries_.count(provider_id) > 0) {
+    const auto& entry = entries_.at(provider_id);
+    return factories_.count(ResolveFactoryIdForEntry(entry)) > 0;
+  }
+  return factories_.count(provider_id) > 0;
 }
 
 const ProviderEntry*
