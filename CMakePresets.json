@@ -14,7 +14,11 @@
         "CMAKE_CXX_STANDARD": "23",
         "CMAKE_CXX_EXTENSIONS": "OFF",
         "CMAKE_CXX_SCAN_FOR_MODULES": "ON",
-        "QC_PRECOMPILE_GCC_STDLIB_MODULES": "ON"
+        "QC_PRECOMPILE_GCC_STDLIB_MODULES": "ON",
+        "GGML_CUDA": "ON",
+        "CMAKE_CUDA_COMPILER": "/usr/local/cuda-13.2/bin/nvcc",
+        "CMAKE_CUDA_HOST_COMPILER": "/usr/bin/g++-15",
+        "CMAKE_CUDA_ARCHITECTURES": "89"
       }
     }
   ],
