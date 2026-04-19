@@ -28,7 +28,8 @@ std::string NormalizeToolNameToken(std::string_view raw) {
   std::string normalized;
   normalized.reserve(raw.size());
   bool last_was_separator = false;
-  for (unsigned char ch : raw) {
+  for (char raw_ch : raw) {
+    const auto ch = static_cast<unsigned char>(raw_ch);
     if (std::isalnum(ch)) {
       normalized.push_back(static_cast<char>(std::tolower(ch)));
       last_was_separator = false;
