@@ -102,24 +102,28 @@ std::optional<std::string> DecodeHtmlEntity(std::string_view entity) {
 std::string DecodeHtmlEntities(std::string_view raw) {
   std::string decoded;
   decoded.reserve(raw.size());
-  for (size_t i = 0; i < raw.size(); ++i) {
+  size_t i = 0;
+  while (i < raw.size()) {
     if (raw[i] != '&') {
       decoded.push_back(raw[i]);
+      ++i;
       continue;
     }
     const auto semi = raw.find(';', i + 1);
     if (semi == std::string_view::npos) {
       decoded.push_back(raw[i]);
+      ++i;
       continue;
     }
     const auto entity = raw.substr(i + 1, semi - i - 1);
     auto replacement = DecodeHtmlEntity(entity);
     if (!replacement) {
       decoded.push_back(raw[i]);
+      ++i;
       continue;
     }
     decoded += *replacement;
-    i = semi;
+    i = semi + 1;
   }
   return decoded;
 }
@@ -336,7 +340,7 @@ bool LooksLikeMalformedToolNameCounter(std::string_view raw_name) {
 std::string ResolveAllowedToolName(std::string_view raw_name,
                                    const StreamNormalizationContext& context,
                                    std::string_view raw_tool_call_id = {}) {
-  const std::string trimmed = Trim(raw_name);
+  std::string trimmed = Trim(raw_name);
   if (trimmed.empty()) {
     return InferToolNameFromToolCallId(raw_tool_call_id,
                                        context.allowed_tool_names,
