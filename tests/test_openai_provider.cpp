@@ -282,7 +282,16 @@ TEST(OpenAIProviderCompatibilityTest,
     quantclaw::test::ReleaseHeldPort(port);
     server.listen("127.0.0.1", port);
   });
-  ASSERT_TRUE(quantclaw::test::WaitForServerReady(port, 5000));
+  auto stop_server = [&]() {
+    server.stop();
+    if (server_thread.joinable()) {
+      server_thread.join();
+    }
+  };
+  if (!quantclaw::test::WaitForServerReady(port, 5000)) {
+    stop_server();
+    FAIL() << "Server not ready on port " << port;
+  }
 
   auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
   auto logger =
@@ -309,8 +318,7 @@ TEST(OpenAIProviderCompatibilityTest,
     ADD_FAILURE() << "ChatCompletion threw: " << e.what();
   }
 
-  server.stop();
-  server_thread.join();
+  stop_server();
 
   ASSERT_TRUE(saw_request.load());
   EXPECT_EQ(response.finish_reason, "tool_calls");
@@ -359,7 +367,16 @@ TEST(OpenAIProviderCompatibilityTest,
     quantclaw::test::ReleaseHeldPort(port);
     server.listen("127.0.0.1", port);
   });
-  ASSERT_TRUE(quantclaw::test::WaitForServerReady(port, 5000));
+  auto stop_server = [&]() {
+    server.stop();
+    if (server_thread.joinable()) {
+      server_thread.join();
+    }
+  };
+  if (!quantclaw::test::WaitForServerReady(port, 5000)) {
+    stop_server();
+    FAIL() << "Server not ready on port " << port;
+  }
 
   auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
   auto logger =
@@ -390,8 +407,7 @@ TEST(OpenAIProviderCompatibilityTest,
     ADD_FAILURE() << "ChatCompletionStream threw: " << e.what();
   }
 
-  server.stop();
-  server_thread.join();
+  stop_server();
 
   ASSERT_TRUE(saw_request.load());
   ASSERT_EQ(chunks.size(), 2u);

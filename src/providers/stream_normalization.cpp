@@ -49,11 +49,10 @@ std::string NormalizeToolNameToken(std::string_view raw) {
 }
 
 const std::unordered_map<std::string, std::string>& HtmlEntityMap() {
-  static const auto* entities =
-      new std::unordered_map<std::string, std::string>{
-          {"amp", "&"}, {"quot", "\""}, {"apos", "'"},
-          {"#39", "'"}, {"lt", "<"},    {"gt", ">"}};  // NOLINT
-  return *entities;
+  static const std::unordered_map<std::string, std::string> entities = {
+      {"amp", "&"}, {"quot", "\""}, {"apos", "'"},
+      {"#39", "'"}, {"lt", "<"},    {"gt", ">"}};
+  return entities;
 }
 
 std::optional<std::string> DecodeHtmlEntity(std::string_view entity) {
@@ -272,10 +271,11 @@ std::string InferToolNameFromToolCallId(
     return {};
   }
 
-  const std::regex trailing_index_re("[:._/-]\\d+$");
-  const std::regex trailing_digits_re("\\d+$");
-  const std::regex function_prefix_re("^functions?[._-]?", std::regex::icase);
-  const std::regex tool_prefix_re("^tools?[._-]?", std::regex::icase);
+  static const std::regex trailing_index_re("[:._/-]\\d+$");
+  static const std::regex trailing_digits_re("\\d+$");
+  static const std::regex function_prefix_re("^functions?[._-]?",
+                                             std::regex::icase);
+  static const std::regex tool_prefix_re("^tools?[._-]?", std::regex::icase);
 
   std::unordered_set<std::string> candidate_tokens;
   auto add_token = [&](std::string token) {
@@ -329,12 +329,13 @@ std::string InferToolNameFromToolCallId(
 }
 
 bool LooksLikeMalformedToolNameCounter(std::string_view raw_name) {
+  static const std::regex prefix_re("^(?:functions?|tools?)[._-]?",
+                                    std::regex::icase);
+  static const std::regex suffix_re("(?:[:._-]\\d+|\\d+)$");
   std::string normalized = Trim(raw_name);
   std::replace(normalized.begin(), normalized.end(), '/', '.');
-  return std::regex_search(
-             normalized,
-             std::regex("^(?:functions?|tools?)[._-]?", std::regex::icase)) &&
-         std::regex_search(normalized, std::regex("(?:[:._-]\\d+|\\d+)$"));
+  return std::regex_search(normalized, prefix_re) &&
+         std::regex_search(normalized, suffix_re);
 }
 
 std::string ResolveAllowedToolName(std::string_view raw_name,
@@ -465,15 +466,29 @@ bool NormalizeToolCall(ToolCall* tool_call,
   if (!HasNonWhitespace(tool_call->name)) {
     return false;
   }
+  bool had_string_arguments = false;
+  bool had_non_whitespace_string_arguments = false;
   if (tool_call->arguments.is_string()) {
-    tool_call->arguments = ParseArgumentsWithRepair(
-        tool_call->arguments.get_ref<const std::string&>(),
-        context.decode_html_entities);
+    const std::string& raw_arguments =
+        tool_call->arguments.get_ref<const std::string&>();
+    had_string_arguments = true;
+    had_non_whitespace_string_arguments = HasNonWhitespace(raw_arguments);
+    tool_call->arguments =
+        ParseArgumentsWithRepair(raw_arguments, context.decode_html_entities);
   }
   if (context.decode_html_entities) {
     DecodeHtmlEntitiesInJson(&tool_call->arguments);
   }
   if (tool_call->arguments.is_null()) {
+    if (had_string_arguments && had_non_whitespace_string_arguments) {
+      if (context.logger) {
+        context.logger->warn(
+            "Dropping malformed tool call '{}' because arguments could not be "
+            "parsed",
+            tool_call->name);
+      }
+      return false;
+    }
     tool_call->arguments = nlohmann::json::object();
   }
   if (!tool_call->arguments.is_object() && !tool_call->arguments.is_array()) {
