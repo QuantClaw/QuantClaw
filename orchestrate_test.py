@@ -1,5 +1,4 @@
 import os
-import struct
 import subprocess
 import sys
 import time
@@ -11,6 +10,14 @@ MODEL_PATH = "/home/jmazz/Projects/QuantClaw/providers.local/qwen3.5-9B-claude4.
 SIDECAR_PATH = "/home/jmazz/Projects/QuantClaw/tmp/Qwen3.5-9B.Q5_K_M.turboquant.bin"
 LLAMA_SERVER = "/home/jmazz/Projects/QuantClaw/build-cmake43/bin/llama-server"
 TMP_DIR = "/home/jmazz/Projects/QuantClaw/tmp"
+ENCODER = "/home/jmazz/Projects/QuantClaw/scripts/turboquant_encode.py"
+
+SIDECAR_NUM_LAYERS   = 24
+SIDECAR_HEAD_DIM     = 256
+SIDECAR_NUM_HEADS    = 32
+SIDECAR_NUM_KV_HEADS = 4
+SIDECAR_BITS_K       = 8
+SIDECAR_BITS_V       = 8
 
 os.makedirs(TMP_DIR, exist_ok=True)
 
@@ -59,35 +66,17 @@ PROMPT_PREFIX = build_prefix()
 
 
 def create_sidecar():
-    # Qwen3.5-9B geometry; payload is zero-filled since loader hooks are pass-through scaffolding.
-    version = 1
-    num_layers = 24
-    head_dim = 256
-    num_heads = 32
-    num_kv_heads = 4
-    bits_k = 8
-    bits_v = 8
-
-    header = struct.pack(
-        "<4sIIIIIBB6x",
-        b"TQNT",
-        version,
-        num_layers,
-        head_dim,
-        num_heads,
-        num_kv_heads,
-        bits_k,
-        bits_v,
-    )
-    assert len(header) == 32
-
-    per_layer_f32 = 2 * head_dim * head_dim + ((1 << bits_k) + (1 << bits_v)) * head_dim
-    payload = b"\0" * (num_layers * per_layer_f32 * 4)
-
-    print(f"Creating sidecar at {SIDECAR_PATH} ({len(header) + len(payload)} bytes)...")
-    with open(SIDECAR_PATH, "wb") as f:
-        f.write(header)
-        f.write(payload)
+    cmd = [
+        sys.executable, ENCODER,
+        "--out", SIDECAR_PATH,
+        "--num-layers", str(SIDECAR_NUM_LAYERS),
+        "--head-dim", str(SIDECAR_HEAD_DIM),
+        "--num-heads", str(SIDECAR_NUM_HEADS),
+        "--num-kv-heads", str(SIDECAR_NUM_KV_HEADS),
+        "--bits-k", str(SIDECAR_BITS_K),
+        "--bits-v", str(SIDECAR_BITS_V),
+    ]
+    subprocess.run(cmd, check=True)
 
 
 def _terminate(proc, timeout=5):
