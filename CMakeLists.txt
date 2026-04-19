@@ -143,6 +143,7 @@ set(QUANTCLAW_CORE_SOURCES
     src/auth/github_copilot_auth.cpp
     src/providers/curl_raii.cpp
     src/providers/openai_provider.cpp
+    src/providers/stream_normalization.cpp
     src/providers/openai_codex_provider.cpp
     src/providers/github_copilot_provider.cpp
     src/providers/anthropic_provider.cpp

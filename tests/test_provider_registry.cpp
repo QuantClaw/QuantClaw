@@ -4,6 +4,8 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+#include "quantclaw/providers/anthropic_provider.hpp"
+#include "quantclaw/providers/openai_provider.hpp"
 #include "quantclaw/providers/provider_registry.hpp"
 
 #include <gtest/gtest.h>
@@ -140,6 +142,38 @@ TEST(ProviderRegistryTest, GetProviderCreatesInstance) {
   // Second call returns same instance
   auto provider2 = reg->GetProvider("openai");
   EXPECT_EQ(provider.get(), provider2.get());
+}
+
+TEST(ProviderRegistryTest, LoadFromConfigApiFieldSelectsCompatibleFactory) {
+  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  reg->RegisterBuiltinFactories();
+
+  nlohmann::json config = {
+      {"qwen",
+       {{"apiKey", "test-key"},
+        {"api", "openai-completions"},
+        {"baseUrl", "https://dashscope.aliyuncs.com/compatible-mode/v1"}}},
+  };
+  reg->LoadFromConfig(config);
+
+  auto provider = reg->GetProvider("qwen");
+  ASSERT_NE(provider, nullptr);
+  EXPECT_NE(dynamic_cast<OpenAIProvider*>(provider.get()), nullptr);
+}
+
+TEST(ProviderRegistryTest, GetProviderWithKeyUsesApiMappedFactory) {
+  auto reg = std::make_unique<ProviderRegistry>(make_logger("providers"));
+  reg->RegisterBuiltinFactories();
+
+  ProviderEntry entry;
+  entry.id = "kimi";
+  entry.api = "anthropic-messages";
+  entry.base_url = "https://api.moonshot.ai";
+  reg->AddProvider(entry);
+
+  auto provider = reg->GetProviderWithKey("kimi", "override-key");
+  ASSERT_NE(provider, nullptr);
+  EXPECT_NE(dynamic_cast<AnthropicProvider*>(provider.get()), nullptr);
 }
 
 TEST(ProviderRegistryTest, OpenAICodexBuiltinFactoryCreatesProvider) {
