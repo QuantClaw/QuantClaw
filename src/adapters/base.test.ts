@@ -24,6 +24,12 @@ class TestAdapter extends ChannelAdapter {
   }
 }
 
+class FailingAdapter extends TestAdapter {
+  async agentRequest(): Promise<string> {
+    throw new Error("provider rejected malformed history");
+  }
+}
+
 function withChannelConfig(
   config: Record<string, unknown>,
   fn: () => Promise<void>
@@ -140,4 +146,17 @@ test("default gateway URL is ws://127.0.0.1:18800 when env is unset", () => {
   } else {
     process.env.QUANTCLAW_GATEWAY_URL = prev;
   }
+});
+
+test("processing failures are sent with the actual error summary", async () => {
+  await withChannelConfig({ token: "t" }, async () => {
+    const adapter = new FailingAdapter();
+    await adapter.handlePlatformMessage("user-1", "channel-1", "hello");
+
+    assert.equal(adapter.sent.length, 1);
+    assert.equal(
+      adapter.sent[0].text,
+      "Error processing your message: provider rejected malformed history"
+    );
+  });
 });

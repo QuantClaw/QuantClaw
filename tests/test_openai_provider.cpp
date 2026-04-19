@@ -245,6 +245,73 @@ TEST_F(OpenAIProviderTest, ConstructionWithCustomBaseUrl) {
   });
 }
 
+TEST(OpenAIProviderCompatibilityTest, ChatCompletionSkipsOrphanToolResults) {
+  const int port = quantclaw::test::FindFreePort();
+  ASSERT_GT(port, 0);
+
+  httplib::Server server;
+  std::atomic<bool> saw_request = false;
+  std::atomic<bool> saw_orphan_tool_message = false;
+  server.Post("/chat/completions", [&](const httplib::Request& req,
+                                       httplib::Response& res) {
+    saw_request = true;
+    const auto body = nlohmann::json::parse(req.body);
+    ASSERT_TRUE(body.contains("messages"));
+    for (const auto& message : body["messages"]) {
+      if (message.value("role", "") == "tool" &&
+          message.value("tool_call_id", "") == "orphan-call") {
+        saw_orphan_tool_message = true;
+      }
+    }
+
+    nlohmann::json response = {
+        {"choices", nlohmann::json::array({{{"message", {{"content", "ok"}}},
+                                            {"finish_reason", "stop"}}})},
+    };
+    res.set_content(response.dump(), "application/json");
+  });
+
+  std::thread server_thread([&]() {
+    quantclaw::test::ReleaseHeldPort(port);
+    server.listen("127.0.0.1", port);
+  });
+  auto stop_server = [&]() {
+    server.stop();
+    if (server_thread.joinable()) {
+      server_thread.join();
+    }
+  };
+  if (!quantclaw::test::WaitForServerReady(port, 5000)) {
+    stop_server();
+    FAIL() << "Server not ready on port " << port;
+  }
+
+  auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
+  auto logger =
+      std::make_shared<spdlog::logger>("openai-orphan-tool", null_sink);
+  quantclaw::OpenAIProvider provider(
+      "test-key", "http://127.0.0.1:" + std::to_string(port), 30, logger);
+
+  quantclaw::ChatCompletionRequest request;
+  request.model = "qwen3-max";
+  request.messages.push_back({"user", "before"});
+
+  quantclaw::Message orphan_tool_result;
+  orphan_tool_result.role = "user";
+  orphan_tool_result.content.push_back(
+      quantclaw::ContentBlock::MakeToolResult("orphan-call", "stale output"));
+  request.messages.push_back(std::move(orphan_tool_result));
+
+  request.messages.push_back({"user", "after"});
+
+  auto response = provider.ChatCompletion(request);
+  stop_server();
+
+  ASSERT_TRUE(saw_request.load());
+  EXPECT_FALSE(saw_orphan_tool_message.load());
+  EXPECT_EQ(response.content, "ok");
+}
+
 TEST(OpenAIProviderCompatibilityTest,
      ChatCompletionRepairsCompatibleToolCallNameAndArguments) {
   const int port = quantclaw::test::FindFreePort();
