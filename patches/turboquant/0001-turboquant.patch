@@ -1,0 +1,968 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index caea48c50..65b54463a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -115,6 +115,11 @@ option(LLAMA_TESTS_INSTALL  "llama: install tests"        ON)
+ # 3rd party libs
+ option(LLAMA_OPENSSL    "llama: use openssl to support HTTPS" ON)
+ option(LLAMA_LLGUIDANCE "llama-common: include LLGuidance library for structured output in common utils" OFF)
++option(LLAMA_TURBOQUANT "llama: enable TurboQuant KV cache hooks" ON)
++
++if (LLAMA_TURBOQUANT)
++    add_compile_definitions(LLAMA_TURBOQUANT)
++endif()
+ 
+ 
+ # Required for relocatable CMake package
+diff --git a/common/arg.cpp b/common/arg.cpp
+index 2e0f46db5..ed80a6448 100644
+--- a/common/arg.cpp
++++ b/common/arg.cpp
+@@ -2135,6 +2135,55 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
+             params.n_sequences = value;
+         }
+     ).set_examples({LLAMA_EXAMPLE_PARALLEL}));
++#if defined(LLAMA_TURBOQUANT)
++    add_opt(common_arg(
++        {"--turboquant"}, "FILE",
++        "TurboQuant sidecar file for KV-cache quantization (enables TurboQuant path; requires --parallel 1)",
++        [](common_params & params, const std::string & value) {
++            params.turboquant_sidecar = value;
++        }
++    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_TURBOQUANT"));
++    add_opt(common_arg(
++        {"--turboquant-bits-k", "--tq-bits-k"}, "N",
++        string_format("TurboQuant bit-width for K cache entries (default: %d, valid: 1..8)", params.turboquant_bits_k),
++        [](common_params & params, int value) {
++            if (value < 1 || value > 8) {
++                throw std::invalid_argument("turboquant bits-k must be in [1, 8]");
++            }
++            params.turboquant_bits_k = value;
++        }
++    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_TURBOQUANT_BITS_K"));
++    add_opt(common_arg(
++        {"--turboquant-bits-v", "--tq-bits-v"}, "N",
++        string_format("TurboQuant bit-width for V cache entries (default: %d, valid: 1..8)", params.turboquant_bits_v),
++        [](common_params & params, int value) {
++            if (value < 1 || value > 8) {
++                throw std::invalid_argument("turboquant bits-v must be in [1, 8]");
++            }
++            params.turboquant_bits_v = value;
++        }
++    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_TURBOQUANT_BITS_V"));
++    add_opt(common_arg(
++        {"--tq-bits"}, "N",
++        string_format("TurboQuant shorthand to set both K and V bit-widths at once (default: %d/%d)",
++                      params.turboquant_bits_k,
++                      params.turboquant_bits_v),
++        [](common_params & params, int value) {
++            if (value < 1 || value > 8) {
++                throw std::invalid_argument("turboquant bits must be in [1, 8]");
++            }
++            params.turboquant_bits_k = value;
++            params.turboquant_bits_v = value;
++        }
++    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_TURBOQUANT_BITS"));
++    add_opt(common_arg(
++        {"--turboquant-calibrate-dir", "--tq-calibrate-dir"}, "DIR",
++        "TurboQuant: dump pre-quant K/V activations into DIR for Lloyd-Max calibration (one file per layer per stream).",
++        [](common_params & params, const std::string & value) {
++            params.turboquant_calibrate_dir = value;
++        }
++    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_TURBOQUANT_CALIBRATE_DIR"));
++#endif
+     add_opt(common_arg(
+         {"-cb", "--cont-batching"},
+         {"-nocb", "--no-cont-batching"},
+diff --git a/common/common.cpp b/common/common.cpp
+index 16f78debd..bbdd38c3a 100644
+--- a/common/common.cpp
++++ b/common/common.cpp
+@@ -7,6 +7,10 @@
+ #include "sampling.h"
+ #include "unicode.h"
+ 
++#if defined(LLAMA_TURBOQUANT)
++#include "../src/turboquant.h"
++#endif
++
+ #include <algorithm>
+ #include <cinttypes>
+ #include <climits>
+@@ -1142,6 +1146,23 @@ struct common_init_result::impl {
+ common_init_result::common_init_result(common_params & params) :
+     pimpl(new impl{}) {
+     auto mparams = common_model_params_to_llama(params);
++
++#if defined(LLAMA_TURBOQUANT)
++    llama_turboquant_configure(params.turboquant_sidecar, params.turboquant_bits_k, params.turboquant_bits_v);
++    llama_turboquant_set_calibrate_dir(params.turboquant_calibrate_dir);
++
++    if (!params.turboquant_sidecar.empty()) {
++        std::string tq_error;
++        if (!llama_turboquant_load_sidecar(&tq_error)) {
++            LOG_ERR("%s: failed to initialize TurboQuant sidecar '%s': %s\n",
++                    __func__,
++                    params.turboquant_sidecar.c_str(),
++                    tq_error.c_str());
++            return;
++        }
++    }
++#endif
++
+     auto cparams = common_context_params_to_llama(params);
+ 
+     if (params.fit_params) {
+@@ -1471,6 +1492,12 @@ struct llama_context_params common_context_params_to_llama(const common_params &
+     cparams.flash_attn_type   = params.flash_attn_type;
+     cparams.cb_eval           = params.cb_eval;
+     cparams.cb_eval_user_data = params.cb_eval_user_data;
++#if defined(LLAMA_TURBOQUANT)
++    if (cparams.cb_eval == nullptr && llama_turboquant_is_calibrating()) {
++        cparams.cb_eval           = llama_turboquant_calibrate_cb_eval();
++        cparams.cb_eval_user_data = llama_turboquant_calibrate_cb_user_data();
++    }
++#endif
+     cparams.offload_kqv       = !params.no_kv_offload;
+     cparams.no_perf           = params.no_perf;
+     cparams.op_offload        = !params.no_op_offload;
+diff --git a/common/common.h b/common/common.h
+index 020b6a721..aa155f075 100644
+--- a/common/common.h
++++ b/common/common.h
+@@ -578,6 +578,8 @@ struct common_params {
+     int32_t timeout_write       = timeout_read;  // http write timeout in seconds
+     int32_t n_threads_http      = -1;    // number of threads to process HTTP requests (TODO: support threadpool)
+     int32_t n_cache_reuse       = 0;     // min chunk size to reuse from the cache via KV shifting
++    int32_t turboquant_bits_k   = 8;     // TurboQuant bits for K cache entries
++    int32_t turboquant_bits_v   = 8;     // TurboQuant bits for V cache entries
+     bool    cache_prompt        = true;  // whether to enable prompt caching
+     bool    clear_idle          = true;  // save and clear idle slots upon starting a new task
+     int32_t n_ctx_checkpoints   = 32;    // max number of context checkpoints per slot
+@@ -615,6 +617,13 @@ struct common_params {
+     bool endpoint_props   = false; // only control POST requests, not GET
+     bool endpoint_metrics = false;
+ 
++    // TurboQuant sidecar for KV-cache quantization. When empty, stock KV cache path is used.
++    std::string turboquant_sidecar;
++
++    // TurboQuant calibration-capture directory. When non-empty, pre-quant K/V activations
++    // at each layer are dumped here (one file per layer per stream) for Lloyd-Max training.
++    std::string turboquant_calibrate_dir;
++
+     // enable built-in tools
+     std::vector<std::string> server_tools;
+ 
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 121c21fed..554d76e44 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -151,6 +151,13 @@ add_library(llama
+             models/xverse.cpp
+             )
+ 
++if (LLAMA_TURBOQUANT)
++    target_sources(llama PRIVATE
++        ${CMAKE_CURRENT_SOURCE_DIR}/turboquant.cpp
++        ${CMAKE_CURRENT_SOURCE_DIR}/turboquant.h
++    )
++endif()
++
+ set_target_properties(llama PROPERTIES
+     VERSION ${LLAMA_INSTALL_VERSION}
+     SOVERSION 0
+diff --git a/src/llama-kv-cache.cpp b/src/llama-kv-cache.cpp
+index 3e0fd3107..40d2fc7b5 100644
+--- a/src/llama-kv-cache.cpp
++++ b/src/llama-kv-cache.cpp
+@@ -5,6 +5,10 @@
+ #include "llama-model.h"
+ #include "llama-context.h"
+ 
++#if defined(LLAMA_TURBOQUANT)
++#include "turboquant.h"
++#endif
++
+ #include <algorithm>
+ #include <cassert>
+ #include <cmath>
+@@ -1141,12 +1145,18 @@ ggml_tensor * llama_kv_cache::get_k(ggml_context * ctx, int32_t il, uint32_t n_k
+ 
+     const uint32_t ns = sinfo.s1 - sinfo.s0 + 1;
+ 
+-    return ggml_view_4d(ctx, k,
++    ggml_tensor * k_view = ggml_view_4d(ctx, k,
+             hparams.n_embd_head_k(il), hparams.n_head_kv(il), n_kv, ns,
+             ggml_row_size(k->type, hparams.n_embd_head_k(il)),
+             ggml_row_size(k->type, n_embd_k_gqa),
+             ggml_row_size(k->type, n_embd_k_gqa*kv_size),
+             ggml_row_size(k->type, n_embd_k_gqa*kv_size)*sinfo.s0);
++
++#if defined(LLAMA_TURBOQUANT)
++    k_view = llama_turboquant_prepare_k_read(ctx, k_view, il);
++#endif
++
++    return k_view;
+ }
+ 
+ ggml_tensor * llama_kv_cache::get_v(ggml_context * ctx, int32_t il, uint32_t n_kv, const slot_info & sinfo) const {
+@@ -1164,21 +1174,33 @@ ggml_tensor * llama_kv_cache::get_v(ggml_context * ctx, int32_t il, uint32_t n_k
+ 
+     if (!v_trans) {
+         // note: v->nb[1] <= v->nb[2]
+-        return ggml_view_4d(ctx, v,
++        ggml_tensor * v_view = ggml_view_4d(ctx, v,
+                 hparams.n_embd_head_v(il), hparams.n_head_kv(il), n_kv, ns,
+                 ggml_row_size(v->type, hparams.n_embd_head_v(il)),          // v->nb[1]
+                 ggml_row_size(v->type, n_embd_v_gqa),                   // v->nb[2]
+                 ggml_row_size(v->type, n_embd_v_gqa*kv_size),           // v->nb[3]
+                 ggml_row_size(v->type, n_embd_v_gqa*kv_size)*sinfo.s0);
++
++    #if defined(LLAMA_TURBOQUANT)
++        v_view = llama_turboquant_prepare_v_read(ctx, v_view, il);
++    #endif
++
++        return v_view;
+     }
+ 
+     // note: v->nb[1] > v->nb[2]
+-    return ggml_view_4d(ctx, v,
++        ggml_tensor * v_view = ggml_view_4d(ctx, v,
+             n_kv, hparams.n_head_kv(il), hparams.n_embd_head_v(il), ns,
+             ggml_row_size(v->type, kv_size*hparams.n_embd_head_v(il)),  // v->nb[1]
+             ggml_row_size(v->type, kv_size),                        // v->nb[2]
+             ggml_row_size(v->type, kv_size*n_embd_v_gqa),           // v->nb[3]
+             ggml_row_size(v->type, kv_size*n_embd_v_gqa)*sinfo.s0);
++
++    #if defined(LLAMA_TURBOQUANT)
++        v_view = llama_turboquant_prepare_v_read(ctx, v_view, il);
++    #endif
++
++        return v_view;
+ }
+ 
+ ggml_tensor * llama_kv_cache::cpy_k(ggml_context * ctx, ggml_tensor * k_cur, ggml_tensor * k_idxs, int32_t il, const slot_info & sinfo) const {
+@@ -1212,6 +1234,10 @@ ggml_tensor * llama_kv_cache::cpy_k(ggml_context * ctx, ggml_tensor * k_cur, ggm
+         k = ggml_reshape_2d(ctx, k, n_embd_gqa, kv_size*n_stream);
+     }
+ 
++#if defined(LLAMA_TURBOQUANT)
++    k_cur = llama_turboquant_prepare_k_write(ctx, k_cur, il);
++#endif
++
+     // store the current K values into the cache
+     return ggml_set_rows(ctx, k, k_cur, k_idxs);
+ }
+@@ -1229,6 +1255,10 @@ ggml_tensor * llama_kv_cache::cpy_v(ggml_context * ctx, ggml_tensor * v_cur, ggm
+ 
+     const int64_t n_embd_gqa = n_embd_head*n_head;
+ 
++#if defined(LLAMA_TURBOQUANT)
++    v_cur = llama_turboquant_prepare_v_write(ctx, v_cur, il);
++#endif
++
+     // we can merge dims 0 and 1
+     GGML_ASSERT(ggml_row_size(v_cur->type, n_embd_head) == v_cur->nb[1]);
+ 
+diff --git a/src/turboquant.cpp b/src/turboquant.cpp
+new file mode 100644
+index 000000000..a3c1a7344
+--- /dev/null
++++ b/src/turboquant.cpp
+@@ -0,0 +1,584 @@
++#include "turboquant.h"
++
++#include "llama-impl.h"
++#include "llama-mmap.h"
++
++#include "ggml.h"
++#include "ggml-backend.h"
++
++#include <atomic>
++#include <cstdio>
++#include <cstring>
++#include <filesystem>
++#include <limits>
++#include <memory>
++#include <mutex>
++#include <string>
++#include <unordered_map>
++#include <vector>
++
++namespace {
++
++constexpr size_t TURBOQUANT_HEADER_SIZE = 32;
++constexpr char TURBOQUANT_MAGIC[4] = {'T', 'Q', 'N', 'T'};
++
++struct llama_turboquant_state {
++    std::mutex mu;
++
++    std::string sidecar_path;
++    int32_t bits_k = 8;
++    int32_t bits_v = 8;
++
++    bool loaded = false;
++    std::string loaded_path;
++    llama_turboquant_sidecar_meta meta;
++
++    std::unique_ptr<llama_file> file;
++    std::unique_ptr<llama_mmap> mmap;
++
++    // calibration capture
++    std::string calibrate_dir;
++    std::unordered_map<std::string, FILE *> calibrate_files;
++    std::vector<uint8_t> calibrate_scratch;
++    bool calibrate_dir_created = false;
++};
++
++llama_turboquant_state & turboquant_state() {
++    static llama_turboquant_state state;
++    return state;
++}
++
++std::atomic<bool> g_turboquant_active{false};
++std::atomic<bool> g_turboquant_logged_write{false};
++std::atomic<bool> g_turboquant_logged_read{false};
++
++bool turboquant_valid_bits(int32_t bits) {
++    return bits >= 1 && bits <= 8;
++}
++
++uint32_t read_u32_le(const uint8_t * p) {
++    return (uint32_t(p[0])      ) |
++           (uint32_t(p[1]) <<  8) |
++           (uint32_t(p[2]) << 16) |
++           (uint32_t(p[3]) << 24);
++}
++
++void set_error(std::string * error_message, const std::string & message) {
++    if (error_message) {
++        *error_message = message;
++    }
++}
++
++std::atomic<bool> g_turboquant_calibrating{false};
++std::atomic<bool> g_turboquant_logged_calibrate{false};
++
++// Filename helpers. Format: "<stream>.layer_<il>.f32" under calibrate_dir.
++std::string calibrate_filename(const std::string & dir, char stream, int32_t il) {
++    char buf[64];
++    std::snprintf(buf, sizeof(buf), "%c.layer_%03d.f32", stream, il);
++    return dir + "/" + buf;
++}
++
++// Parse "turboquant.<k|v>.<il>"; return true + fill out params on match.
++bool parse_turboquant_tensor_name(const char * name, char & stream, int32_t & il) {
++    if (name == nullptr) {
++        return false;
++    }
++    constexpr const char prefix[] = "turboquant.";
++    constexpr size_t prefix_len = sizeof(prefix) - 1;
++    if (std::strncmp(name, prefix, prefix_len) != 0) {
++        return false;
++    }
++    const char * rest = name + prefix_len;
++    if (rest[0] != 'k' && rest[0] != 'v') {
++        return false;
++    }
++    if (rest[1] != '.') {
++        return false;
++    }
++    char * end = nullptr;
++    long parsed = std::strtol(rest + 2, &end, 10);
++    if (end == rest + 2 || parsed < 0) {
++        return false;
++    }
++    stream = rest[0];
++    il = int32_t(parsed);
++    return true;
++}
++
++FILE * calibrate_open_file(llama_turboquant_state & state, char stream, int32_t il) {
++    const std::string key = std::string(1, stream) + "." + std::to_string(il);
++
++    auto it = state.calibrate_files.find(key);
++    if (it != state.calibrate_files.end()) {
++        return it->second;
++    }
++
++    if (!state.calibrate_dir_created) {
++        std::error_code ec;
++        std::filesystem::create_directories(state.calibrate_dir, ec);
++        state.calibrate_dir_created = true;
++    }
++
++    const std::string path = calibrate_filename(state.calibrate_dir, stream, il);
++    FILE * f = std::fopen(path.c_str(), "ab");
++    if (f == nullptr) {
++        LLAMA_LOG_WARN("turboquant: failed to open calibration file '%s' (errno=%d)\n",
++                       path.c_str(), errno);
++        return nullptr;
++    }
++    state.calibrate_files.emplace(key, f);
++    return f;
++}
++
++bool turboquant_cb_eval_impl(ggml_tensor * t, bool ask, void * /*user_data*/) {
++    static std::atomic<int> dbg_tensor_count{0};
++    int count = dbg_tensor_count.fetch_add(1, std::memory_order_relaxed);
++    if (count < 80) {
++        LLAMA_LOG_INFO("turboquant_cb_eval: name='%s' ask=%d op=%d\n",
++                       t->name, int(ask), int(t->op));
++    }
++
++    char stream = 0;
++    int32_t il = 0;
++    if (!parse_turboquant_tensor_name(t->name, stream, il)) {
++        return false;
++    }
++
++    if (ask) {
++        return true;
++    }
++
++    if (t->type != GGML_TYPE_F32) {
++        // Only f32 supported for now. Skip silently; the user will notice empty dumps.
++        return false;
++    }
++
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    if (state.calibrate_dir.empty()) {
++        return false;
++    }
++
++    const size_t nbytes = ggml_nbytes(t);
++    state.calibrate_scratch.resize(nbytes);
++    ggml_backend_tensor_get(t, state.calibrate_scratch.data(), 0, nbytes);
++
++    FILE * f = calibrate_open_file(state, stream, il);
++    if (f == nullptr) {
++        return false;
++    }
++
++    const size_t written = std::fwrite(state.calibrate_scratch.data(), 1, nbytes, f);
++    if (written != nbytes) {
++        LLAMA_LOG_WARN("turboquant: short write while dumping calibration tensor '%s' (%zu/%zu)\n",
++                       t->name, written, nbytes);
++    }
++
++    if (!g_turboquant_logged_calibrate.exchange(true, std::memory_order_acq_rel)) {
++        LLAMA_LOG_INFO("turboquant: calibration capture engaged (dir='%s')\n",
++                       state.calibrate_dir.c_str());
++    }
++    return false;  // nothing to keep after collection
++}
++
++} // namespace
++
++void llama_turboquant_configure(const std::string & sidecar_path, int32_t bits_k, int32_t bits_v) {
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    const bool changed =
++        state.sidecar_path != sidecar_path ||
++        state.bits_k != bits_k ||
++        state.bits_v != bits_v;
++
++    state.sidecar_path = sidecar_path;
++    state.bits_k = bits_k;
++    state.bits_v = bits_v;
++
++    if (changed) {
++        state.loaded = false;
++        state.loaded_path.clear();
++        state.meta = {};
++        state.mmap.reset();
++        state.file.reset();
++
++        g_turboquant_active.store(false, std::memory_order_release);
++        g_turboquant_logged_write.store(false, std::memory_order_release);
++        g_turboquant_logged_read.store(false, std::memory_order_release);
++    }
++}
++
++bool llama_turboquant_is_requested() {
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    return !state.sidecar_path.empty();
++}
++
++bool llama_turboquant_is_active() {
++    return g_turboquant_active.load(std::memory_order_acquire);
++}
++
++int32_t llama_turboquant_bits_k() {
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    return state.bits_k;
++}
++
++int32_t llama_turboquant_bits_v() {
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    return state.bits_v;
++}
++
++std::string llama_turboquant_sidecar_path() {
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    return state.sidecar_path;
++}
++
++bool llama_turboquant_load_sidecar(std::string * error_message) {
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    if (state.sidecar_path.empty()) {
++        g_turboquant_active.store(false, std::memory_order_release);
++        return true;
++    }
++
++    if (!turboquant_valid_bits(state.bits_k) || !turboquant_valid_bits(state.bits_v)) {
++        set_error(error_message, "turboquant bits must be in [1, 8]");
++        return false;
++    }
++
++    if (state.loaded && state.loaded_path == state.sidecar_path) {
++        g_turboquant_active.store(true, std::memory_order_release);
++        return true;
++    }
++
++    state.loaded = false;
++    state.loaded_path.clear();
++    state.meta = {};
++    state.mmap.reset();
++    state.file.reset();
++
++    std::unique_ptr<llama_file> file;
++    std::unique_ptr<llama_mmap> mmap;
++
++    try {
++        file = std::make_unique<llama_file>(state.sidecar_path.c_str(), "rb");
++        mmap = std::make_unique<llama_mmap>(file.get());
++    } catch (const std::exception & e) {
++        set_error(error_message, std::string("failed to open turboquant sidecar: ") + e.what());
++        return false;
++    }
++
++    if (!mmap || mmap->size() < TURBOQUANT_HEADER_SIZE) {
++        set_error(error_message, "invalid turboquant sidecar: file is too small");
++        return false;
++    }
++
++    const auto * data = static_cast<const uint8_t *>(mmap->addr());
++    if (data == nullptr) {
++        set_error(error_message, "invalid turboquant sidecar: mmap returned null address");
++        return false;
++    }
++
++    if (std::memcmp(data, TURBOQUANT_MAGIC, sizeof(TURBOQUANT_MAGIC)) != 0) {
++        set_error(error_message, "invalid turboquant sidecar: bad magic (expected TQNT)");
++        return false;
++    }
++
++    llama_turboquant_sidecar_meta meta;
++    meta.version      = read_u32_le(data +  4);
++    meta.num_layers   = read_u32_le(data +  8);
++    meta.head_dim     = read_u32_le(data + 12);
++    meta.num_heads    = read_u32_le(data + 16);
++    meta.num_kv_heads = read_u32_le(data + 20);
++    meta.bits_k       = data[24];
++    meta.bits_v       = data[25];
++
++    if (meta.num_layers == 0 || meta.head_dim == 0) {
++        set_error(error_message, "invalid turboquant sidecar: num_layers/head_dim must be non-zero");
++        return false;
++    }
++
++    if (meta.bits_k != static_cast<uint8_t>(state.bits_k) ||
++        meta.bits_v != static_cast<uint8_t>(state.bits_v)) {
++        set_error(error_message,
++                  "turboquant sidecar bits do not match requested --turboquant-bits-k/--turboquant-bits-v");
++        return false;
++    }
++
++    const uint64_t head_dim = meta.head_dim;
++    const uint64_t layer_values_f32 =
++        2ULL * head_dim * head_dim +
++        ((1ULL << meta.bits_k) + (1ULL << meta.bits_v)) * head_dim;
++
++    if (layer_values_f32 > std::numeric_limits<uint64_t>::max() / 4ULL) {
++        set_error(error_message, "invalid turboquant sidecar: overflow while computing payload size");
++        return false;
++    }
++
++    const uint64_t layer_bytes = layer_values_f32 * 4ULL;
++    const uint64_t payload_bytes = uint64_t(meta.num_layers) * layer_bytes;
++    const uint64_t expected_min_size = uint64_t(TURBOQUANT_HEADER_SIZE) + payload_bytes;
++
++    if (expected_min_size > uint64_t(mmap->size())) {
++        set_error(error_message,
++                  "invalid turboquant sidecar: file smaller than expected payload for declared dimensions");
++        return false;
++    }
++
++    state.file = std::move(file);
++    state.mmap = std::move(mmap);
++    state.meta = meta;
++    state.loaded = true;
++    state.loaded_path = state.sidecar_path;
++
++    g_turboquant_active.store(true, std::memory_order_release);
++
++    LLAMA_LOG_INFO(
++        "turboquant: engaged layers=%u bits_k=%u bits_v=%u\n",
++        state.meta.num_layers,
++        state.meta.bits_k,
++        state.meta.bits_v);
++
++    LLAMA_LOG_INFO(
++        "%s: loaded sidecar '%s' (v%u, layers=%u, head_dim=%u, heads=%u, kv_heads=%u, bits_k=%u, bits_v=%u)\n",
++        __func__,
++        state.loaded_path.c_str(),
++        state.meta.version,
++        state.meta.num_layers,
++        state.meta.head_dim,
++        state.meta.num_heads,
++        state.meta.num_kv_heads,
++        state.meta.bits_k,
++        state.meta.bits_v);
++
++    return true;
++}
++
++bool llama_turboquant_get_sidecar_meta(llama_turboquant_sidecar_meta & out_meta) {
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    if (!state.loaded) {
++        return false;
++    }
++
++    out_meta = state.meta;
++    return true;
++}
++
++namespace {
++
++const float * turboquant_layer_region(int32_t il, uint64_t region_offset_f32) {
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    if (!state.loaded || state.mmap == nullptr) {
++        return nullptr;
++    }
++    if (il < 0 || uint32_t(il) >= state.meta.num_layers) {
++        return nullptr;
++    }
++
++    const uint64_t D = state.meta.head_dim;
++    const uint64_t K = 1ULL << state.meta.bits_k;
++    const uint64_t V = 1ULL << state.meta.bits_v;
++    const uint64_t per_layer_f32 = 2ULL * D * D + (K + V) * D;
++
++    const uint8_t * base    = static_cast<const uint8_t *>(state.mmap->addr());
++    const uint64_t  byte_ofs = uint64_t(TURBOQUANT_HEADER_SIZE)
++                             + uint64_t(il) * per_layer_f32 * sizeof(float)
++                             + region_offset_f32 * sizeof(float);
++
++    return reinterpret_cast<const float *>(base + byte_ofs);
++}
++
++} // namespace
++
++const float * llama_turboquant_layer_hh_k(int32_t il) {
++    return turboquant_layer_region(il, 0);
++}
++
++const float * llama_turboquant_layer_hh_v(int32_t il) {
++    auto & state = turboquant_state();
++    uint64_t D = 0;
++    {
++        std::lock_guard<std::mutex> lock(state.mu);
++        if (!state.loaded) {
++            return nullptr;
++        }
++        D = state.meta.head_dim;
++    }
++    return turboquant_layer_region(il, D * D);
++}
++
++const float * llama_turboquant_layer_codebook_k(int32_t il) {
++    auto & state = turboquant_state();
++    uint64_t D = 0;
++    {
++        std::lock_guard<std::mutex> lock(state.mu);
++        if (!state.loaded) {
++            return nullptr;
++        }
++        D = state.meta.head_dim;
++    }
++    return turboquant_layer_region(il, 2ULL * D * D);
++}
++
++const float * llama_turboquant_layer_codebook_v(int32_t il) {
++    auto & state = turboquant_state();
++    uint64_t D = 0;
++    uint64_t K = 0;
++    {
++        std::lock_guard<std::mutex> lock(state.mu);
++        if (!state.loaded) {
++            return nullptr;
++        }
++        D = state.meta.head_dim;
++        K = 1ULL << state.meta.bits_k;
++    }
++    return turboquant_layer_region(il, 2ULL * D * D + K * D);
++}
++
++ggml_tensor * llama_turboquant_prepare_k_write(ggml_context * ctx, ggml_tensor * k_cur, int32_t il) {
++    (void) ctx;
++
++    if (!llama_turboquant_is_active()) {
++        return k_cur;
++    }
++
++    if (!g_turboquant_logged_write.exchange(true, std::memory_order_acq_rel)) {
++        LLAMA_LOG_INFO(
++            "%s: TurboQuant write hooks enabled (bits_k=%d, bits_v=%d)\n",
++            __func__,
++            llama_turboquant_bits_k(),
++            llama_turboquant_bits_v());
++    }
++
++    if (llama_turboquant_is_calibrating()) {
++        ggml_tensor * tap = ggml_cont(ctx, k_cur);
++        char name[32];
++        std::snprintf(name, sizeof(name), "turboquant.k.%d", int(il));
++        ggml_set_name(tap, name);
++        ggml_set_output(tap);
++        return tap;
++    }
++
++    // Scaffolding hook: currently pass-through.
++    // Real quantization will replace this with Householder+Lloyd-Max encode.
++    return k_cur;
++}
++
++ggml_tensor * llama_turboquant_prepare_v_write(ggml_context * ctx, ggml_tensor * v_cur, int32_t il) {
++    (void) ctx;
++
++    if (!llama_turboquant_is_active()) {
++        return v_cur;
++    }
++
++    if (!g_turboquant_logged_write.exchange(true, std::memory_order_acq_rel)) {
++        LLAMA_LOG_INFO(
++            "%s: TurboQuant write hooks enabled (bits_k=%d, bits_v=%d)\n",
++            __func__,
++            llama_turboquant_bits_k(),
++            llama_turboquant_bits_v());
++    }
++
++    if (llama_turboquant_is_calibrating()) {
++        ggml_tensor * tap = ggml_cont(ctx, v_cur);
++        char name[32];
++        std::snprintf(name, sizeof(name), "turboquant.v.%d", int(il));
++        ggml_set_name(tap, name);
++        ggml_set_output(tap);
++        return tap;
++    }
++
++    // Scaffolding hook: currently pass-through.
++    return v_cur;
++}
++
++ggml_tensor * llama_turboquant_prepare_k_read(ggml_context * ctx, ggml_tensor * k_view, int32_t il) {
++    (void) ctx;
++    (void) il;
++
++    if (!llama_turboquant_is_active()) {
++        return k_view;
++    }
++
++    if (!g_turboquant_logged_read.exchange(true, std::memory_order_acq_rel)) {
++        LLAMA_LOG_INFO(
++            "%s: TurboQuant read hooks enabled (bits_k=%d, bits_v=%d)\n",
++            __func__,
++            llama_turboquant_bits_k(),
++            llama_turboquant_bits_v());
++    }
++
++    // Scaffolding hook: currently pass-through.
++    // Real reconstruction will decode cached indices/centroids here.
++    return k_view;
++}
++
++ggml_tensor * llama_turboquant_prepare_v_read(ggml_context * ctx, ggml_tensor * v_view, int32_t il) {
++    (void) ctx;
++    (void) il;
++
++    if (!llama_turboquant_is_active()) {
++        return v_view;
++    }
++
++    if (!g_turboquant_logged_read.exchange(true, std::memory_order_acq_rel)) {
++        LLAMA_LOG_INFO(
++            "%s: TurboQuant read hooks enabled (bits_k=%d, bits_v=%d)\n",
++            __func__,
++            llama_turboquant_bits_k(),
++            llama_turboquant_bits_v());
++    }
++
++    // Scaffolding hook: currently pass-through.
++    return v_view;
++}
++
++void llama_turboquant_set_calibrate_dir(const std::string & dir) {
++    auto & state = turboquant_state();
++    std::lock_guard<std::mutex> lock(state.mu);
++
++    // Close existing files when the dir changes (or is cleared).
++    if (state.calibrate_dir != dir) {
++        for (auto & kv : state.calibrate_files) {
++            if (kv.second != nullptr) {
++                std::fclose(kv.second);
++            }
++        }
++        state.calibrate_files.clear();
++        state.calibrate_dir_created = false;
++    }
++
++    state.calibrate_dir = dir;
++    g_turboquant_calibrating.store(!dir.empty(), std::memory_order_release);
++    g_turboquant_logged_calibrate.store(false, std::memory_order_release);
++}
++
++bool llama_turboquant_is_calibrating() {
++    return g_turboquant_calibrating.load(std::memory_order_acquire);
++}
++
++ggml_backend_sched_eval_callback llama_turboquant_calibrate_cb_eval() {
++    if (!llama_turboquant_is_calibrating()) {
++        return nullptr;
++    }
++    return turboquant_cb_eval_impl;
++}
++
++void * llama_turboquant_calibrate_cb_user_data() {
++    return nullptr;
++}
+diff --git a/src/turboquant.h b/src/turboquant.h
+new file mode 100644
+index 000000000..79bc2ed97
+--- /dev/null
++++ b/src/turboquant.h
+@@ -0,0 +1,80 @@
++#pragma once
++
++#include <cstdint>
++#include <string>
++
++#include "ggml-backend.h"
++
++struct ggml_context;
++struct ggml_tensor;
++
++// TurboQuant sidecar binary format (little-endian, all floats are IEEE754 f32):
++//
++//   header (32 bytes):
++//     char     magic[4]      "TQNT"
++//     uint32   version       currently 1
++//     uint32   num_layers    L
++//     uint32   head_dim      D
++//     uint32   num_heads     H
++//     uint32   num_kv_heads  Hkv
++//     uint8    bits_k        1..8
++//     uint8    bits_v        1..8
++//     uint8    _pad[6]       zero
++//
++//   payload: L contiguous per-layer blocks, each of size
++//       (2*D*D + (2^bits_k + 2^bits_v) * D) * sizeof(float)
++//     laid out as:
++//       float hh_k       [D * D]              Householder for K, row-major
++//       float hh_v       [D * D]              Householder for V, row-major
++//       float codebook_k [2^bits_k * D]       K centroids, row-major (row i = centroid i)
++//       float codebook_v [2^bits_v * D]       V centroids, row-major
++//
++// The loader mmaps the payload read-only; accessors below return pointers into it.
++
++struct llama_turboquant_sidecar_meta {
++    uint32_t version      = 0;
++    uint32_t num_layers   = 0;
++    uint32_t head_dim     = 0;
++    uint32_t num_heads    = 0;
++    uint32_t num_kv_heads = 0;
++    uint8_t  bits_k       = 0;
++    uint8_t  bits_v       = 0;
++};
++
++void llama_turboquant_configure(const std::string & sidecar_path, int32_t bits_k, int32_t bits_v);
++
++bool llama_turboquant_is_requested();
++bool llama_turboquant_is_active();
++
++int32_t llama_turboquant_bits_k();
++int32_t llama_turboquant_bits_v();
++
++std::string llama_turboquant_sidecar_path();
++
++bool llama_turboquant_load_sidecar(std::string * error_message = nullptr);
++bool llama_turboquant_get_sidecar_meta(llama_turboquant_sidecar_meta & out_meta);
++
++// Per-layer pointers into the mmap'd payload. Return nullptr if sidecar is not
++// loaded or `il` is out of range. Pointers are stable for the lifetime of the
++// mapping (i.e. until llama_turboquant_configure is called with a new path).
++const float * llama_turboquant_layer_hh_k      (int32_t il);
++const float * llama_turboquant_layer_hh_v      (int32_t il);
++const float * llama_turboquant_layer_codebook_k(int32_t il);
++const float * llama_turboquant_layer_codebook_v(int32_t il);
++
++ggml_tensor * llama_turboquant_prepare_k_write(ggml_context * ctx, ggml_tensor * k_cur, int32_t il);
++ggml_tensor * llama_turboquant_prepare_v_write(ggml_context * ctx, ggml_tensor * v_cur, int32_t il);
++ggml_tensor * llama_turboquant_prepare_k_read (ggml_context * ctx, ggml_tensor * k_view, int32_t il);
++ggml_tensor * llama_turboquant_prepare_v_read (ggml_context * ctx, ggml_tensor * v_view, int32_t il);
++
++// Calibration capture: when set, K/V write-hook tensors are tagged with names
++// "turboquant.k.<il>" / "turboquant.v.<il>", and the eval callback dumps their
++// post-compute contents (raw f32, per-layer append) into <dir> for later
++// Lloyd-Max codebook training.
++void llama_turboquant_set_calibrate_dir(const std::string & dir);
++bool llama_turboquant_is_calibrating();
++
++// Returns the eval callback + user_data for cparams.cb_eval when calibrating.
++// Safe to call unconditionally; returns (nullptr, nullptr) when not calibrating.
++ggml_backend_sched_eval_callback llama_turboquant_calibrate_cb_eval();
++void *                            llama_turboquant_calibrate_cb_user_data();
+diff --git a/tools/server/server.cpp b/tools/server/server.cpp
+index a7afa7743..a3d945707 100644
+--- a/tools/server/server.cpp
++++ b/tools/server/server.cpp
+@@ -90,6 +90,21 @@ int main(int argc, char ** argv) {
+         params.n_batch = params.n_ubatch;
+     }
+ 
++#if defined(LLAMA_TURBOQUANT)
++    if (!params.turboquant_sidecar.empty() && params.n_parallel != 1) {
++        LOG_ERR("%s: --turboquant requires --parallel 1 (got %d)\n", __func__, params.n_parallel);
++        return 1;
++    }
++
++    if (!params.turboquant_sidecar.empty()) {
++        LOG_INF("%s: TurboQuant enabled (sidecar=%s, bits_k=%d, bits_v=%d)\n",
++                __func__,
++                params.turboquant_sidecar.c_str(),
++                params.turboquant_bits_k,
++                params.turboquant_bits_v);
++    }
++#endif
++
+     if (params.n_parallel < 0) {
+         LOG_INF("%s: n_parallel is set to auto, using n_parallel = 4 and kv_unified = true\n", __func__);
+ 
