@@ -66,6 +66,17 @@
     }
   },
   "mcp": {
-    "servers": []
+    "servers": [
+      {
+        "name": "okx-agent-trade-kit",
+        "url": "https://us.okx.com/api/v1/mcp/trading-oauth",
+        "transport": "http",
+        "auth": {
+          "type": "oauth",
+          "tokenEnv": "OKX_ACCESS_TOKEN"
+        },
+        "timeout": 30
+      }
+    ]
   }
 }

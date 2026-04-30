@@ -26,12 +26,14 @@ struct MCPResponse {
 class MCPClient {
  private:
 	std::string server_url_;
+	std::string auth_token_;  // Bearer token for authenticated MCP servers
 	std::shared_ptr<spdlog::logger> logger_;
 	int request_id_ = 0;
 
  public:
 	MCPClient(const std::string& server_url,
-						std::shared_ptr<spdlog::logger> logger);
+						std::shared_ptr<spdlog::logger> logger,
+						std::string auth_token = {});
 
 	std::vector<Tool> ListTools();
 	MCPResponse CallTool(const std::string& tool_name,

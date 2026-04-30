@@ -21,8 +21,11 @@ static std::size_t WriteCallback(void* contents, std::size_t size,
 }
 
 MCPClient::MCPClient(const std::string& server_url,
-                     std::shared_ptr<spdlog::logger> logger)
-    : server_url_(server_url), logger_(logger) {
+                     std::shared_ptr<spdlog::logger> logger,
+                     std::string auth_token)
+    : server_url_(server_url),
+      auth_token_(std::move(auth_token)),
+      logger_(logger) {
   logger_->info("MCPClient initialized with server: {}", server_url_);
 }
 
@@ -100,6 +103,11 @@ nlohmann::json MCPClient::make_request(const nlohmann::json& request) {
   // Set headers
   struct curl_slist* headers = nullptr;
   headers = curl_slist_append(headers, "Content-Type: application/json");
+  std::string auth_header;
+  if (!auth_token_.empty()) {
+    auth_header = "Authorization: Bearer " + auth_token_;
+    headers = curl_slist_append(headers, auth_header.c_str());
+  }
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
   // Set write callback

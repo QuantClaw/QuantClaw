@@ -36,7 +36,8 @@ void MCPToolManager::DiscoverTools(const MCPConfig& config) {
                   server_cfg.name, server_cfg.url);
 
     try {
-      auto client = std::make_shared<MCPClient>(server_cfg.url, logger_);
+      auto client = std::make_shared<MCPClient>(server_cfg.url, logger_,
+                                                server_cfg.auth.token);
       auto tools = client->ListTools();
 
       clients_[server_cfg.name] = client;

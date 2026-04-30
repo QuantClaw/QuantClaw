@@ -124,9 +124,19 @@ export struct ToolPermissionConfig {
 
 // --- MCP ---
 
+export struct MCPServerAuth {
+  std::string type = "none";  // "none" | "bearer" | "oauth"
+  std::string token;          // Direct token value
+  std::string token_env;      // Env var name (resolved at startup)
+
+  static MCPServerAuth FromJson(const nlohmann::json& json);
+};
+
 export struct MCPServerConfig {
   std::string name;
   std::string url;
+  std::string transport = "http";  // "http" | "sse" | "stdio"
+  MCPServerAuth auth;
   int timeout = kDefaultMcpTimeoutSec;
 
   static MCPServerConfig FromJson(const nlohmann::json& json);

@@ -277,11 +277,29 @@ ToolPermissionConfig::FromJson(const nlohmann::json& json) {
   return config;
 }
 
+MCPServerAuth MCPServerAuth::FromJson(const nlohmann::json& json) {
+  MCPServerAuth auth;
+  auth.type = json.value("type", "none");
+  auth.token = json.value("token", json.value("apiKey", ""));
+  auth.token_env = json.value("tokenEnv", json.value("apiKeyEnv", ""));
+  // Resolve env var if token is empty but env var name is set
+  if (auth.token.empty() && !auth.token_env.empty()) {
+    const char* env_val = std::getenv(auth.token_env.c_str());
+    if (env_val)
+      auth.token = env_val;
+  }
+  return auth;
+}
+
 MCPServerConfig MCPServerConfig::FromJson(const nlohmann::json& json) {
   MCPServerConfig config;
   config.name = json.value("name", "");
   config.url = json.value("url", "");
+  config.transport = json.value("transport", "http");
   config.timeout = json.value("timeout", kDefaultMcpTimeoutSec);
+  if (json.contains("auth") && json["auth"].is_object()) {
+    config.auth = MCPServerAuth::FromJson(json["auth"]);
+  }
   return config;
 }
 
