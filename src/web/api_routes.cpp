@@ -15,6 +15,7 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
+#include "quantclaw/channels/channel_policy.hpp"
 #include "quantclaw/config.hpp"
 #include "quantclaw/core/agent_loop.hpp"
 #include "quantclaw/core/prompt_builder.hpp"
@@ -46,6 +47,20 @@ static std::string generate_openai_session_key() {
   std::ostringstream ss;
   ss << "v1-chat:" << std::hex << dist(gen);
   return ss.str();
+}
+
+static quantclaw::DmScope resolve_channel_dm_scope(
+    const quantclaw::QuantClawConfig& config, const std::string& channel) {
+  const std::string fallback =
+      config.session_config.is_object()
+          ? config.session_config.value("dmScope", "per-channel-peer")
+          : "per-channel-peer";
+  auto it = config.channels.find(channel);
+  if (it != config.channels.end() && it->second.raw.is_object()) {
+    return quantclaw::DmScopeFromString(
+        it->second.raw.value("dmScope", fallback));
+  }
+  return quantclaw::DmScopeFromString(fallback);
 }
 
 // --- Route registration ---
@@ -731,13 +746,14 @@ void register_api_routes(
   // "sessionKey": "..."}
   server.AddRawRoute(
       "/api/channel/message", "POST",
-      [session_manager, agent_loop, prompt_builder,
+      [session_manager, agent_loop, prompt_builder, config,
        logger](const httplib::Request& req, httplib::Response& res) {
         try {
           auto params = nlohmann::json::parse(req.body);
           std::string channel = params.value("channel", "webhook");
           std::string sender_id = params.value("senderId", "anonymous");
           std::string channel_id = params.value("channelId", "default");
+          std::string account_id = params.value("accountId", "");
           std::string message = params.value("message", "");
 
           if (message.empty()) {
@@ -745,8 +761,9 @@ void register_api_routes(
             return;
           }
 
-          // Session key: channel:<platform>:<channelId>
-          std::string session_key = "channel:" + channel + ":" + channel_id;
+          auto dm_scope = resolve_channel_dm_scope(config, channel);
+          std::string session_key = quantclaw::SessionResolver::ResolveSessionKey(
+              dm_scope, "main", channel_id, sender_id, account_id);
 
           // Get or create session
           session_manager->GetOrCreate(session_key, "", channel);

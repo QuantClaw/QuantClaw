@@ -84,9 +84,18 @@ bool ChannelAdapterManager::launch_adapter(AdapterProcess& adapter,
       std::filesystem::path(adapter.script_path).parent_path().string();
 
 #ifdef _WIN32
-  // On Windows, npx is a batch script and must be run through cmd /c
-  std::vector<std::string> args = {"cmd", "/c", "npx", "tsx",
-                                   adapter.script_path};
+  std::vector<std::string> args;
+  auto tsx_cli =
+      std::filesystem::path(script_dir) / "node_modules" / "tsx" / "dist" /
+      "cli.mjs";
+  if (std::filesystem::exists(tsx_cli)) {
+    // Prefer the workspace-local tsx package so adapter startup does not depend
+    // on global npm shims or a .cmd wrapper being present.
+    args = {"node", tsx_cli.string(), adapter.script_path};
+  } else {
+    // Fallback to npx for environments without local node_modules.
+    args = {"cmd", "/c", "npx", "tsx", adapter.script_path};
+  }
 #else
   // Try npx tsx first
   std::vector<std::string> args = {"npx", "tsx", adapter.script_path};

@@ -52,6 +52,12 @@ interface RpcEvent {
 
 type GatewayFrame = RpcResponse | RpcEvent;
 
+type DmScope =
+  | "main"
+  | "per-peer"
+  | "per-channel-peer"
+  | "per-account-channel-peer";
+
 function errorSummary(err: unknown): string {
   if (err instanceof Error && err.message) return err.message;
   if (typeof err === "string") return err;
@@ -67,6 +73,26 @@ function errorSummary(err: unknown): string {
     }
   }
   return String(err || "unknown error");
+}
+
+function resolveSessionKey(
+  dmScope: DmScope,
+  agentId: string,
+  channelId: string,
+  senderId: string,
+  accountId?: string
+): string {
+  switch (dmScope) {
+    case "main":
+      return `agent:${agentId}:main`;
+    case "per-peer":
+      return `agent:${agentId}:peer:${senderId}`;
+    case "per-account-channel-peer":
+      return `agent:${agentId}:${accountId || "default"}:${channelId}:${senderId}`;
+    case "per-channel-peer":
+    default:
+      return `agent:${agentId}:${channelId}:${senderId}`;
+  }
 }
 
 // ---- Base Adapter ----
@@ -376,7 +402,16 @@ export abstract class ChannelAdapter {
     if (allowedUsers?.length && !allowedUsers.includes(senderId)) return;
     if (allowedChannels?.length && !allowedChannels.includes(channelId)) return;
 
-    const sessionKey = `channel:${this.channelName}:${channelId}`;
+    const dmScope = ((this.channelConfig.dmScope as string | undefined) ??
+      "per-channel-peer") as DmScope;
+    const accountId = this.channelConfig.accountId as string | undefined;
+    const sessionKey = resolveSessionKey(
+      dmScope,
+      "main",
+      channelId,
+      senderId,
+      accountId
+    );
     console.log(
       `[adapter] Message from ${senderId} in ${channelId}: ${text.slice(0, 80)}`
     );

@@ -507,6 +507,7 @@ QuantClawConfig QuantClawConfig::FromJsonExpanded(const nlohmann::json& json) {
   // Session maintenance
   // ================================================================
   if (json.contains("session") && json["session"].is_object()) {
+    config.session_config = json["session"];
     if (json["session"].contains("maintenance")) {
       config.session_maintenance_config = json["session"]["maintenance"];
     }

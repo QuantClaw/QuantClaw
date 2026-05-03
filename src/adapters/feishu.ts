@@ -13,6 +13,7 @@ import {
 } from "@larksuiteoapi/node-sdk";
 
 import { ChannelAdapter, runAdapter } from "./base.js";
+import { stripFeishuMentions } from "./feishu_utils.js";
 
 interface FeishuConfig {
   appId: string;
@@ -168,6 +169,7 @@ class FeishuAdapter extends ChannelAdapter {
 
       if (botMentioned) {
         console.log("[feishu] Bot mentioned, processing");
+        content = stripFeishuMentions(content);
       } else if (this.requireMention) {
         console.log(
           "[feishu] Group message ignored (requireMention=true, not mentioned)",

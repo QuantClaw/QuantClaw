@@ -76,6 +76,9 @@ class ApiRoutesTest : public ::testing::Test {
     config_.agent.max_tokens = 512;
     config_.gateway.port = gw_port_;
     config_.gateway.auth.mode = "none";
+    config_.channels["feishu"].enabled = true;
+    config_.channels["feishu"].raw = {{"enabled", true},
+                                      {"dmScope", "per-channel-peer"}};
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
@@ -330,6 +333,30 @@ TEST_F(ApiRoutesTest, ChannelsList) {
   ASSERT_TRUE(body.is_array());
   EXPECT_GE(body.size(), 1u);
   EXPECT_EQ(body[0]["name"], "cli");
+}
+
+TEST_F(ApiRoutesTest, ChannelMessageSeparatesSessionsPerSender) {
+  auto cli = make_client();
+  cli.set_read_timeout(10);
+
+  auto res_a = cli.Post("/api/channel/message",
+                        R"({"channel":"feishu","senderId":"user-A","channelId":"group-1","message":"alpha"})",
+                        "application/json");
+  ASSERT_TRUE(res_a);
+  ASSERT_EQ(res_a->status, 200) << res_a->body;
+
+  auto res_b = cli.Post("/api/channel/message",
+                        R"({"channel":"feishu","senderId":"user-B","channelId":"group-1","message":"beta"})",
+                        "application/json");
+  ASSERT_TRUE(res_b);
+  ASSERT_EQ(res_b->status, 200) << res_b->body;
+
+  auto body_a = nlohmann::json::parse(res_a->body);
+  auto body_b = nlohmann::json::parse(res_b->body);
+
+  EXPECT_NE(body_a["sessionKey"], body_b["sessionKey"]);
+  EXPECT_EQ(body_a["sessionKey"], "agent:main:group-1:user-A");
+  EXPECT_EQ(body_b["sessionKey"], "agent:main:group-1:user-B");
 }
 
 // --- CORS ---

@@ -108,6 +108,23 @@ test("messages from different channels use separate session keys", async () => {
   });
 });
 
+test("messages from different senders in the same channel use separate session keys", async () => {
+  await withChannelConfig({ token: "t", dmScope: "per-channel-peer" }, async () => {
+    process.env.QUANTCLAW_CHANNEL_NAME = "feishu";
+    const adapter = new TestAdapter();
+
+    await adapter.handlePlatformMessage("user-1", "group-1", "first");
+    await adapter.handlePlatformMessage("user-2", "group-1", "second");
+
+    assert.equal(adapter.requests.length, 2);
+    assert.notEqual(adapter.requests[0].sessionKey, adapter.requests[1].sessionKey);
+    assert.ok(adapter.requests[0].sessionKey?.includes("group-1"));
+    assert.ok(adapter.requests[0].sessionKey?.includes("user-1"));
+    assert.ok(adapter.requests[1].sessionKey?.includes("group-1"));
+    assert.ok(adapter.requests[1].sessionKey?.includes("user-2"));
+  });
+});
+
 test("allowedUsers blocks messages from non-allowlisted sender", async () => {
   await withChannelConfig(
     { token: "t", allowedUsers: ["user-allowed"] },

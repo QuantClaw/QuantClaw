@@ -1,5 +1,8 @@
 {
   "private": true,
+  "scripts": {
+    "test": "node feishu-e2e.test.js && node feishu-live-verify.test.js && node qa-channel.test.js"
+  },
   "dependencies": {
     "ws": "^8.19.0"
   }

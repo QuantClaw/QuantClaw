@@ -254,6 +254,9 @@ struct QuantClawConfig {
   // Session maintenance config (raw JSON, consumed by SessionMaintenance)
   nlohmann::json session_maintenance_config;
 
+  // Session config (raw JSON, used by channel/session isolation logic)
+  nlohmann::json session_config;
+
   // Subagent config (raw JSON, consumed by SubagentManager)
   nlohmann::json subagent_config;
 
