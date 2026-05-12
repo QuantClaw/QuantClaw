@@ -55,7 +55,7 @@ jobs:
           persist-credentials: false
 
       - name: Dependency review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
 
   strict-build-linux:
     name: Strict Build (Linux/Clang)
