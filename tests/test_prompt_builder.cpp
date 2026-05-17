@@ -10,7 +10,7 @@
 
 #include "quantclaw/core/memory_manager.hpp"
 #include "quantclaw/core/prompt_builder.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+#include "quantclaw/skill/skill_loader_meta.hpp"
 #include "quantclaw/tools/tool_registry.hpp"
 
 #include "test_helpers.hpp"
@@ -27,7 +27,7 @@ class PromptBuilderTest : public ::testing::Test {
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(test_dir_, logger_);
-    skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
+    skill_loader_ = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
 
@@ -51,7 +51,7 @@ class PromptBuilderTest : public ::testing::Test {
   std::filesystem::path test_dir_;
   std::shared_ptr<spdlog::logger> logger_;
   std::shared_ptr<quantclaw::MemoryManager> memory_manager_;
-  std::shared_ptr<quantclaw::SkillLoader> skill_loader_;
+  std::shared_ptr<quantclaw::SkillLoaderMeta> skill_loader_;
   std::shared_ptr<quantclaw::ToolRegistry> tool_registry_;
   std::unique_ptr<quantclaw::PromptBuilder> builder_;
 };

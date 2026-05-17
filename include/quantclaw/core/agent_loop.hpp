@@ -18,10 +18,10 @@
 #include "quantclaw/core/usage_accumulator.hpp"
 #include "quantclaw/providers/llm_provider.hpp"
 
+
 namespace quantclaw {
 
 class MemoryManager;
-class SkillLoader;
 class ToolRegistry;
 class ProviderRegistry;
 class SubagentManager;
@@ -41,9 +41,7 @@ using AgentEventCallback = std::function<void(const AgentEvent&)>;
 
 class AgentLoop : public Noncopyable {
  public:
-  AgentLoop(std::shared_ptr<MemoryManager> memory_manager,
-            std::shared_ptr<SkillLoader> skill_loader,
-            std::shared_ptr<ToolRegistry> tool_registry,
+  AgentLoop(std::shared_ptr<ToolRegistry> tool_registry,
             std::shared_ptr<LLMProvider> llm_provider,
             const AgentConfig& agent_config,
             std::shared_ptr<spdlog::logger> logger);
@@ -127,8 +125,12 @@ class AgentLoop : public Noncopyable {
   std::vector<std::string>
   handle_tool_calls(const std::vector<nlohmann::json>& tool_calls);
 
-  std::shared_ptr<MemoryManager> memory_manager_;
-  std::shared_ptr<SkillLoader> skill_loader_;
+  // Execute a single tool call and append result to results_msg (streaming mode)
+  void execute_single_tool_call(
+      const ToolCall& tc,
+      Message& results_msg,
+      const AgentEventCallback& callback);
+
   std::shared_ptr<ToolRegistry> tool_registry_;
   std::shared_ptr<LLMProvider> llm_provider_;  // Fallback / injected provider
   ProviderRegistry* provider_registry_ = nullptr;        // Non-owning, optional

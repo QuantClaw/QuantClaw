@@ -28,6 +28,8 @@ namespace fs = std::filesystem;
 #include "quantclaw/security/tool_permissions.hpp"
 #include "quantclaw/session/session_manager.hpp"
 #include "quantclaw/tools/tool_chain.hpp"
+#include "quantclaw/skill/skill_meta_tool.hpp"
+#include "quantclaw/skill/skill_loader_meta.hpp"
 
 namespace quantclaw {
 
@@ -238,27 +240,41 @@ void ToolRegistry::RegisterChainTool() {
     return ToolChainExecutor::ResultToJson(result).dump();
   };
 
-  nlohmann::json chain_params;
-  chain_params["type"] = "object";
-  chain_params["properties"] = {
-      {"name", {{"type", "string"}, {"description", "Name of the chain"}}},
-      {"steps",
-       {{"type", "array"},
-        {"items",
-         {{"type", "object"},
-          {"properties",
-           {{"tool", {{"type", "string"}, {"description", "Tool name"}}},
-            {"arguments",
-             {{"type", "object"},
-              {"description",
-               "Args, may use {{prev.result}} or {{steps[N].result}}"}}}}},
-          {"required", {"tool"}}}},
-        {"description", "Ordered tool invocations"}}},
-      {"error_policy",
-       {{"type", "string"},
-        {"enum", {"stop_on_error", "continue_on_error", "retry"}}}},
-      {"max_retries", {{"type", "integer"}}}};
-  chain_params["required"] = {"steps"};
+  nlohmann::json chain_params = nlohmann::json::parse(R"JSON({
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the chain"
+      },
+      "steps": {
+        "type": "array",
+        "description": "Ordered tool invocations",
+        "items": {
+          "type": "object",
+          "properties": {
+            "tool": {
+              "type": "string",
+              "description": "Tool name"
+            },
+            "arguments": {
+              "type": "object",
+              "description": "Args, may use {{prev.result}} or {{steps[N].result}}"
+            }
+          },
+          "required": ["tool"]
+        }
+      },
+      "error_policy": {
+        "type": "string",
+        "enum": ["stop_on_error", "continue_on_error", "retry"]
+      },
+      "max_retries": {
+        "type": "integer"
+      }
+    },
+    "required": ["steps"]
+  })JSON");
 
   tool_schemas_.erase(
       std::remove_if(tool_schemas_.begin(), tool_schemas_.end(),
@@ -271,6 +287,61 @@ void ToolRegistry::RegisterChainTool() {
                            chain_params});
 
   logger_->info("Registered chain tool");
+}
+
+void ToolRegistry::RegisterSkillMetaTool(const std::string& description,
+                                         const nlohmann::json& parameters) {
+  tools_["skill"] = [this](const nlohmann::json& params) -> std::string {
+    std::string skill_name = params.value("command", "");
+    return ExecuteSkill(skill_name, params);
+  };
+
+  tool_schemas_.erase(
+      std::remove_if(tool_schemas_.begin(), tool_schemas_.end(),
+                     [](const ToolSchema& s) { return s.name == "skill"; }),
+      tool_schemas_.end());
+  tool_schemas_.push_back({"skill", description, parameters});
+
+  logger_->info("Registered skill meta-tool");
+}
+
+void ToolRegistry::SetSkillTool(
+    std::shared_ptr<SkillMetaTool> skill_meta_tool,
+    std::shared_ptr<SkillLoaderMeta> skill_loader_meta) {
+  skill_meta_tool_ = std::move(skill_meta_tool);
+  skill_loader_meta_ = std::move(skill_loader_meta);
+  logger_->info("Skill meta-tool and loader configured");
+}
+
+std::string ToolRegistry::ExecuteSkill(const std::string& skill_name,
+                                       const nlohmann::json& parameters) {
+  if (!skill_meta_tool_ || !skill_loader_meta_) {
+    return "Error: Skill meta-tool or loader not configured";
+  }
+
+  logger_->info("Executing skill: {}", skill_name);
+  
+  // Get skill metadata list
+  auto skills_meta = skill_loader_meta_->GetAllMetaData();
+  
+  // Handle skill invocation (dynamically loads full data)
+  auto result = skill_meta_tool_->HandleInvocation(parameters, skills_meta);
+  
+  if (result.success) {
+    // Build dual-context response: visible + hidden messages
+    std::string response = result.visible_message + "\n\n";
+    response += "<skill-context isMeta='true'>\n";
+    response += result.hidden_message;
+    response += "\n</skill-context>";
+    logger_->info("Skill '{}' executed successfully: visible={} chars, hidden={} chars",
+                 result.skill_name, result.visible_message.size(),
+                 result.hidden_message.size());
+    return response;
+  } else {
+    std::string error_msg = "Skill execution failed: " + result.error;
+    logger_->warn("Skill execution failed: {}", result.error);
+    return error_msg;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -338,21 +409,23 @@ void ToolRegistry::SetSubagentManager(SubagentManager* manager,
     return r.dump();
   };
 
-  nlohmann::json sp;
-  sp["type"] = "object";
-  sp["properties"] = {
-      {"task", {{"type", "string"}, {"description", "Task for the subagent"}}},
-      {"label", {{"type", "string"}, {"description", "Human-readable label"}}},
-      {"agent_id", {{"type", "string"}, {"description", "Target agent ID"}}},
-      {"model", {{"type", "string"}, {"description", "Model override"}}},
-      {"thinking",
-       {{"type", "string"},
-        {"description", "Thinking level: off|low|medium|high"}}},
-      {"timeout", {{"type", "integer"}, {"description", "Timeout in seconds"}}},
-      {"mode", {{"type", "string"}, {"enum", {"run", "session"}}}},
-      {"cleanup",
-       {{"type", "boolean"}, {"description", "Auto-delete on completion"}}}};
-  sp["required"] = {"task"};
+  nlohmann::json sp = nlohmann::json::parse(R"JSON({
+    "type": "object",
+    "properties": {
+      "task": {"type": "string", "description": "Task for the subagent"},
+      "label": {"type": "string", "description": "Human-readable label"},
+      "agent_id": {"type": "string", "description": "Target agent ID"},
+      "model": {"type": "string", "description": "Model override"},
+      "thinking": {
+        "type": "string",
+        "description": "Thinking level: off|low|medium|high"
+      },
+      "timeout": {"type": "integer", "description": "Timeout in seconds"},
+      "mode": {"type": "string", "enum": ["run", "session"]},
+      "cleanup": {"type": "boolean", "description": "Auto-delete on completion"}
+    },
+    "required": ["task"]
+  })JSON");
 
   tool_schemas_.erase(std::remove_if(tool_schemas_.begin(), tool_schemas_.end(),
                                      [](const ToolSchema& s) {

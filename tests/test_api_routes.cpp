@@ -14,7 +14,7 @@
 #include "quantclaw/core/agent_loop.hpp"
 #include "quantclaw/core/memory_manager.hpp"
 #include "quantclaw/core/prompt_builder.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+#include "quantclaw/skill/skill_loader_meta.hpp"
 #include "quantclaw/gateway/gateway_server.hpp"
 #include "quantclaw/providers/llm_provider.hpp"
 #include "quantclaw/session/session_manager.hpp"
@@ -79,13 +79,13 @@ class ApiRoutesTest : public ::testing::Test {
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
-    skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
+    skill_loader_ = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
 
     mock_llm_ = std::make_shared<ApiMockLLMProvider>();
     agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
-        memory_manager_, skill_loader_, tool_registry_, mock_llm_,
+        tool_registry_, mock_llm_,
         config_.agent, logger_);
     session_manager_ =
         std::make_shared<quantclaw::SessionManager>(sessions_dir_, logger_);
@@ -145,7 +145,7 @@ class ApiRoutesTest : public ::testing::Test {
   std::shared_ptr<spdlog::logger> logger_;
   quantclaw::QuantClawConfig config_;
   std::shared_ptr<quantclaw::MemoryManager> memory_manager_;
-  std::shared_ptr<quantclaw::SkillLoader> skill_loader_;
+  std::shared_ptr<quantclaw::SkillLoaderMeta> skill_loader_;
   std::shared_ptr<quantclaw::ToolRegistry> tool_registry_;
   std::shared_ptr<ApiMockLLMProvider> mock_llm_;
   std::shared_ptr<quantclaw::AgentLoop> agent_loop_;
@@ -363,11 +363,11 @@ class ApiRoutesAuthTest : public ::testing::Test {
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
-    skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
+    skill_loader_ = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     mock_llm_ = std::make_shared<ApiMockLLMProvider>();
     agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
-        memory_manager_, skill_loader_, tool_registry_, mock_llm_,
+        tool_registry_, mock_llm_,
         config_.agent, logger_);
     session_manager_ =
         std::make_shared<quantclaw::SessionManager>(sessions_dir_, logger_);
@@ -420,7 +420,7 @@ class ApiRoutesAuthTest : public ::testing::Test {
   std::shared_ptr<spdlog::logger> logger_;
   quantclaw::QuantClawConfig config_;
   std::shared_ptr<quantclaw::MemoryManager> memory_manager_;
-  std::shared_ptr<quantclaw::SkillLoader> skill_loader_;
+  std::shared_ptr<quantclaw::SkillLoaderMeta> skill_loader_;
   std::shared_ptr<quantclaw::ToolRegistry> tool_registry_;
   std::shared_ptr<ApiMockLLMProvider> mock_llm_;
   std::shared_ptr<quantclaw::AgentLoop> agent_loop_;
@@ -478,13 +478,13 @@ class ApiRoutesReloadTest : public ::testing::Test {
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
-    skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
+    skill_loader_ = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
 
     mock_llm_ = std::make_shared<ApiMockLLMProvider>();
     agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
-        memory_manager_, skill_loader_, tool_registry_, mock_llm_,
+        tool_registry_, mock_llm_,
         config_.agent, logger_);
     session_manager_ =
         std::make_shared<quantclaw::SessionManager>(sessions_dir_, logger_);
@@ -544,7 +544,7 @@ class ApiRoutesReloadTest : public ::testing::Test {
   std::shared_ptr<spdlog::logger> logger_;
   quantclaw::QuantClawConfig config_;
   std::shared_ptr<quantclaw::MemoryManager> memory_manager_;
-  std::shared_ptr<quantclaw::SkillLoader> skill_loader_;
+  std::shared_ptr<quantclaw::SkillLoaderMeta> skill_loader_;
   std::shared_ptr<quantclaw::ToolRegistry> tool_registry_;
   std::shared_ptr<ApiMockLLMProvider> mock_llm_;
   std::shared_ptr<quantclaw::AgentLoop> agent_loop_;
@@ -593,13 +593,13 @@ class ApiGatewayInfoTest : public ::testing::Test {
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
-    skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
+    skill_loader_ = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
 
     mock_llm_ = std::make_shared<ApiMockLLMProvider>();
     agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
-        memory_manager_, skill_loader_, tool_registry_, mock_llm_,
+        tool_registry_, mock_llm_,
         config_.agent, logger_);
     session_manager_ =
         std::make_shared<quantclaw::SessionManager>(sessions_dir_, logger_);
@@ -669,7 +669,7 @@ class ApiGatewayInfoTest : public ::testing::Test {
   std::shared_ptr<spdlog::logger> logger_;
   quantclaw::QuantClawConfig config_;
   std::shared_ptr<quantclaw::MemoryManager> memory_manager_;
-  std::shared_ptr<quantclaw::SkillLoader> skill_loader_;
+  std::shared_ptr<quantclaw::SkillLoaderMeta> skill_loader_;
   std::shared_ptr<quantclaw::ToolRegistry> tool_registry_;
   std::shared_ptr<ApiMockLLMProvider> mock_llm_;
   std::shared_ptr<quantclaw::AgentLoop> agent_loop_;

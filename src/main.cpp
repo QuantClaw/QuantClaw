@@ -30,7 +30,8 @@
 #include "quantclaw/common/parse_util.hpp"
 #include "quantclaw/config.hpp"
 #include "quantclaw/core/memory_search.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+#include "quantclaw/skill/skill_loader_meta.hpp"
+#include "quantclaw/skill/skill_install_deps.hpp"
 #include "quantclaw/gateway/gateway_client.hpp"
 #include "quantclaw/platform/process.hpp"
 
@@ -587,9 +588,9 @@ int main(int argc, char* argv[]) {
              // Use defaults if no config
            }
 
-           auto skill_loader = std::make_shared<quantclaw::SkillLoader>(logger);
+           auto skill_loader = std::make_shared<quantclaw::SkillLoaderMeta>(logger);
            auto skills =
-               skill_loader->LoadSkills(skills_config, workspace_path);
+               skill_loader->LoaderAllMetaData(skills_config, workspace_path);
 
            if (skills.empty()) {
              std::cout << "No skills found" << std::endl;
@@ -597,11 +598,11 @@ int main(int argc, char* argv[]) {
              std::cout << "Skills (" << skills.size() << "):" << std::endl;
              for (const auto& skill : skills) {
                std::cout << "  ";
-               if (!skill.emoji.empty())
-                 std::cout << skill.emoji << " ";
-               std::cout << skill.name;
-               if (!skill.description.empty()) {
-                 std::cout << " - " << skill.description;
+               if (!skill.mini.emoji.empty())
+                 std::cout << skill.mini.emoji << " ";
+               std::cout << skill.mini.name;
+               if (!skill.mini.description.empty()) {
+                 std::cout << " - " << skill.mini.description;
                }
                std::cout << std::endl;
              }
@@ -626,23 +627,21 @@ int main(int argc, char* argv[]) {
                  quantclaw::QuantClawConfig::DefaultConfigPath());
              skills_config = config.skills;
            } catch (const std::exception&) {}
-
-           auto skill_loader = std::make_shared<quantclaw::SkillLoader>(logger);
-           auto skills =
-               skill_loader->LoadSkills(skills_config, workspace_path);
-
-           auto it = std::find_if(skills.begin(), skills.end(),
+           auto skill_loader_meta = std::make_shared<quantclaw::SkillLoaderMeta>(logger);
+           auto skills_meta = skill_loader_meta->LoaderAllMetaData(skills_config, workspace_path);
+           auto it = std::find_if(skills_meta.begin(), skills_meta.end(),
                                   [&](const quantclaw::SkillMetadata& s) {
-                                    return s.name == skill_name;
+                                    return s.mini.name == skill_name;
                                   });
-           if (it == skills.end()) {
+           if (it == skills_meta.end()) {
              std::cerr << "Skill not found: " << skill_name << std::endl;
              return 1;
            }
 
            std::cout << "Installing dependencies for skill: " << skill_name
                      << std::endl;
-           bool ok = skill_loader->InstallSkill(*it);
+           quantclaw::SkillInstallDeps skill_install_deps(logger);
+           bool ok = skill_install_deps.InstallSkillDependenceByName(skill_name, skills_meta);
            if (ok) {
              std::cout << "Done." << std::endl;
              return 0;

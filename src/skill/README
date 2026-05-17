@@ -1,0 +1,48 @@
+QuantClaw Skill 模块 — Claude Skills 架构简述
+=============================================
+
+Claude Skills 的第一性原理：基于提示词的动态上下文注入与元工具架构
+（Prompt-based Dynamic Context Injection & Meta-Tool Architecture）
+
+Skill 不是一段在模型之外运行的可执行代码，而是一份 Markdown 文件
+（SKILL.md）。当 Skill 被调用时，系统并不"运行"它，而是读取文件
+内容并将其"注入"到当前对话历史中，瞬间把 Claude 变成解决该问题的专家。
+
+核心架构由三个维度构成：
+
+1. 元工具（Meta-Tool）与渐进式披露
+-----------------------------------
+   - 系统在 LLM 上下文中仅注册一个名为 "Skill" 的元工具
+   - 元工具的描述只列出各 Skill 的名称和简介（Name + Description）
+   - LLM 完全依靠自身推理能力判断用户意图是否匹配某个 Skill
+   - 没有硬编码路由、正则或分类器，决策发生在 Transformer 前向传播中
+   - 对应实现：SkillMetaTool::BuildSchema()
+
+2. 双重上下文注入（Dual Context Injection）
+--------------------------------------------
+   当 Skill 被选中时，系统执行两个层面的注入：
+
+   A. 对话上下文注入（Conversation Context Injection）
+      - 显性消息（visible_message）：给用户看
+        例：<command-message>The "pdf" skill is loading</command-message>
+      - 隐性消息（hidden_message, isMeta=true）：给 AI 看
+        包含 SKILL.md 完整内容（数千字指令），用户界面不可见
+      - 对应实现：SkillMetaTool::HandleInvocation()
+
+   B. 执行上下文修改（Execution Context Modification）
+      - 工具权限：临时授予特定工具权限（如 allowed-tools: "Bash(git:*)"）
+      - 模型切换：强制切换模型（如从 Sonnet 切到 Opus 进行深度推理）
+      - 对应实现：SkillInvocationResult::allowed_tools / model_override
+
+3. 模块分工
+-----------
+   skill_parse_file  — SKILL.md 文件解析，产出 SkillFullData
+   skill_loader_meta — 元数据加载（YAML frontmatter only），产出 SkillMetadata
+   skill_loader_full — 完整技能加载（含 markdown body），产出 SkillFullData
+   skill_meta_tool   — 元工具：构建 Schema + 处理调用 + 双通道注入
+
+运作流程：
+  用户请求 → LLM 决策(匹配 Skill 简介) → 系统读取 SKILL.md
+           → 显性消息(用户可见) + 隐性消息(AI 上下文注入)
+           → 执行上下文修改(工具权限/模型切换)
+           → LLM 以新身份执行任务

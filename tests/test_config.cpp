@@ -22,7 +22,7 @@
 #include "quantclaw/config.hpp"
 #include "quantclaw/core/agent_loop.hpp"
 #include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+#include "quantclaw/skill/skill_loader_meta.hpp"
 #include "quantclaw/providers/llm_provider.hpp"
 #include "quantclaw/providers/provider_registry.hpp"
 #include "quantclaw/tools/tool_registry.hpp"
@@ -412,7 +412,7 @@ TEST_F(ConfigTest, ConfigReload_PropagatesChanges) {
 
   auto memory_manager =
       std::make_shared<quantclaw::MemoryManager>(workspace_dir, logger);
-  auto skill_loader = std::make_shared<quantclaw::SkillLoader>(logger);
+  auto skill_loader_meta = std::make_shared<quantclaw::SkillLoaderMeta>(logger);
   auto tool_registry = std::make_shared<quantclaw::ToolRegistry>(logger);
   auto mock_llm = std::make_shared<ConfigReloadMockLLM>();
 
@@ -422,7 +422,7 @@ TEST_F(ConfigTest, ConfigReload_PropagatesChanges) {
   initial_config.temperature = 0.5;
 
   auto agent_loop = std::make_shared<quantclaw::AgentLoop>(
-      memory_manager, skill_loader, tool_registry, mock_llm, initial_config,
+      tool_registry, mock_llm, initial_config,
       logger);
 
   EXPECT_EQ(agent_loop->GetConfig().model, "initial-model");

@@ -282,6 +282,37 @@ bool CronScheduler::RemoveJob(const std::string& id) {
   return true;
 }
 
+bool CronScheduler::UpdateJob(const std::string& id, const std::string& name,
+                               const std::string& schedule,
+                               const std::string& message,
+                               const std::string& session_key) {
+  // Validate cron expression first (before acquiring lock)
+  CronExpression expr(schedule);
+
+  std::lock_guard<std::mutex> lock(mu_);
+  for (auto& job : jobs_) {
+    if (job.id == id) {
+      job.name = name;
+      job.schedule = schedule;
+      job.message = message;
+      job.session_key = session_key;
+      job.next_run = expr.NextAfter(std::chrono::system_clock::now());
+
+      if (!storage_path_.empty()) {
+        nlohmann::json arr = nlohmann::json::array();
+        for (const auto& j : jobs_)
+          arr.push_back(j.ToJson());
+        std::ofstream ofs(storage_path_);
+        ofs << arr.dump(2) << std::endl;
+      }
+
+      logger_->info("Updated cron job '{}' ({}): {}", name, id, schedule);
+      return true;
+    }
+  }
+  return false;
+}
+
 std::vector<CronJob> CronScheduler::ListJobs() const {
   std::lock_guard<std::mutex> lock(mu_);
   return jobs_;

@@ -11,12 +11,10 @@
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
-
 #include "quantclaw/core/context_pruner.hpp"
 #include "quantclaw/core/default_context_engine.hpp"
 #include "quantclaw/core/memory_manager.hpp"
 #include "quantclaw/core/session_compaction.hpp"
-#include "quantclaw/core/skill_loader.hpp"
 #include "quantclaw/gateway/protocol.hpp"
 #include "quantclaw/providers/failover_resolver.hpp"
 #include "quantclaw/providers/provider_error.hpp"
@@ -128,15 +126,11 @@ static int get_context_window(const std::string& model) {
   return kDefaultContextWindow;
 }
 
-AgentLoop::AgentLoop(std::shared_ptr<MemoryManager> memory_manager,
-                     std::shared_ptr<SkillLoader> skill_loader,
-                     std::shared_ptr<ToolRegistry> tool_registry,
+AgentLoop::AgentLoop(std::shared_ptr<ToolRegistry> tool_registry,
                      std::shared_ptr<LLMProvider> llm_provider,
                      const AgentConfig& agent_config,
                      std::shared_ptr<spdlog::logger> logger)
-    : memory_manager_(memory_manager),
-      skill_loader_(skill_loader),
-      tool_registry_(tool_registry),
+    : tool_registry_(tool_registry),
       llm_provider_(llm_provider),
       logger_(logger),
       agent_config_(agent_config) {
@@ -546,28 +540,7 @@ std::vector<Message> AgentLoop::ProcessMessageStream(
               Message results_msg;
               results_msg.role = "user";
               for (const auto& tc : valid_tool_calls) {
-                try {
-                  auto result =
-                      tool_registry_->ExecuteTool(tc.name, tc.arguments);
-                  result = truncate_tool_result(result, kToolResultMaxChars,
-                                                kToolResultKeepLines);
-                  if (callback) {
-                    callback({events::kToolResult,
-                              {{"tool_use_id", tc.id}, {"content", result}}});
-                  }
-                  results_msg.content.push_back(
-                      ContentBlock::MakeToolResult(tc.id, result));
-                } catch (const std::exception& e) {
-                  std::string error_content = "Error: " + std::string(e.what());
-                  if (callback) {
-                    callback({events::kToolResult,
-                              {{"tool_use_id", tc.id},
-                               {"content", error_content},
-                               {"is_error", true}}});
-                  }
-                  results_msg.content.push_back(
-                      ContentBlock::MakeToolResult(tc.id, error_content));
-                }
+                execute_single_tool_call(tc, results_msg, callback);
               }
               request.messages.push_back(results_msg);
               new_messages.push_back(results_msg);
@@ -765,9 +738,18 @@ AgentLoop::handle_tool_calls(const std::vector<nlohmann::json>& tool_calls) {
 
       logger_->info("Executing tool: {} with arguments: {}", tool_name,
                     arguments.dump());
-      std::string result = tool_registry_->ExecuteTool(tool_name, arguments);
-      results.push_back(result);
-      logger_->info("Tool execution successful");
+
+      // Check if this is a skill meta-tool invocation
+      if (tool_name == "skill") {
+        std::string skill_name = arguments.value("command", "");
+        std::string result = tool_registry_->ExecuteSkill(skill_name, arguments);
+        results.push_back(result);
+      } else {
+        // Standard tool execution
+        std::string result = tool_registry_->ExecuteTool(tool_name, arguments);
+        results.push_back(result);
+        logger_->info("Tool execution successful");
+      }
 
     } catch (const std::exception& e) {
       logger_->error("Tool execution failed: {}", e.what());
@@ -776,6 +758,43 @@ AgentLoop::handle_tool_calls(const std::vector<nlohmann::json>& tool_calls) {
   }
 
   return results;
+}
+
+void AgentLoop::execute_single_tool_call(
+    const ToolCall& tc,
+    Message& results_msg,
+    const AgentEventCallback& callback) {
+  try {
+    std::string result;
+    
+    // Check if this is a skill meta-tool invocation
+    if (tc.name == "skill") {
+      std::string skill_name = tc.arguments.value("command", "");
+      result = tool_registry_->ExecuteSkill(skill_name, tc.arguments);
+    } else {
+      // Standard tool execution
+      result = tool_registry_->ExecuteTool(tc.name, tc.arguments);
+    }
+    
+    result = truncate_tool_result(result, kToolResultMaxChars,
+                                  kToolResultKeepLines);
+    if (callback) {
+      callback({events::kToolResult,
+                {{"tool_use_id", tc.id}, {"content", result}}});
+    }
+    results_msg.content.push_back(
+        ContentBlock::MakeToolResult(tc.id, result));
+  } catch (const std::exception& e) {
+    std::string error_content = "Error: " + std::string(e.what());
+    if (callback) {
+      callback({events::kToolResult,
+                {{"tool_use_id", tc.id},
+                 {"content", error_content},
+                 {"is_error", true}}});
+    }
+    results_msg.content.push_back(
+        ContentBlock::MakeToolResult(tc.id, error_content));
+  }
 }
 
 }  // namespace quantclaw

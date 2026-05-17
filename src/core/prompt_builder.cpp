@@ -10,13 +10,13 @@
 
 #include "quantclaw/config.hpp"
 #include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+#include "quantclaw/skill/skill_loader_meta.hpp"
 #include "quantclaw/tools/tool_registry.hpp"
 
 namespace quantclaw {
 
 PromptBuilder::PromptBuilder(std::shared_ptr<MemoryManager> memory_manager,
-                             std::shared_ptr<SkillLoader> skill_loader,
+                             std::shared_ptr<SkillLoaderMeta> skill_loader,
                              std::shared_ptr<ToolRegistry> tool_registry,
                              const QuantClawConfig* config)
     : memory_manager_(memory_manager),
@@ -45,18 +45,20 @@ std::string PromptBuilder::BuildFull(const std::string& /*agent_id*/) const {
     prompt << "## Tool Usage Guide\n" << tools << "\n\n";
   }
 
-  // 4. Loaded skills (multi-dir if config available, single-dir fallback)
+  // 4. Loaded skills (multi-dir with config filtering and dedup)
+  // 4. Loaded skills meta data, except for content (multi-dir with config filtering and dedup)
   std::vector<SkillMetadata> skills;
-  if (config_) {
-    skills = skill_loader_->LoadSkills(config_->skills,
-                                       memory_manager_->GetWorkspacePath());
-  } else {
-    skills = skill_loader_->LoadSkillsFromDirectory(
-        memory_manager_->GetWorkspacePath() / "skills");
+  {
+    SkillsConfig skills_config;
+    if (config_) {
+      skills_config = config_->skills;
+    }
+    skills = skill_loader_->LoaderAllMetaData(
+        skills_config, memory_manager_->GetWorkspacePath());
   }
   if (!skills.empty()) {
     prompt << "## Available Skills\n"
-           << skill_loader_->GetSkillContext(skills) << "\n\n";
+           << skill_loader_->MergeSkillContext(skills) << "\n\n";
   }
 
   // 5. Memory context (recent daily memory)
