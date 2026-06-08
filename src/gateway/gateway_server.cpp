@@ -10,10 +10,14 @@
 #include <thread>
 #include <unordered_set>
 
+#include "quantclaw/rpchandler/rpc_handler_manager.hpp"
+
 namespace quantclaw::gateway {
 
 GatewayServer::GatewayServer(int port, std::shared_ptr<spdlog::logger> logger)
-    : port_(port), logger_(logger) {
+    : port_(port),
+      logger_(std::move(logger)),
+      handler_manager_(std::make_unique<RpcHandlerManager>(*this, logger_)) {
   logger_->info("GatewayServer created on port {}", port_);
 }
 
@@ -89,6 +93,10 @@ void GatewayServer::RegisterHandler(const std::string& method,
   std::lock_guard<std::mutex> lock(handlers_mutex_);
   handlers_[method] = std::move(handler);
   logger_->debug("Registered RPC handler: {}", method);
+}
+
+RpcHandlerManager& GatewayServer::GetHandlerManager() {
+  return *handler_manager_;
 }
 
 void GatewayServer::BroadcastEvent(const std::string& event,

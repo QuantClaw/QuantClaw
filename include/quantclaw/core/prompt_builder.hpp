@@ -11,7 +11,7 @@
 namespace quantclaw {
 
 class MemoryManager;
-class SkillLoader;
+class SkillLoaderMeta;
 class ToolRegistry;
 
 struct AgentConfig;
@@ -20,7 +20,7 @@ struct QuantClawConfig;
 class PromptBuilder {
  public:
   PromptBuilder(std::shared_ptr<MemoryManager> memory_manager,
-                std::shared_ptr<SkillLoader> skill_loader,
+                std::shared_ptr<SkillLoaderMeta> skill_loader,
                 std::shared_ptr<ToolRegistry> tool_registry,
                 const QuantClawConfig* config = nullptr);
 
@@ -32,7 +32,7 @@ class PromptBuilder {
 
  private:
   std::shared_ptr<MemoryManager> memory_manager_;
-  std::shared_ptr<SkillLoader> skill_loader_;
+  std::shared_ptr<SkillLoaderMeta> skill_loader_;
   std::shared_ptr<ToolRegistry> tool_registry_;
   const QuantClawConfig* config_ = nullptr;
 

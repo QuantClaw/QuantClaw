@@ -18,7 +18,8 @@
 #include "quantclaw/core/memory_manager.hpp"
 #include "quantclaw/core/prompt_builder.hpp"
 #include "quantclaw/core/signal_handler.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+#include "quantclaw/skill/skill_loader_meta.hpp"
+#include "quantclaw/skill/skill_meta_tool.hpp"
 #include "quantclaw/core/subagent.hpp"
 #include "quantclaw/gateway/command_queue.hpp"
 #include "quantclaw/gateway/daemon_manager.hpp"
@@ -29,6 +30,7 @@
 #include "quantclaw/platform/process.hpp"
 #include "quantclaw/plugins/plugin_system.hpp"
 #include "quantclaw/providers/provider_registry.hpp"
+#include "quantclaw/rpchandler/rpc_handler_manager.hpp"
 #include "quantclaw/security/exec_approval.hpp"
 #include "quantclaw/security/rate_limiter.hpp"
 #include "quantclaw/security/rbac.hpp"
@@ -37,27 +39,6 @@
 #include "quantclaw/tools/tool_registry.hpp"
 #include "quantclaw/web/api_routes.hpp"
 #include "quantclaw/web/web_server.hpp"
-
-// Forward declare from rpc_handlers.cpp
-namespace quantclaw::gateway {
-void register_rpc_handlers(
-    GatewayServer& server,
-    std::shared_ptr<quantclaw::SessionManager> session_manager,
-    std::shared_ptr<quantclaw::AgentLoop> agent_loop,
-    std::shared_ptr<quantclaw::PromptBuilder> prompt_builder,
-    std::shared_ptr<quantclaw::ToolRegistry> tool_registry,
-    const quantclaw::QuantClawConfig& config,
-    std::shared_ptr<spdlog::logger> logger,
-    std::function<void()> reload_fn = nullptr,
-    std::shared_ptr<quantclaw::ProviderRegistry> provider_registry = nullptr,
-    std::shared_ptr<quantclaw::SkillLoader> skill_loader = nullptr,
-    std::shared_ptr<quantclaw::CronScheduler> cron_scheduler = nullptr,
-    std::shared_ptr<quantclaw::ExecApprovalManager> exec_approval_mgr = nullptr,
-    quantclaw::PluginSystem* plugin_system = nullptr,
-    gateway::CommandQueue* command_queue = nullptr,
-    std::string log_file_path = {},
-    std::function<std::vector<std::string>()> running_adapters_fn = {});
-}
 
 namespace quantclaw::cli {
 namespace {
@@ -155,7 +136,6 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       std::make_shared<quantclaw::MemoryManager>(workspace_dir, logger_);
   memory_manager->LoadWorkspaceFiles();
 
-  auto skill_loader = std::make_shared<quantclaw::SkillLoader>(logger_);
   auto tool_registry = std::make_shared<quantclaw::ToolRegistry>(logger_);
   tool_registry->RegisterBuiltinTools();
   tool_registry->RegisterChainTool();
@@ -179,6 +159,26 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   auto provider_registry =
       std::make_shared<quantclaw::ProviderRegistry>(logger_);
   provider_registry->RegisterBuiltinFactories();
+
+  // Initialize SkillMetaTool and register to ToolRegistry
+  auto skill_loader_meta = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
+  skill_loader_meta->LoaderAllMetaData(config.skills, workspace_dir.string());
+  auto skills_meta = skill_loader_meta->GetAllMetaData();
+  if (!skills_meta.empty()) {
+    try {
+      auto skill_meta_tool = std::make_shared<quantclaw::SkillMetaTool>(logger_);
+      auto schema = skill_meta_tool->BuildSchema(skills_meta);
+      tool_registry->SetSkillTool(skill_meta_tool, skill_loader_meta);
+      tool_registry->RegisterSkillMetaTool(schema.description,
+                                           schema.parameters);
+      logger_->info("SkillMetaTool registered with {} skills",
+                    skills_meta.size());
+    } catch (const std::exception& e) {
+      logger_->error("Failed to initialize SkillMetaTool: {}", e.what());
+    }
+  } else {
+    logger_->info("No skills available, skipping SkillMetaTool registration");
+  }
 
   // Load provider entries from config (apiKey, baseUrl, timeout)
   for (const auto& [id, prov] : config.providers) {
@@ -218,7 +218,7 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   }
 
   auto agent_loop = std::make_shared<quantclaw::AgentLoop>(
-      memory_manager, skill_loader, tool_registry, llm_provider, config.agent,
+      tool_registry, llm_provider, config.agent,
       logger_);
   agent_loop->SetProviderRegistry(provider_registry.get());
 
@@ -226,7 +226,7 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       std::make_shared<quantclaw::SessionManager>(sessions_dir, logger_);
 
   auto prompt_builder = std::make_shared<quantclaw::PromptBuilder>(
-      memory_manager, skill_loader, tool_registry, &config);
+      memory_manager, skill_loader_meta, tool_registry, &config);
 
   // Create and configure gateway server
   gateway::GatewayServer server(port, logger_);
@@ -441,15 +441,26 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   quantclaw::PluginSystem plugin_system(logger_);
   plugin_system.Initialize(config, workspace_dir);
 
-  // Register RPC handlers
-  gateway::register_rpc_handlers(
-      server, session_manager, agent_loop, prompt_builder, tool_registry,
-      config, logger_, reload_fn, provider_registry, skill_loader,
-      cron_scheduler, exec_approval_mgr, &plugin_system, command_queue.get(),
-      (base_dir / "logs" / "gateway.log").string(), [adapter_manager]() {
-        return adapter_manager ? adapter_manager->RunningAdapters()
-                               : std::vector<std::string>{};
-      });
+  // Register RPC handlers using Builder pattern
+  auto& handler_mgr = server.GetHandlerManager();
+  handler_mgr.WithSessionManager(session_manager)
+             .WithAgentLoop(agent_loop)
+             .WithPromptBuilder(prompt_builder)
+             .WithToolRegistry(tool_registry)
+             .WithConfig(config)
+             .WithReloadFn(reload_fn)
+             .WithProviderRegistry(provider_registry)
+             .WithSkillLoaderMeta(skill_loader_meta)
+             .WithCronScheduler(cron_scheduler)
+             .WithExecApprovalManager(exec_approval_mgr)
+             .WithPluginSystem(&plugin_system)
+             .WithCommandQueue(command_queue.get())
+             .WithLogFilePath((base_dir / "logs" / "gateway.log").string())
+             .WithRunningAdaptersFn([adapter_manager]() {
+               return adapter_manager ? adapter_manager->RunningAdapters()
+                                      : std::vector<std::string>{};
+             });
+  handler_mgr.RegisterAll();
 
   // Start server
   try {
@@ -554,7 +565,10 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
       reload_fn);
 
   // Start config file watcher thread
-  std::atomic<bool> watching{true};
+  // Use shared_ptr for the stop flag so the watcher thread owns its own copy,
+  // eliminating any dangling-reference risk if the stack frame unwinds before
+  // the thread finishes.
+  auto watching = std::make_shared<std::atomic<bool>>(true);
   std::filesystem::file_time_type config_mtime;
   try {
     config_mtime = std::filesystem::last_write_time(config_path);
@@ -563,10 +577,10 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   }
 
   std::thread config_watcher(
-      [&config_path, &config_mtime, &reload_fn, &watching, logger = logger_]() {
-        while (watching.load()) {
+      [config_path, config_mtime, watching, &reload_fn, logger = logger_]() mutable {
+        while (watching->load()) {
           std::this_thread::sleep_for(std::chrono::seconds(5));
-          if (!watching.load())
+          if (!watching->load())
             break;
           try {
             auto current_mtime = std::filesystem::last_write_time(config_path);
@@ -585,7 +599,7 @@ int GatewayCommands::ForegroundCommand(const std::vector<std::string>& args) {
   quantclaw::SignalHandler::WaitForShutdown();
 
   // Stop config watcher
-  watching.store(false);
+  watching->store(false);
   if (config_watcher.joinable()) {
     config_watcher.join();
   }

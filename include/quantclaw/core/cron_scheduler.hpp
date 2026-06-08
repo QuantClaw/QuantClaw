@@ -88,6 +88,12 @@ class CronScheduler {
   // Remove a job by ID
   bool RemoveJob(const std::string& id);
 
+  // Update an existing job in-place, preserving its ID and last_run.
+  // Returns true on success, false if job not found.
+  bool UpdateJob(const std::string& id, const std::string& name,
+                 const std::string& schedule, const std::string& message,
+                 const std::string& session_key);
+
   // List all jobs
   std::vector<CronJob> ListJobs() const;
 

@@ -26,6 +26,8 @@ class ExecApprovalManager;
 class SubagentManager;
 class CronScheduler;
 class SessionManager;
+class SkillMetaTool;
+class SkillLoaderMeta;
 
 namespace mcp {
 class MCPToolManager;
@@ -65,6 +67,10 @@ class ToolRegistry {
   std::string current_session_key_;
   std::unordered_set<std::string> external_tools_;
 
+  // Skill execution support
+  std::shared_ptr<SkillMetaTool> skill_meta_tool_;
+  std::shared_ptr<SkillLoaderMeta> skill_loader_meta_;
+
   // Optional subsystems wired in at startup
   std::shared_ptr<CronScheduler> cron_scheduler_;
   std::shared_ptr<SessionManager> session_manager_;
@@ -90,6 +96,18 @@ class ToolRegistry {
 
   // Register the chain meta-tool
   void RegisterChainTool();
+
+  // Register the skill meta-tool (Claude Skills progressive disclosure)
+  void RegisterSkillMetaTool(const std::string& description,
+                             const nlohmann::json& parameters);
+
+  // Set skill meta-tool and loader for skill execution
+  void SetSkillTool(std::shared_ptr<SkillMetaTool> skill_meta_tool,
+                    std::shared_ptr<SkillLoaderMeta> skill_loader_meta);
+
+  // Execute a skill by name (with dual-context injection)
+  std::string ExecuteSkill(const std::string& skill_name,
+                           const nlohmann::json& parameters);
 
   // Set permission checker (filters GetToolSchemas and ExecuteTool)
   void SetPermissionChecker(std::shared_ptr<ToolPermissionChecker> checker);

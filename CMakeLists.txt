@@ -122,7 +122,12 @@ set(QUANTCLAW_CORE_SOURCES
     src/core/agent_loop.cpp
     src/core/config.cpp
     src/core/memory_manager.cpp
-    src/core/skill_loader.cpp
+    src/skill/skill_loader_full.cpp
+    src/skill/skill_loader_meta.cpp
+    src/skill/skill_parse_file.cpp
+    src/skill/skill_meta_tool.cpp
+    src/skill/skill_hot_install.cpp
+    src/skill/skill_install_deps.cpp
     src/core/prompt_builder.cpp
     src/core/signal_handler.cpp
     src/core/session_compaction.cpp
@@ -162,9 +167,24 @@ set(QUANTCLAW_CORE_SOURCES
     # Gateway
     src/gateway/gateway_server.cpp
     src/gateway/gateway_client.cpp
-    src/gateway/rpc_handlers.cpp
     src/gateway/daemon_manager.cpp
     src/gateway/command_queue.cpp
+    # RPC Handlers
+    src/rpchandler/rpc_handler_manager.cpp
+    src/rpchandler/rpc_handler_gateway.cpp
+    src/rpchandler/rpc_handler_config.cpp
+    src/rpchandler/rpc_handler_agent.cpp
+    src/rpchandler/rpc_handler_session.cpp
+    src/rpchandler/rpc_handler_channel.cpp
+    src/rpchandler/rpc_handler_skill.cpp
+    src/rpchandler/rpc_handler_cron.cpp
+    src/rpchandler/rpc_handler_memory.cpp
+    src/rpchandler/rpc_handler_exec.cpp
+    src/rpchandler/rpc_handler_model.cpp
+    src/rpchandler/rpc_handler_plugin.cpp
+    src/rpchandler/rpc_handler_queue.cpp
+    src/rpchandler/rpc_handler_openclaw.cpp
+    src/rpchandler/rpc_handler_ui_compat.cpp
     # Session
     src/session/session_manager.cpp
     src/session/session_maintenance.cpp

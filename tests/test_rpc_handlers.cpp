@@ -14,49 +14,35 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "quantclaw/config.hpp"
-#include "quantclaw/core/agent_loop.hpp"
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/prompt_builder.hpp"
-#include "quantclaw/core/skill_loader.hpp"
-#include "quantclaw/gateway/gateway_client.hpp"
-#include "quantclaw/gateway/gateway_server.hpp"
-#include "quantclaw/gateway/protocol.hpp"
-#include "quantclaw/providers/llm_provider.hpp"
-#include "quantclaw/session/session_manager.hpp"
-#include "quantclaw/tools/tool_chain.hpp"
-#include "quantclaw/tools/tool_registry.hpp"
+#include "quantclaw/core/cron_scheduler.hpp"
 
 #include "test_helpers.hpp"
 #include <gtest/gtest.h>
 
+#include "quantclaw/config.hpp"
+#include "quantclaw/core/agent_loop.hpp"
+#include "quantclaw/core/memory_manager.hpp"
+#include "quantclaw/core/prompt_builder.hpp"
+#include "quantclaw/skill/skill_loader_meta.hpp"
+#include "quantclaw/gateway/gateway_client.hpp"
+#include "quantclaw/gateway/gateway_server.hpp"
+#include "quantclaw/gateway/protocol.hpp"
+#include "quantclaw/providers/llm_provider.hpp"
+#include "quantclaw/rpchandler/rpc_handler_manager.hpp"
+#include "quantclaw/session/session_manager.hpp"
+#include "quantclaw/tools/tool_chain.hpp"
+#include "quantclaw/tools/tool_registry.hpp"
+
 // Forward declare
 namespace quantclaw {
 class ProviderRegistry;
-class SkillLoader;
+class SkillLoaderMeta;
 class CronScheduler;
 class ExecApprovalManager;
 class PluginSystem;
 }  // namespace quantclaw
 namespace quantclaw::gateway {
 class CommandQueue;
-void register_rpc_handlers(
-    GatewayServer& server,
-    std::shared_ptr<quantclaw::SessionManager> session_manager,
-    std::shared_ptr<quantclaw::AgentLoop> agent_loop,
-    std::shared_ptr<quantclaw::PromptBuilder> prompt_builder,
-    std::shared_ptr<quantclaw::ToolRegistry> tool_registry,
-    const quantclaw::QuantClawConfig& config,
-    std::shared_ptr<spdlog::logger> logger,
-    std::function<void()> reload_fn = nullptr,
-    std::shared_ptr<quantclaw::ProviderRegistry> provider_registry = nullptr,
-    std::shared_ptr<quantclaw::SkillLoader> skill_loader = nullptr,
-    std::shared_ptr<quantclaw::CronScheduler> cron_scheduler = nullptr,
-    std::shared_ptr<quantclaw::ExecApprovalManager> exec_approval_mgr = nullptr,
-    quantclaw::PluginSystem* plugin_system = nullptr,
-    quantclaw::gateway::CommandQueue* command_queue = nullptr,
-    std::string log_file_path = {},
-    std::function<std::vector<std::string>()> running_adapters_fn = {});
 }  // namespace quantclaw::gateway
 
 // Minimal mock LLM
@@ -132,14 +118,14 @@ class RpcHandlersTest : public ::testing::Test {
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
-    skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
+    skill_loader_ = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
     tool_registry_->RegisterChainTool();
 
     mock_llm_ = std::make_shared<RpcMockLLMProvider>();
     agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
-        memory_manager_, skill_loader_, tool_registry_, mock_llm_,
+        tool_registry_, mock_llm_,
         config_.agent, logger_);
     session_manager_ =
         std::make_shared<quantclaw::SessionManager>(sessions_dir_, logger_);
@@ -150,10 +136,15 @@ class RpcHandlersTest : public ::testing::Test {
         std::make_unique<quantclaw::gateway::GatewayServer>(port_, logger_);
     server_->SetAuth("none", "");
 
-    quantclaw::gateway::register_rpc_handlers(
-        *server_, session_manager_, agent_loop_, prompt_builder_,
-        tool_registry_, config_, logger_, nullptr, nullptr, nullptr, nullptr,
-        nullptr, nullptr, nullptr, {}, [this]() { return running_adapters_; });
+    // Configure and register RPC handlers using Builder pattern
+    auto& handler_mgr = server_->GetHandlerManager();
+    handler_mgr.WithSessionManager(session_manager_)
+               .WithAgentLoop(agent_loop_)
+               .WithPromptBuilder(prompt_builder_)
+               .WithToolRegistry(tool_registry_)
+               .WithConfig(config_)
+               .WithRunningAdaptersFn([this]() { return running_adapters_; });
+    handler_mgr.RegisterAll();
 
     quantclaw::test::ReleaseHeldPorts();
     server_->Start();
@@ -188,7 +179,7 @@ class RpcHandlersTest : public ::testing::Test {
   std::shared_ptr<spdlog::logger> logger_;
   quantclaw::QuantClawConfig config_;
   std::shared_ptr<quantclaw::MemoryManager> memory_manager_;
-  std::shared_ptr<quantclaw::SkillLoader> skill_loader_;
+  std::shared_ptr<quantclaw::SkillLoaderMeta> skill_loader_;
   std::shared_ptr<quantclaw::ToolRegistry> tool_registry_;
   std::shared_ptr<RpcMockLLMProvider> mock_llm_;
   std::shared_ptr<quantclaw::AgentLoop> agent_loop_;
@@ -594,14 +585,14 @@ class RpcReloadTest : public ::testing::Test {
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
-    skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
+    skill_loader_ = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
     tool_registry_->RegisterChainTool();
 
     mock_llm_ = std::make_shared<RpcMockLLMProvider>();
     agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
-        memory_manager_, skill_loader_, tool_registry_, mock_llm_,
+        tool_registry_, mock_llm_,
         config_.agent, logger_);
     session_manager_ =
         std::make_shared<quantclaw::SessionManager>(sessions_dir_, logger_);
@@ -615,9 +606,18 @@ class RpcReloadTest : public ::testing::Test {
         std::make_unique<quantclaw::gateway::GatewayServer>(port_, logger_);
     server_->SetAuth("none", "");
 
-    quantclaw::gateway::register_rpc_handlers(
-        *server_, session_manager_, agent_loop_, prompt_builder_,
-        tool_registry_, config_, logger_, reload_fn_);
+    reload_called_ = false;
+    reload_fn_ = [this]() { reload_called_ = true; };
+
+    // Configure and register RPC handlers using Builder pattern
+    auto& handler_mgr = server_->GetHandlerManager();
+    handler_mgr.WithSessionManager(session_manager_)
+               .WithAgentLoop(agent_loop_)
+               .WithPromptBuilder(prompt_builder_)
+               .WithToolRegistry(tool_registry_)
+               .WithConfig(config_)
+               .WithReloadFn(reload_fn_);
+    handler_mgr.RegisterAll();
 
     quantclaw::test::ReleaseHeldPorts();
     server_->Start();
@@ -652,7 +652,7 @@ class RpcReloadTest : public ::testing::Test {
   std::shared_ptr<spdlog::logger> logger_;
   quantclaw::QuantClawConfig config_;
   std::shared_ptr<quantclaw::MemoryManager> memory_manager_;
-  std::shared_ptr<quantclaw::SkillLoader> skill_loader_;
+  std::shared_ptr<quantclaw::SkillLoaderMeta> skill_loader_;
   std::shared_ptr<quantclaw::ToolRegistry> tool_registry_;
   std::shared_ptr<RpcMockLLMProvider> mock_llm_;
   std::shared_ptr<quantclaw::AgentLoop> agent_loop_;
@@ -864,7 +864,7 @@ TEST_F(RpcHandlersTest, SessionsDeleteExistingReturnsOk) {
   client->Disconnect();
 }
 
-// Test tools.catalog — new shape: {agentId, profiles:[], groups:[{tools:[]}]}
+// Test tools.catalog — new shape: {agentId, profiles:[], groups:[{tools:[]}]
 TEST_F(RpcHandlersTest, ToolsCatalogStub) {
   auto client = make_client();
   ASSERT_TRUE(client->Connect(5000));
@@ -879,11 +879,183 @@ TEST_F(RpcHandlersTest, ToolsCatalogStub) {
   ASSERT_TRUE(result["groups"].is_array());
   EXPECT_GE(result["groups"].size(), 1u);
 
-  // Verify group structure
   for (const auto& group : result["groups"]) {
     EXPECT_TRUE(group.contains("id"));
     EXPECT_TRUE(group.contains("tools"));
     ASSERT_TRUE(group["tools"].is_array());
+  }
+
+  client->Disconnect();
+}
+
+// Windows SDK defines AddJob as AddJobA; undefine to prevent collision
+#ifdef AddJob
+#undef AddJob
+#endif
+
+// --- CronRun: job ID match resolution tests ---
+
+class CronRunTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    test_dir_ = quantclaw::test::MakeTestDir("quantclaw_cron_run_test");
+    workspace_dir_ = test_dir_ / "workspace";
+    sessions_dir_ = test_dir_ / "sessions";
+    std::filesystem::create_directories(workspace_dir_);
+    std::filesystem::create_directories(sessions_dir_);
+
+    auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
+    logger_ = std::make_shared<spdlog::logger>("cron_run_test", null_sink);
+
+    config_.agent.model = "mock-model";
+    config_.agent.max_iterations = 3;
+    config_.agent.temperature = 0.0;
+    config_.agent.max_tokens = 512;
+    config_.gateway.port = port_;
+    config_.gateway.auth.mode = "none";
+
+    memory_manager_ =
+        std::make_shared<quantclaw::MemoryManager>(workspace_dir_, logger_);
+    skill_loader_ = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
+    tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
+    tool_registry_->RegisterBuiltinTools();
+    tool_registry_->RegisterChainTool();
+
+    mock_llm_ = std::make_shared<RpcMockLLMProvider>();
+    agent_loop_ = std::make_shared<quantclaw::AgentLoop>(
+        tool_registry_, mock_llm_, config_.agent, logger_);
+    session_manager_ =
+        std::make_shared<quantclaw::SessionManager>(sessions_dir_, logger_);
+    prompt_builder_ = std::make_shared<quantclaw::PromptBuilder>(
+        memory_manager_, skill_loader_, tool_registry_);
+
+    cron_scheduler_ = std::make_shared<quantclaw::CronScheduler>(logger_);
+    // Pre-load jobs with controlled IDs via JSON file
+    auto cron_file = (test_dir_ / "cron.json").string();
+    {
+      auto job_json = [&](const char* id, const char* name,
+                          const char* msg) -> nlohmann::json {
+        return {{"id", id}, {"name", name},
+                {"schedule", "0 * * * *"}, {"message", msg},
+                {"sessionKey", "agent:main:main"}, {"enabled", true}};
+      };
+      nlohmann::json arr = {job_json("abc123", "j1", "m1"),
+                            job_json("abc456", "j2", "m2"),
+                            job_json("xyz789", "j3", "m3")};
+      std::ofstream(cron_file) << arr.dump(2);
+    }
+    cron_scheduler_->Load(cron_file);
+
+    server_ =
+        std::make_unique<quantclaw::gateway::GatewayServer>(port_, logger_);
+    server_->SetAuth("none", "");
+
+    auto& handler_mgr = server_->GetHandlerManager();
+    handler_mgr.WithSessionManager(session_manager_)
+               .WithAgentLoop(agent_loop_)
+               .WithPromptBuilder(prompt_builder_)
+               .WithToolRegistry(tool_registry_)
+               .WithConfig(config_)
+               .WithCronScheduler(cron_scheduler_);
+    handler_mgr.RegisterAll();
+
+    quantclaw::test::ReleaseHeldPorts();
+    server_->Start();
+    ASSERT_TRUE(quantclaw::test::WaitForServerReady(port_, 5000))
+        << "Server not ready on port " << port_;
+  }
+
+  void TearDown() override {
+    if (server_) {
+      server_->Stop();
+      server_.reset();
+    }
+    if (std::filesystem::exists(test_dir_))
+      std::filesystem::remove_all(test_dir_);
+  }
+
+  std::unique_ptr<quantclaw::gateway::GatewayClient> make_client() {
+    return std::make_unique<quantclaw::gateway::GatewayClient>(
+        "ws://127.0.0.1:" + std::to_string(port_), "", logger_);
+  }
+
+  static int next_port() { return quantclaw::test::FindFreePort(); }
+
+  int port_ = next_port();
+  std::filesystem::path test_dir_;
+  std::filesystem::path workspace_dir_;
+  std::filesystem::path sessions_dir_;
+  std::shared_ptr<spdlog::logger> logger_;
+  quantclaw::QuantClawConfig config_;
+  std::shared_ptr<quantclaw::MemoryManager> memory_manager_;
+  std::shared_ptr<quantclaw::SkillLoaderMeta> skill_loader_;
+  std::shared_ptr<quantclaw::ToolRegistry> tool_registry_;
+  std::shared_ptr<RpcMockLLMProvider> mock_llm_;
+  std::shared_ptr<quantclaw::AgentLoop> agent_loop_;
+  std::shared_ptr<quantclaw::SessionManager> session_manager_;
+  std::shared_ptr<quantclaw::PromptBuilder> prompt_builder_;
+  std::shared_ptr<quantclaw::CronScheduler> cron_scheduler_;
+  std::unique_ptr<quantclaw::gateway::GatewayServer> server_;
+};
+
+TEST_F(CronRunTest, EmptyIdThrowsError) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  EXPECT_THROW(client->Call("cron.run", {{"id", ""}}, 5000),
+               std::runtime_error);
+
+  client->Disconnect();
+}
+
+TEST_F(CronRunTest, ExactMatchRunsJob) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  auto result = client->Call("cron.run", {{"id", "abc123"}}, 10000);
+  EXPECT_TRUE(result.value("ok", false));
+  EXPECT_EQ(result["jobId"], "abc123");
+  EXPECT_GE(result["messagesGenerated"].get<int>(), 0);
+
+  client->Disconnect();
+}
+
+TEST_F(CronRunTest, UniquePrefixMatchRunsJob) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  // "xy" uniquely matches "xyz789"
+  auto result = client->Call("cron.run", {{"id", "xy"}}, 10000);
+  EXPECT_TRUE(result.value("ok", false));
+  EXPECT_EQ(result["jobId"], "xyz789");
+
+  client->Disconnect();
+}
+
+TEST_F(CronRunTest, AmbiguousPrefixThrowsError) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  // "abc" matches both "abc123" and "abc456"
+  try {
+    client->Call("cron.run", {{"id", "abc"}}, 5000);
+    FAIL() << "ambiguous prefix should throw";
+  } catch (const std::runtime_error& e) {
+    EXPECT_NE(std::string(e.what()).find("ambiguous"), std::string::npos);
+  }
+
+  client->Disconnect();
+}
+
+TEST_F(CronRunTest, NoMatchThrowsNotFound) {
+  auto client = make_client();
+  ASSERT_TRUE(client->Connect(5000));
+
+  try {
+    client->Call("cron.run", {{"id", "noexist"}}, 5000);
+    FAIL() << "nonexistent id should throw";
+  } catch (const std::runtime_error& e) {
+    EXPECT_NE(std::string(e.what()).find("not found"), std::string::npos);
   }
 
   client->Disconnect();

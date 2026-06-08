@@ -1,13 +1,27 @@
 // Copyright 2025 QuantClaw Contributors
 // SPDX-License-Identifier: Apache-2.0
 //
-// Tests for P1 features:
-// - Usage accumulator (#16)
-// - Dynamic max iterations (#17)
-// - Context window guard (#15)
-// - Tool result truncation (#14)
-// - Overflow compaction retry (#13)
-// - Budget-based context pruning (#26)
+// ============================================================================
+// P1 优先级功能测试套件
+//
+// 测试范围：
+//   - Usage Accumulator (#16): Token 使用量统计与追踪
+//   - Dynamic Max Iterations (#17): 根据上下文窗口动态调整最大迭代次数
+//   - Context Window Guard (#15): 上下文窗口保护机制
+//   - Tool Result Truncation (#14): 工具结果截断策略
+//   - Overflow Compaction Retry (#13): 上下文溢出时的压缩重试机制
+//   - Budget-based Context Pruning (#26): 基于预算的上下文裁剪
+//
+// 测试分类：
+//   1. 使用量统计测试 - 会话级/全局统计、重置、JSON 输出
+//   2. 动态迭代次数测试 - 不同上下文窗口的迭代次数计算
+//   3. 上下文保护测试 - 窗口常量验证
+//   4. 工具截断测试 - 截断常量验证
+//   5. 溢出重试测试 - 压缩重试机制、错误分类
+//   6. 预算裁剪测试 - 小窗口激进裁剪、大窗口保留更多、Token 估算
+//   7. AgentLoop 集成测试 - 溢出重试恢复、使用量追踪、动态迭代
+//   8. Token 使用量测试 - 默认值、响应中的使用量
+// ============================================================================
 
 #include <memory>
 
@@ -18,8 +32,6 @@
 #include "quantclaw/constants.hpp"
 #include "quantclaw/core/agent_loop.hpp"
 #include "quantclaw/core/context_pruner.hpp"
-#include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/skill_loader.hpp"
 #include "quantclaw/core/usage_accumulator.hpp"
 #include "quantclaw/providers/llm_provider.hpp"
 #include "quantclaw/providers/provider_error.hpp"
@@ -240,9 +252,6 @@ class P1AgentLoopTest : public ::testing::Test {
 
     auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
     logger_ = std::make_shared<spdlog::logger>("test", null_sink);
-
-    memory_manager_ = std::make_shared<MemoryManager>(test_dir_, logger_);
-    skill_loader_ = std::make_shared<SkillLoader>(logger_);
     tool_registry_ = std::make_shared<ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
   }
@@ -255,8 +264,6 @@ class P1AgentLoopTest : public ::testing::Test {
 
   std::filesystem::path test_dir_;
   std::shared_ptr<spdlog::logger> logger_;
-  std::shared_ptr<MemoryManager> memory_manager_;
-  std::shared_ptr<SkillLoader> skill_loader_;
   std::shared_ptr<ToolRegistry> tool_registry_;
 };
 
@@ -269,7 +276,7 @@ TEST_F(P1AgentLoopTest, OverflowCompactionRetryRecovers) {
   config.context_window = 128000;
 
   auto loop = std::make_unique<AgentLoop>(
-      memory_manager_, skill_loader_, tool_registry_, mock, config, logger_);
+      tool_registry_, mock, config, logger_);
 
   auto msgs = loop->ProcessMessage("Hello", {}, "System prompt");
   ASSERT_FALSE(msgs.empty());
@@ -286,7 +293,7 @@ TEST_F(P1AgentLoopTest, OverflowCompactionRetryExhausted) {
   config.context_window = 128000;
 
   auto loop = std::make_unique<AgentLoop>(
-      memory_manager_, skill_loader_, tool_registry_, mock, config, logger_);
+      tool_registry_, mock, config, logger_);
 
   // After 3 retries, should throw
   EXPECT_THROW(loop->ProcessMessage("Hello", {}, "System"), ProviderError);
@@ -331,7 +338,7 @@ TEST_F(P1AgentLoopTest, UsageAccumulatorTracksTokens) {
   config.context_window = 128000;
 
   auto loop = std::make_unique<AgentLoop>(
-      memory_manager_, skill_loader_, tool_registry_, mock, config, logger_);
+      tool_registry_, mock, config, logger_);
   loop->SetSessionKey("test-session");
   loop->SetUsageAccumulator(acc);
 
@@ -352,7 +359,7 @@ TEST_F(P1AgentLoopTest, UsageAccumulatorTracksStreaming) {
   config.context_window = 128000;
 
   auto loop = std::make_unique<AgentLoop>(
-      memory_manager_, skill_loader_, tool_registry_, mock, config, logger_);
+      tool_registry_, mock, config, logger_);
   loop->SetSessionKey("test-stream");
   loop->SetUsageAccumulator(acc);
 
@@ -372,7 +379,7 @@ TEST_F(P1AgentLoopTest, DynamicMaxIterationsUsed) {
   config.context_window = kContextWindow200K;  // Should give 160 iterations
 
   auto loop = std::make_unique<AgentLoop>(
-      memory_manager_, skill_loader_, tool_registry_, mock, config, logger_);
+      tool_registry_, mock, config, logger_);
 
   // The loop should use dynamic iterations
   // We can't directly inspect max_iterations_, but we can verify

@@ -14,7 +14,7 @@
 #include "quantclaw/config.hpp"
 #include "quantclaw/core/agent_loop.hpp"
 #include "quantclaw/core/memory_manager.hpp"
-#include "quantclaw/core/skill_loader.hpp"
+#include "quantclaw/skill/skill_loader_meta.hpp"
 #include "quantclaw/core/usage_accumulator.hpp"
 #include "quantclaw/gateway/protocol.hpp"
 #include "quantclaw/providers/llm_provider.hpp"
@@ -88,7 +88,7 @@ class AgentLoopTest : public ::testing::Test {
 
     memory_manager_ =
         std::make_shared<quantclaw::MemoryManager>(test_dir_, logger_);
-    skill_loader_ = std::make_shared<quantclaw::SkillLoader>(logger_);
+    skill_loader_ = std::make_shared<quantclaw::SkillLoaderMeta>(logger_);
     tool_registry_ = std::make_shared<quantclaw::ToolRegistry>(logger_);
     tool_registry_->RegisterBuiltinTools();
 
@@ -101,7 +101,7 @@ class AgentLoopTest : public ::testing::Test {
     agent_config.max_iterations = 15;
 
     agent_loop_ = std::make_unique<quantclaw::AgentLoop>(
-        memory_manager_, skill_loader_, tool_registry_, mock_provider_,
+        tool_registry_, mock_provider_,
         agent_config, logger_);
   }
 
@@ -115,7 +115,7 @@ class AgentLoopTest : public ::testing::Test {
   std::ostringstream log_stream_;
   std::shared_ptr<spdlog::logger> logger_;
   std::shared_ptr<quantclaw::MemoryManager> memory_manager_;
-  std::shared_ptr<quantclaw::SkillLoader> skill_loader_;
+  std::shared_ptr<quantclaw::SkillLoaderMeta> skill_loader_;
   std::shared_ptr<quantclaw::ToolRegistry> tool_registry_;
   std::shared_ptr<MockLLMProvider> mock_provider_;
   std::unique_ptr<quantclaw::AgentLoop> agent_loop_;
@@ -261,7 +261,7 @@ TEST_F(AgentLoopTest,
   agent_config.max_iterations = 15;
 
   auto loop = std::make_unique<quantclaw::AgentLoop>(
-      memory_manager_, skill_loader_, tool_registry_, openai_provider,
+      tool_registry_, openai_provider,
       agent_config, logger_);
   loop->SetProviderRegistry(registry.get());
 
@@ -308,7 +308,7 @@ TEST_F(AgentLoopTest,
   agent_config.max_iterations = 15;
 
   auto loop = std::make_unique<quantclaw::AgentLoop>(
-      memory_manager_, skill_loader_, tool_registry_, openai_provider,
+      tool_registry_, openai_provider,
       agent_config, logger_);
   loop->SetProviderRegistry(registry.get());
 

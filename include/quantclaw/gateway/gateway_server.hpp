@@ -22,6 +22,9 @@
 
 namespace quantclaw::gateway {
 
+class RpcHandlerModule;  // Forward declaration
+class RpcHandlerManager;  // Forward declaration
+
 // WebSocket server that handles plain HTTP requests gracefully
 // instead of logging "Missing Sec-WebSocket-Key" errors.
 // When a browser or HTTP client hits the WS port, it returns a redirect
@@ -132,6 +135,9 @@ class GatewayServer : public quantclaw::Noncopyable {
     rate_limiter_ = std::move(limiter);
   }
 
+  // Get RpcHandlerManager for configuration and registration
+  RpcHandlerManager& GetHandlerManager();
+
  private:
   void on_connection(std::shared_ptr<ix::ConnectionState> state,
                      ix::WebSocket& ws, const ix::WebSocketMessagePtr& msg);
@@ -172,6 +178,9 @@ class GatewayServer : public quantclaw::Noncopyable {
   // Security
   std::shared_ptr<RBACChecker> rbac_checker_;
   std::shared_ptr<RateLimiter> rate_limiter_;
+
+  // RPC Handler Manager (owns all handler modules)
+  std::unique_ptr<RpcHandlerManager> handler_manager_;
 
   // Active async handler threads (for graceful shutdown)
   std::vector<std::thread> async_threads_;
