@@ -213,7 +213,7 @@ jobs:
           gcc-11 g++-11 curl jq
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
         node-version: 22
 
